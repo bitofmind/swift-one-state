@@ -37,8 +37,13 @@ public struct ModelProperty<Value> {
     public var projectedValue: Self {
         return self
     }
+}
+
+extension ModelProperty: Publisher {
+    public typealias Output = Value
+    public typealias Failure = Never
     
-    public var valueDidChangePublisher: AnyPublisher<Value, Never> {
-        subject.eraseToAnyPublisher()
+    public func receive<S>(subscriber: S) where S : Subscriber, S.Input == Value, S.Failure == Never {
+        subject.receive(subscriber: subscriber)
     }
 }
