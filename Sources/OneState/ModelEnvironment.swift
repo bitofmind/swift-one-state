@@ -28,14 +28,18 @@ public struct ModelEnvironment<Value>: DynamicProperty {
     
     public var wrappedValue: Value {
         get {
-            (contextBinding ?? binding).get()
+            (contextBinding ?? environmentBinding).get()
         }
         nonmutating set {
-            (contextBinding ?? binding).set(newValue)
+            (contextBinding ?? environmentBinding).set(newValue)
         }
     }
     
-    public var projectedValue: Binding<Value> {
+    public var projectedValue: Self {
+        return self
+    }
+    
+    public var binding: Binding<Value> {
         .init {
             wrappedValue
         } set: {
@@ -59,7 +63,7 @@ public extension View {
 }
 
 private extension ModelEnvironment {
-    var binding: EnvironmentBinding<Value> {
+    var environmentBinding: EnvironmentBinding<Value> {
         let binding = modelEnvironments[ObjectIdentifier(Value.self)]
             .map {
                 $0 as! EnvironmentBinding<Value>
