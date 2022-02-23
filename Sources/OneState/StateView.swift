@@ -3,7 +3,7 @@ import SwiftUI
 @dynamicMemberLookup
 public struct StateView<State, Value> {
     let context: Context<State>
-    let path: WritableKeyPath<State, Value>
+    public let path: WritableKeyPath<State, Value>
 }
 
 public extension StateView {
@@ -72,5 +72,11 @@ public extension StateView {
             guard let val = newValue, val != value?[keyPath: path] else { return }
             value?[keyPath: path] = val
         }
+    }
+}
+
+extension StateView: StoreViewProvider {
+    public var storeView: StoreView<State, Value> {
+        .init(context: context, path: path, access: .fromViewModel)
     }
 }
