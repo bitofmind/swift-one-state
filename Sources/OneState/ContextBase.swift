@@ -12,6 +12,8 @@ class ContextBase: HoldsLock {
     let observedStateDidUpdate = PassthroughSubject<(), Never>()
 
     @Locked var environments: Environments = [:]
+    @Locked var propertyIndex = 0
+    @Locked var properties: [Any] = []
     @Locked var anyCancellables: Set<AnyCancellable> = []
     @Locked var isFullyInitialized: Bool = false
     @Locked var isForTesting = false

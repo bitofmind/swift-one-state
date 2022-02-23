@@ -53,6 +53,7 @@ public extension StoreViewProvider {
         let view = storeView
         let context = view.context.context(at: view.path)
 
+        context.propertyIndex = 0
         return ContextBase.$current.withValue(context) {
              viewModel()
         }
