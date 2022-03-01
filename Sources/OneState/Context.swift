@@ -1,8 +1,5 @@
 import Foundation
 import Combine
-#if canImport(CustomDump)
-import CustomDump
-#endif
 
 class Context<State>: ContextBase {
     var observedStates: [AnyKeyPath: (Context<State>, AnyStateChange) -> Bool] = [:]
@@ -20,17 +17,12 @@ class Context<State>: ContextBase {
         let wasUpdated: Bool = lock {
             for equal in observedStates.values {
                 guard equal(self, update) else {
-#if false //canImport(CustomDump)
+#if false
                     let previous = getShared(shared: update.previous, path: \State.self) as! State
                     let current = getShared(shared: update.current, path: \State.self) as! State
-                    if let d = diff(previous, current) {
-                        print(d)
-                    } else {
-                        print("previous", previous)
-                        print("current", current)
-                    }
+                    print("previous", previous)
+                    print("current", current)
 #endif
-
                     return true
                 }
             }
