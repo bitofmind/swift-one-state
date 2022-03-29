@@ -18,6 +18,7 @@ class ContextBase: HoldsLock {
     @Locked var isFullyInitialized: Bool = false
     @Locked var isForTesting = false
     @Locked var hasBeenRemoved = false
+    @Locked var refCount = 0
 
     @TaskLocal static var current: ContextBase?
 
@@ -96,15 +97,26 @@ extension ContextBase {
             parent?._overrideChildren.values.contains { $0 === self } ?? false
         }
     }
-        
+    
+    func retainFromView() {
+        refCount += 1
+    }
+    
+    func releaseFromView() {
+        refCount -= 1
+        if refCount == 0 {
+            onRemovalFromView()
+        }
+    }
+}
+
+private extension ContextBase {
     func onRemovalFromView() {
         if isStateOverridden && !isOverrideStore { return }
         
         onRemoval()
     }
-}
-
-private extension ContextBase {
+    
     func onRemoval() {
         guard !hasBeenRemoved else {
             return
