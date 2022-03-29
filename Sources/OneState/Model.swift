@@ -39,11 +39,16 @@ public struct Model<VM: ViewModel>: DynamicProperty {
 
 private extension Model {
     final class Shared: ObservableObject {
-        var context: Context<VM.State>!
         var cancellable: AnyCancellable?
+        var context: Context<VM.State>! {
+            willSet {
+                context?.releaseFromView()
+                newValue.retainFromView()
+            }
+        }
 
         deinit {
-            context.onRemovalFromView()
+            context.releaseFromView()
         }
     }
 }
