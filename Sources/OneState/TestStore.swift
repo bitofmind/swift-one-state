@@ -28,13 +28,17 @@ extension TestStore: StoreViewProvider {
 }
 
 public extension TestStore {
-    func modelEnvironment<T>(_ value: T) -> Self {
-        modelEnvironment(Binding.constant(value))
+    func modelEnvironment<Value>(get: @escaping () -> Value, set: @escaping (Value) -> Void = { _ in }) -> Self {
+        context.environments[ObjectIdentifier(Value.self)] = EnvironmentBinding(get: get, set: set)
+        return self
+    }
+
+    func modelEnvironment<Value>(_ value: Value) -> Self {
+        modelEnvironment(.constant(value))
     }
     
     func modelEnvironment<T>(_ value: Binding<T>) -> Self {
-        context.environments[ObjectIdentifier(type(of: value))] = value
-        return self
+        modelEnvironment(get: { value.wrappedValue }, set: { value.wrappedValue = $0 })
     }
 }
 
