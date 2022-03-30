@@ -9,9 +9,15 @@ public protocol StoreViewProvider {
 }
 
 public extension StoreViewProvider {
-    func value<T>(for keyPath: KeyPath<State, T>, isSame: @escaping (T, T) -> Bool) -> T {
+    func value<T>(for keyPath: KeyPath<State, T>, shouldUpdateViewModelAccessToViewAccess: Bool = false, isSame: @escaping (T, T) -> Bool) -> T {
         let view = self.storeView
-        return view.context.value(for: view.path.appending(path: keyPath), access: view.access, isSame: isSame)
+        
+        var access = view.access
+        if shouldUpdateViewModelAccessToViewAccess, access == .fromViewModel {
+            access = .fromView
+        }
+
+        return view.context.value(for: view.path.appending(path: keyPath), access: access, isSame: isSame)
     }
     
     func value<T: Equatable>(for keyPath: KeyPath<State, T>) -> T {
@@ -34,21 +40,13 @@ public extension StoreViewProvider {
             case (.some, .none), (.none, .some): return false
             }
         }
-        
-        let view = storeView
-        let optionPath = view.path(keyPath)
-        
-        // If an access of `fromViewModel` goes via an optional path we need to change it to `fromView` to make sure view's are notified of changes in e.g. modals
-        var optionalAccess = view.access
-        if optionalAccess == .fromViewModel {
-            optionalAccess = .fromView
-        }
-        
-        guard let initial = view.context.value(for: optionPath, access: optionalAccess, isSame: isSame) else {
+                        
+        guard let initial = value(for: keyPath, shouldUpdateViewModelAccessToViewAccess: true, isSame: isSame) else {
             return nil
         }
         
-        let unwrapPath = optionPath.appending(path: \T?[unwrapFallback: UnwrapFallback(initial)])
+        let view = storeView
+        let unwrapPath = view.path(keyPath).appending(path: \T?[unwrapFallback: UnwrapFallback(initial)])
         return StoreView(context: view.context, path: unwrapPath, access: view.access)
     }
 }
@@ -150,69 +148,60 @@ public extension StoreViewProvider {
             return true
         }
 
-        let view = storeView
-        
-        // If an access of `fromViewModel` goes via an optional path we need to change it to `fromView` to make sure view's are notified of array changes in e.g. a ForEach
-        var arrayAccess = view.access
-        if arrayAccess == .fromViewModel {
-            arrayAccess = .fromView
-        }
-
-        return view.context.value(for: view.path(\.self), access: arrayAccess, isSame: isSame).map {
-            $0[keyPath: keyPath]
-        }.compactMap { id in
-            storeView(for: \State[pathAndId: PathAndId(path: keyPath, id: id)]).map {
-                .init(context: $0.context, path: $0.path, idPath: keyPath, access: view.access)
-            }
+        let array = value(for: \.self, shouldUpdateViewModelAccessToViewAccess: true, isSame: isSame)
+        return array.indices.map { index in
+            let element = array[index]
+            let cursor = Cursor<_, _, State.Index>(idPath: keyPath, id: element[keyPath: keyPath], index: index, fallback: element)
+            let view = storeView
+            let path = view.path.appending(path: \State[cursor: cursor])
+            return IdentifiableStoreView(context: view.context, path: path, idPath: keyPath, access: view.access)
         }
     }
     
-//    subscript<C>(dynamicMember keyPath: WritableKeyPath<State, C>) -> [StoreView<Root, C.Element>] where C: MutableCollection, C: Equatable, C.Index: Hashable {
-//        context.value(for: path(keyPath)).indices.compactMap { index in
-//            storeView(for: keyPath.appending(path: \C[safe: index]))
-//        }
-//    }
-
     subscript<C>(dynamicMember keyPath: WritableKeyPath<State, C>) -> [IdentifiableStoreView<Root, C.Element, C.Element.ID>] where C: MutableCollection, C: Equatable, C.Element: Identifiable, C.Index: Hashable {
         storeView(for: keyPath).id(\.id)
     }
 }
 
-//extension StoreViewProvider {
-////    var context: Context<Root> { storeView.context }
-////    var path: WritableKeyPath<Root, State> { storeView.path }
-//
-//    func path<T>(_ keyPath: WritableKeyPath<State, T>) -> WritableKeyPath<Root, T>{
-//        storeView.path.appending(path: keyPath)
-//    }
-//}
-
-//extension MutableCollection {
-//    subscript (safe index: Index) -> Element? {
-//        get {
-//            guard indices.contains(index) else { return nil }
-//            return self[index]
-//        }
-//        set {
-//            guard let value = newValue else { return }
-//            self[index] = value
-//        }
-//    }
-//}
-
-struct PathAndId<Value, ID: Hashable>: Hashable {
-    var path: KeyPath<Value, ID>
+struct Cursor<Value, ID: Hashable, Index>: Hashable {
+    var idPath: KeyPath<Value, ID>
     var id: ID
+    var index: Index
+    var fallback: Value
+    
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.idPath == rhs.idPath && lhs.id == rhs.id
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(idPath)
+        hasher.combine(id)
+    }
 }
 
 extension MutableCollection {
-    subscript<ID: Hashable>(pathAndId pathAndId: PathAndId<Element, ID>) -> Element? {
+    subscript<ID: Hashable>(cursor cursor: Cursor<Element, ID, Index>) -> Element {
         get {
-            first { $0[keyPath: pathAndId.path] == pathAndId.id }
+            if cursor.index >= startIndex && cursor.index < endIndex {
+                let element = self[cursor.index]
+                if element[keyPath: cursor.idPath] == cursor.id {
+                    return element
+                }
+            }
+               
+            return first { $0[keyPath: cursor.idPath] == cursor.id } ?? cursor.fallback
         }
         set {
-            guard let value = newValue, let index = firstIndex(where: { $0[keyPath: pathAndId.path] == pathAndId.id }) else { return }
-            self[index] = value
+            if cursor.index >= startIndex && cursor.index < endIndex {
+                if self[cursor.index][keyPath: cursor.idPath] == cursor.id {
+                    self[cursor.index] = newValue
+                    return
+                }
+            }
+            
+            guard let index = firstIndex(where: { $0[keyPath: cursor.idPath] == cursor.id }) else { return }
+            
+            self[index] = newValue
         }
     }
 }
