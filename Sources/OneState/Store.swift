@@ -56,16 +56,7 @@ private extension Store {
     
     class Shared: ObservableObject {
         var cancellable: AnyCancellable?
-        var context: RootContext<State>! {
-            willSet {
-                context?.releaseFromView()
-                newValue.retainFromView()
-            }
-        }
-        
-        deinit {
-            context.releaseFromView()
-        }
+        var context: RootContext<State>!
     }
 
     class ViewContext {

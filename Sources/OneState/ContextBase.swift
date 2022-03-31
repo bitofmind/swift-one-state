@@ -132,14 +132,13 @@ private extension ContextBase {
             return onRemoval() // Call recursively in case more actions has been added while cancelling
         }
 
-        hasBeenRemoved = true
+        if parent != nil {
+            hasBeenRemoved = true
+        }
                             
         removeChildren()
         if let parent = parent {
             parent.removeChildStore(self)
-        } else {
-            _overrideChildren.removeAll()
-            children.removeAll()
         }
     }
 }
