@@ -20,7 +20,7 @@ final class RootContext<State>: Context<State> {
         super.init(parent: nil)
     }
 
-    override func getCurrent(access: StoreAccess, path: PartialKeyPath<State>) -> Any {
+    override func getCurrent<T>(access: StoreAccess, path: KeyPath<State, T>) -> T {
         stateLock {
             assert(access != .test || isForTesting == true)
             
@@ -32,7 +32,7 @@ final class RootContext<State>: Context<State> {
         }
     }
     
-    override func getShared(shared: AnyObject, path:  PartialKeyPath<State>) -> Any {
+    override func getShared<T>(shared: AnyObject, path: KeyPath<State, T>) -> T {
         (shared as! Shared<State>).value[keyPath: path]
     }
     

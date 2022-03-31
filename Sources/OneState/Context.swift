@@ -5,8 +5,8 @@ class Context<State>: ContextBase {
     var observedStates: [AnyKeyPath: (Context<State>, AnyStateChange) -> Bool] = [:]
 
     // TODO: rename
-    func getCurrent(access: StoreAccess, path: PartialKeyPath<State>) -> Any { fatalError() }
-    func getShared(shared: AnyObject, path:  PartialKeyPath<State>) -> Any { fatalError() }
+    func getCurrent<T>(access: StoreAccess, path: KeyPath<State, T>) -> T { fatalError() }
+    func getShared<T>(shared: AnyObject, path: KeyPath<State, T>) -> T { fatalError() }
     func modify(access: StoreAccess, updateState: (inout State) throws -> Void) rethrows { fatalError() }
     
     override func notifyStateUpdate(_ update: AnyStateChange) {
@@ -54,7 +54,7 @@ enum StoreAccess {
 extension Context {
     subscript<T>(keyPath keyPath: WritableKeyPath<State, T>, access access: StoreAccess) -> T {
         get {
-            getCurrent(access: access, path: keyPath) as! T
+            getCurrent(access: access, path: keyPath)
         }
         set {
             modify(access: access) { state in
@@ -64,7 +64,7 @@ extension Context {
     }
     
     subscript<T>(keyPath keyPath: KeyPath<State, T>, access access: StoreAccess) -> T {
-        self.getCurrent(access: access, path: keyPath) as! T
+        self.getCurrent(access: access, path: keyPath)
     }
 }
 
@@ -75,8 +75,8 @@ extension Context {
                 if observedStates.index(forKey: keyPath) == nil {
                     observedStates[keyPath] = { context, update in
                         isSame(
-                            context.getShared(shared: update.current, path: keyPath) as! T,
-                            context.getShared(shared: update.previous, path: keyPath) as! T
+                            context.getShared(shared: update.current, path: keyPath),
+                            context.getShared(shared: update.previous, path: keyPath)
                         )
                     }
                 }

@@ -11,11 +11,11 @@ public struct StateUpdate<Root, State>: Equatable {
     }
 
     public var previous: State {
-        view.context.getShared(shared: update.previous, path: view.path) as! State
+        view.context.getShared(shared: update.previous, path: view.path)
     }
     
     public var current: State {
-        view.context.getShared(shared: update.current, path: view.path) as! State
+        view.context.getShared(shared: update.current, path: view.path)
     }
 
     public subscript<T: Equatable>(dynamicMember keyPath: WritableKeyPath<State, T>) -> StateUpdate<Root, T> {
@@ -34,8 +34,8 @@ public struct StateUpdate<Root, State>: Equatable {
 
     public subscript<T: Equatable>(dynamicMember keyPath: KeyPath<State, T>) -> T? {
         let path = view.path.appending(path: keyPath)
-        let current = view.context.getShared(shared: update.current, path: path) as! T
-        let previous = view.context.getShared(shared: update.previous, path: path) as! T
+        let current = view.context.getShared(shared: update.current, path: path)
+        let previous = view.context.getShared(shared: update.previous, path: path)
 
         return current == previous ? nil : current
     }
