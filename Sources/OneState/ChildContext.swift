@@ -16,17 +16,12 @@ final class ChildContext<ParentState, State>: Context<State> {
         }
     }
     
-    private func parentPath(for path: PartialKeyPath<State>) -> PartialKeyPath<ParentState> {
-        (self.path as PartialKeyPath<ParentState>).appending(path: path)!
-    }
-        
-    override func getCurrent(access: StoreAccess, path: PartialKeyPath<State>) -> Any {
-        return context.getCurrent(access: access, path: parentPath(for: path))
+    override func getCurrent<T>(access: StoreAccess, path: KeyPath<State, T>) -> T {
+        return context.getCurrent(access: access, path: self.path.appending(path: path))
     }
     
-    override func getShared(shared: AnyObject, path:  PartialKeyPath<State>) -> Any {
-        context.getShared(shared: shared, path: parentPath(for: path))
-
+    override func getShared<T>(shared: AnyObject, path: KeyPath<State, T>) -> T {
+        context.getShared(shared: shared, path: self.path.appending(path: path))
     }
     
     override func modify(access: StoreAccess, updateState: (inout State) throws -> Void) rethrows {
