@@ -140,7 +140,7 @@ private struct EnvironmentValuesModifier<T>: ViewModifier {
     }
 }
 
-private struct EnvironmentBinding<Value> {
+struct EnvironmentBinding<Value> {
     let get: () -> Value
     let set: (Value) -> Void
 }
