@@ -36,7 +36,7 @@ final class RootContext<State>: Context<State> {
         (shared as! Shared<State>).value[keyPath: path]
     }
     
-    override func modify(access: StoreAccess, updateState: (inout State) throws -> Void) rethrows {
+    override func _modify(access: StoreAccess, updateState: (inout State) throws -> Void) rethrows -> AnyStateChange? {
         if ContextBase.current != nil {
             fatalError("Not allowed to modify a ViewModel's state from init()")
         }
@@ -44,12 +44,13 @@ final class RootContext<State>: Context<State> {
         assert(access != .test || isForTesting == true)
         
         if access == .fromView && isStateOverridden {
-            return // Ignore any updates from views while overriding the state
+            return nil// Ignore any updates from views while overriding the state
         }
 
         if isOverrideStore == true {
             // Upgrade to runtime error?
-            return assertionFailure("Not allowed to modify state from a overridden store")
+            assertionFailure("Not allowed to modify state from a overridden store")
+            return nil
         }
         
         try stateLock {
@@ -61,8 +62,25 @@ final class RootContext<State>: Context<State> {
         
         updateTask?.cancel()
         updateTask = Task { @MainActor in
-            update()
+            let update: AnyStateChange? = stateLock {
+                let state = currentState
+                guard previousState !== state else { return nil }
+
+                defer { previousState = state }
+                return .init(previous: previousState, current: state, isOverrideUpdate: false)
+            }
+            
+            guard let update = update else { return }
+            
+            stateDidUpdate.send(update)
         }
+        
+        guard !isStateOverridden else { return nil }
+        
+        let update = AnyStateChange(previous: previousState, current: currentState, isOverrideUpdate: false)
+        notifyObservedStateUpdate(update)
+        
+        return update
     }
     
     override var isStateOverridden: Bool {
@@ -82,38 +100,22 @@ extension RootContext {
         }
         set {
             let update: AnyStateChange? = stateLock {
-                let current = currentOverride?.update.current
-                let previous = (currentOverride?.update.current ?? currentState)
+                let previous = currentOverride?.update.current ?? currentState
+                let current = newValue?.update.current ?? currentState
                 currentOverride = newValue
 
-                guard let current = newValue?.update.current ?? current,
-                      previous !== current else { return nil }
+                guard previous !== current else { return nil }
 
                 return .init(previous: previous, current: current, isOverrideUpdate: true)
             }
 
             guard let update = update else { return }
 
-            notifyStateUpdate(update)
             stateDidUpdate.send(update)
+            
+            notifyObservedStateUpdate(update)
+            notifyObservedUpdateToAllDescendants(update)
         }
-    }
-}
-
-private extension RootContext {
-    func update() {
-        let update: AnyStateChange? = stateLock {
-            let state = currentState
-            guard previousState !== state else { return nil }
-
-            defer { previousState = state }
-            return .init(previous: previousState, current: state, isOverrideUpdate: false)
-        }
-        
-        guard let update = update else { return }
-        
-        notifyStateUpdate(update)
-        stateDidUpdate.send(update)
     }
 }
 
