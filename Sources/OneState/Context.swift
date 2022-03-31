@@ -4,22 +4,23 @@ import Combine
 class Context<State>: ContextBase {
     var observedStates: [AnyKeyPath: (Context<State>, AnyStateChange) -> Bool] = [:]
 
-    // TODO: rename
     func getCurrent<T>(access: StoreAccess, path: KeyPath<State, T>) -> T { fatalError() }
     func getShared<T>(shared: AnyObject, path: KeyPath<State, T>) -> T { fatalError() }
-    func modify(access: StoreAccess, updateState: (inout State) throws -> Void) rethrows { fatalError() }
+    func _modify(access: StoreAccess, updateState: (inout State) throws -> Void) rethrows -> AnyStateChange? { fatalError() }
     
-    override func notifyStateUpdate(_ update: AnyStateChange) {
-        guard (update.isOverrideUpdate && isStateOverridden) || (!update.isOverrideUpdate && !isStateOverridden)  else {
-            return
-        }
+    func modify(access: StoreAccess, updateState: (inout State) throws -> Void) rethrows {
+        guard let update = try _modify(access: access, updateState: updateState) else { return }
         
+        notifyObservedUpdateToAllDescendants(update)
+    }
+
+    override func notifyObservedStateUpdate(_ update: AnyStateChange) {
         let wasUpdated: Bool = lock {
             for equal in observedStates.values {
                 guard equal(self, update) else {
 #if false
-                    let previous = getShared(shared: update.previous, path: \State.self) as! State
-                    let current = getShared(shared: update.current, path: \State.self) as! State
+                    let previous = getShared(shared: update.previous, path: \State.self)
+                    let current = getShared(shared: update.current, path: \State.self)
                     print("previous", previous)
                     print("current", current)
 #endif
@@ -29,13 +30,13 @@ class Context<State>: ContextBase {
             return false
         }
 
-        if wasUpdated {
-            if Thread.isMainThread {
-                observedStateDidUpdate.send()
-            } else {
-                DispatchQueue.main.async {
-                    self.observedStateDidUpdate.send()
-                }
+        guard wasUpdated else { return }
+        
+        if Thread.isMainThread {
+            observedStateDidUpdate.send()
+        } else {
+            DispatchQueue.main.async {
+                self.observedStateDidUpdate.send()
             }
         }
     }
@@ -64,7 +65,7 @@ extension Context {
     }
     
     subscript<T>(keyPath keyPath: KeyPath<State, T>, access access: StoreAccess) -> T {
-        self.getCurrent(access: access, path: keyPath)
+        getCurrent(access: access, path: keyPath)
     }
 }
 

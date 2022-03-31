@@ -114,8 +114,8 @@ public extension ViewModel {
     }
 
     @discardableResult func onChange<T: Equatable>(ofUnwrapped keyPath: KeyPath<State, T?>, @_implicitSelfCapture perform: @escaping (T) -> Void) -> AnyCancellable {
-        onReceive(stateDidUpdatePublisher) { change in
-            guard let value = change[dynamicMember: keyPath],
+        onReceive(stateDidUpdatePublisher) { update in
+            guard let value = update[dynamicMember: keyPath],
                 let unwrapped = value else { return }
             perform(unwrapped)
         }

@@ -75,7 +75,7 @@ public extension ModelState {
 public extension ModelState {
     func transaction<T>(_ perform: @escaping (inout State) throws -> T) rethrows -> T {
         var result: T!
-        try context.modify(access: .fromViewModel) { state in
+        _ = try context.modify(access: .fromViewModel) { state in
             result = try perform(&state)
         }
         return result

@@ -82,8 +82,26 @@ class ContextBase: HoldsLock {
         }
     }
     
-    func notifyStateUpdate(_ update: AnyStateChange) {
+    func notifyObservedStateUpdate(_ update: AnyStateChange) {
         fatalError()
+    }
+    
+    func notifyObservedUpdateToAllDescendants(_ update: AnyStateChange) {
+        let (children, overrideChildren) = lock {
+            (_children.values, _overrideChildren.values)
+        }
+        
+        for child in children {
+            child.notifyObservedStateUpdate(update)
+            child.notifyObservedUpdateToAllDescendants(update)
+        }
+        
+        for child in overrideChildren {
+            if update.isOverrideUpdate {
+                child.notifyObservedStateUpdate(update)
+            }
+            child.notifyObservedUpdateToAllDescendants(update)
+        }
     }
     
     var isStateOverridden: Bool {
