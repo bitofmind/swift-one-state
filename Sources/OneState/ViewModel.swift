@@ -38,18 +38,7 @@ public extension ViewModel {
         return cancellable
     }
 
-    @discardableResult func task(@_implicitSelfCapture _ operation: @escaping @MainActor @Sendable () async throws -> Void) rethrows -> AnyCancellable {
-        let task = Task {
-            try await context {
-                guard !Task.isCancelled else { return }
-                try await operation()
-            }
-        }
-        
-        return onDisappear(task.cancel)
-    }
-
-    @discardableResult func task(@_implicitSelfCapture _ operation: @escaping @MainActor @Sendable () async throws -> Void, `catch`: @escaping @Sendable (Error) -> Void) -> AnyCancellable {
+    @discardableResult func task(@_implicitSelfCapture _ operation: @escaping @MainActor @Sendable () async throws -> Void, `catch`: ((Error) -> Void)? = nil) -> AnyCancellable {
         let task = Task {
             do {
                 try await context {
@@ -57,7 +46,7 @@ public extension ViewModel {
                     try await operation()
                 }
             } catch {
-                `catch`(error)
+                `catch`?(error)
             }
         }
         
@@ -76,15 +65,7 @@ public extension ViewModel {
         return cancellable
     }
 
-    @discardableResult func forEach<S: AsyncSequence>(_ sequence: S, @_implicitSelfCapture perform: @escaping @MainActor @Sendable (S.Element) async throws -> Void) rethrows -> AnyCancellable {
-        try task {
-            for try await value in sequence {
-                try await perform(value)
-            }
-        }
-    }
-
-    @discardableResult func forEach<S: AsyncSequence>(_ sequence: S,  @_implicitSelfCapture perform: @escaping @MainActor @Sendable (S.Element) async throws -> Void, `catch`: @escaping @Sendable (Error) -> Void) -> AnyCancellable {
+    @discardableResult func forEach<S: AsyncSequence>(_ sequence: S,  @_implicitSelfCapture perform: @escaping @MainActor @Sendable (S.Element) async throws -> Void, `catch`: ((Error) -> Void)? = nil) -> AnyCancellable {
         task({
             for try await value in sequence {
                 try await perform(value)
