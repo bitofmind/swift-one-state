@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 
+// A view into a store's state
 @dynamicMemberLookup
 public struct StoreView<Root, State> {
     var context: Context<Root>

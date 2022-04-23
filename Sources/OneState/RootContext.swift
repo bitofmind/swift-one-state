@@ -8,15 +8,12 @@ final class RootContext<State>: Context<State> {
     private var previousState: Shared<State>
     private var currentState: Shared<State>
 
-    private var latestChange: AnyStateChange
     private var currentOverride: StateUpdate<State, State>?
     private var updateTask: Task<(), Never>?
 
     init(state: State) {
         previousState = Shared(state)
         currentState = previousState
-        latestChange = .init(previous: previousState, current: previousState, isOverrideUpdate: false)
-        
         super.init(parent: nil)
     }
 
@@ -91,7 +88,9 @@ final class RootContext<State>: Context<State> {
 extension RootContext {
     var latestUpdate: StateUpdate<State, State> {
         let view = StoreView(context: self, path: \.self, access: .fromView)
-        return .init(view: view, update: stateLock { latestChange })
+        return .init(view: view, update: stateLock {
+            .init(previous: previousState, current: previousState, isOverrideUpdate: false)
+        })
     }
 
     var stateOverride: StateUpdate<State, State>? {
