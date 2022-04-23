@@ -53,24 +53,36 @@ public extension ViewModel {
         return onDisappear(task.cancel)
     }
 
-    @discardableResult func onReceive<P: Publisher>(_ publisher: P, @_implicitSelfCapture perform: @escaping @MainActor @Sendable (P.Output) -> Void) -> AnyCancellable where P.Failure == Never {
-        let cancellable = publisher.sink(receiveValue: { value in
-            Task {
-                await context {
-                    perform(value)
-                }
-            }
-        })
-        cancellable.store(in: self)
-        return cancellable
-    }
-
     @discardableResult func forEach<S: AsyncSequence>(_ sequence: S,  @_implicitSelfCapture perform: @escaping @MainActor @Sendable (S.Element) async throws -> Void, `catch`: ((Error) -> Void)? = nil) -> AnyCancellable {
         task({
             for try await value in sequence {
                 try await perform(value)
             }
         }, catch: `catch`)
+    }
+    
+    @discardableResult func onReceive<P: Publisher>(_ publisher: P, @_implicitSelfCapture perform: @escaping @MainActor @Sendable (P.Output) async throws -> Void, `catch`: ((Error) -> Void)? = nil) -> AnyCancellable {
+        if #available(iOS 15, macOS 12,  *) {
+            return forEach(publisher.values, perform: perform, catch: `catch`)
+        } else {
+            let stream = AsyncStream<P.Output> { cont in
+                let cancellable = publisher.sink(receiveCompletion: { completion in
+                    if case let .failure(error) = completion {
+                        `catch`?(error)
+                    }
+                      
+                    cont.finish()
+                }, receiveValue: { value in
+                    cont.yield(value)
+                })
+                
+                cont.onTermination = { _ in
+                    cancellable.cancel()
+                }
+            }
+
+            return forEach(stream, perform: perform, catch: `catch`)
+        }
     }
 
     @available(iOS 15, macOS 12,  *)
@@ -87,18 +99,18 @@ public extension ViewModel {
         }
     }
     
-    @discardableResult func onChange<T: Equatable>(of keyPath: KeyPath<State, T>, to value: T, @_implicitSelfCapture perform: @escaping () -> Void) -> AnyCancellable {
+    @discardableResult func onChange<T: Equatable>(of keyPath: KeyPath<State, T>, to value: T, @_implicitSelfCapture perform: @escaping @MainActor @Sendable () async throws -> Void) -> AnyCancellable {
         onReceive(stateDidUpdatePublisher) { change in
             guard let val = change[dynamicMember: keyPath], val == value else { return }
-            perform()
+            try await perform()
         }
     }
 
-    @discardableResult func onChange<T: Equatable>(ofUnwrapped keyPath: KeyPath<State, T?>, @_implicitSelfCapture perform: @escaping (T) -> Void) -> AnyCancellable {
+    @discardableResult func onChange<T: Equatable>(ofUnwrapped keyPath: KeyPath<State, T?>, @_implicitSelfCapture perform: @escaping @MainActor @Sendable (T) async throws -> Void) -> AnyCancellable {
         onReceive(stateDidUpdatePublisher) { update in
             guard let value = update[dynamicMember: keyPath],
                 let unwrapped = value else { return }
-            perform(unwrapped)
+            try await perform(unwrapped)
         }
     }
 }
