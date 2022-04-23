@@ -52,15 +52,3 @@ private extension Model {
         }
     }
 }
-
-public extension StoreViewProvider {
-    func viewModel<VM: ViewModel>(_ viewModel: @escaping @autoclosure () -> VM) -> VM where VM.State == State {
-        let view = storeView
-        let context = view.context.context(at: view.path)
-
-        context.propertyIndex = 0
-        return ContextBase.$current.withValue(context) {
-             viewModel()
-        }
-    }
-}

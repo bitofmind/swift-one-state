@@ -1,6 +1,16 @@
 import SwiftUI
 import Combine
 
+/// Conforming types exposes a view into the store holding its state
+///
+/// Typically conforming types are also declared as `@dynamicMemberLookup`
+/// to allow convienent access to a stores states members.
+///
+/// Most common when accessing a sub state is that you get anothter store view
+/// back instead of the raw value. This allows you to construct viewModels with direct
+/// view into a store:
+///
+///     provider.myState.viewModel(MyModel())
 public protocol StoreViewProvider {
     associatedtype Root
     associatedtype State
@@ -160,6 +170,49 @@ public extension StoreViewProvider {
     
     subscript<C>(dynamicMember keyPath: WritableKeyPath<State, C>) -> [IdentifiableStoreView<Root, C.Element, C.Element.ID>] where C: MutableCollection, C: Equatable, C.Element: Identifiable, C.Index: Hashable {
         storeView(for: keyPath).id(\.id)
+    }
+}
+
+public extension StoreViewProvider {
+    /// Constructs a view model with a view into a store's state
+    ///
+    /// A view modal is required to be constructed from a view into a store's state for
+    /// its `@ModelState` and other dependencies such as `@ModelEnvironment` to be
+    /// set up correclty.
+    ///
+    ///     struct MyView: View {
+    ///         @Model var model: MyModel
+    ///
+    ///         var body: some View {
+    ///             SubView(model: $model.subState.viewModel(SubModel()))
+    ///         }
+    ///     }
+    ///
+    ///  To avoid having to repeat setup code for a view model for both view
+    ///  and for testing the a TestStore, one can preferable add the view model
+    ///  construction as a method to the parent model
+    ///
+    ///     extension MyModel {
+    ///         var subModel: SubModel {
+    ///             $state.subState.viewModel(SubModel())
+    ///         }
+    ///     }
+    ///
+    ///     struct MyView: View {
+    ///         @Model var model: MyModel
+    ///
+    ///         var body: some View {
+    ///             SubView(model: model.subModel)
+    ///         }
+    ///     }
+    func viewModel<VM: ViewModel>(_ viewModel: @escaping @autoclosure () -> VM) -> VM where VM.State == State {
+        let view = storeView
+        let context = view.context.context(at: view.path)
+
+        context.propertyIndex = 0
+        return ContextBase.$current.withValue(context) {
+             viewModel()
+        }
     }
 }
 
