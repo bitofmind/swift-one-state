@@ -152,6 +152,8 @@ private extension ContextBase {
 
         if parent != nil {
             hasBeenRemoved = true
+        } else {
+            isFullyInitialized = false
         }
                             
         removeChildren()
