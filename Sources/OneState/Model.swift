@@ -1,6 +1,20 @@
 import SwiftUI
 import Combine
 
+/// Declares a view models state
+///
+/// To access a models state from its injected store (view `viewModel()`),
+/// a view model must declare a state property using `@ModelState`:
+///
+///     struct MyModel: ViewModel {
+///         @ModelState state: State
+///     }
+///
+/// Any access to a models state goes view the this property.
+/// If you like to access a view into the state's store, e.g. for creating a
+/// view model of a sub state, use the state's projected value:
+///
+///     $state.subState.viewModel(SubModel())
 @propertyWrapper
 public struct Model<VM: ViewModel>: DynamicProperty {
     @Environment(\.modelEnvironments) private var modelEnvironments

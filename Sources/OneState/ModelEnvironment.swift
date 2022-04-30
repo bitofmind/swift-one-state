@@ -1,5 +1,29 @@
 import SwiftUI
 
+/// Declares a dependency on an enviroment
+///
+/// A view model access it's enviroment, i.e. external depenencies,
+/// by declaring @ModelEnvironment with a matching type
+///
+///     struct MyServer {
+///         var hello: () async -> ()
+///     }
+///
+///     struct MyModel: ViewModel {
+///         @ModelEnvironment myServer: MyServer
+///
+///         func onAppear() async {
+///             await myServer.hello()
+///         }
+///     }
+///
+/// An enviroment is set (injected) via a SwiftUI View's
+///  `modelEnvironment()` method, typically from the root view
+///
+///     $store.viewModel(AppModel())
+///         .modelEnvironment(MyServer(
+///             hello: { print("Hello") }
+///         ))
 @propertyWrapper
 public struct ModelEnvironment<Value>: DynamicProperty {
     let context: ContextBase?
@@ -49,14 +73,18 @@ public struct ModelEnvironment<Value>: DynamicProperty {
 }
 
 public extension View {
+    /// Set/injects an environment via a getter and setter, that can be accesses from
+    /// a view model's `@ModeEnvironment` property
     func modelEnvironment<Value>(get: @escaping () -> Value, set: @escaping (Value) -> Void = { _ in }) -> some View {
         modifier(EnvironmentValuesModifier(value: .init(get: get, set: set)))
     }
 
+    /// Set/injects an environment that can be accesses from a view model's `@ModeEnvironment` property
     func modelEnvironment<Value>(_ value: Value) -> some View {
         modelEnvironment(.constant(value))
     }
     
+    /// Set/injects an environment from a binding, that can be accessed from a view model's `@ModeEnvironment` property
     func modelEnvironment<Value>(_ value: Binding<Value>) -> some View {
         modelEnvironment(get: { value.wrappedValue }, set: { value.wrappedValue = $0 })
     }

@@ -1,6 +1,12 @@
 import Foundation
 import Combine
 
+/// Declares a value stored outside of a models store
+///
+/// This is useful for state that is derived or cached from the models state,
+/// where we don't want the value to refelected in the state it self
+///
+///     @ModelProperty var cancellable: AnyCancellable? = nil
 @propertyWrapper
 public struct ModelProperty<Value> {
     let context: ContextBase
