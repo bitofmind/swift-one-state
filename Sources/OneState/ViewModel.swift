@@ -54,6 +54,8 @@ public extension ViewModel {
 }
 
 public extension ViewModel where State: Identifiable {
+    typealias ID = State.ID
+    
     var id: State.ID {
         let view = storeView
         return view.context[keyPath: view.path(\.id), access: view.access]
