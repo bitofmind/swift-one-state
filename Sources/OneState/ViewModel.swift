@@ -213,9 +213,9 @@ extension ViewModel {
         context.retainFromView()
         guard !context.isOverrideStore, context.refCount == 1 else { return }
                 
-        Task {
+        Task { @MainActor in
             await ContextBase.$current.withValue(nil) {
-                await StoreAccess.$viewModel.withValue(.fromViewModel) { @MainActor in
+                await StoreAccess.$viewModel.withValue(.fromViewModel) {
                     await onAppear()
                 }
             }
