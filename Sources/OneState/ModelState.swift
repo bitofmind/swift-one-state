@@ -37,7 +37,7 @@ public struct ModelState<State> {
 
 extension ModelState: StoreViewProvider {
     public var storeView: StoreView<State, State> {
-        .init(context: context, path: \.self, access: .fromViewModel)
+        .init(context: context, path: \.self, access: access)
     }
 }
 
@@ -56,7 +56,7 @@ public extension ModelState {
 
     func binding<T>(_ path: WritableKeyPath<State, T>) -> Binding<T> {
         .init {
-            context[keyPath: path, access: access]
+            context.value(for: path, access: access)
         } set: {
             context[keyPath: path, access: access] = $0
         }
@@ -64,7 +64,7 @@ public extension ModelState {
 
     func binding<T: Equatable>(_ path: WritableKeyPath<State, T>) -> Binding<T> {
         .init {
-            context[keyPath: path, access: access]
+            context.value(for: path, access: access)
         } set: {
             guard context[keyPath: path, access: access] != $0 else { return }
             context[keyPath: path, access: access] = $0
