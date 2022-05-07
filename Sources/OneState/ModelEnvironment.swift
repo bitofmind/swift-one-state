@@ -52,90 +52,65 @@ public struct ModelEnvironment<Value>: DynamicProperty {
     
     public var wrappedValue: Value {
         get {
-            (contextBinding ?? environmentBinding).get()
+            let value: Value?
+            if let context = context {
+                precondition(ContextBase.current == nil, "Not allowed to access a ViewModel's environment from init()")
+                precondition(!context.hasBeenRemoved, "The context holding the environment has been removed and is no longer active in any view")
+                
+                value = context.environmentValue(fallbackValue: fallbackValue)
+            } else {
+                value = modelEnvironments[key].map { $0 as! Value } ?? shared.fallbackValue
+            }
+
+            guard let value = value else {
+                fatalError("No environment has been set for `\(Value.self)`")
+            }
+            
+            return value
         }
         nonmutating set {
-            (contextBinding ?? environmentBinding).set(newValue)
+            guard let context = context else {
+                fatalError("You are not allowed to modify a `ModelEnvironment` when ussed in a SwiftUI view")
+            }
+            
+            context.localEnvironments[key] = newValue
         }
     }
     
     public var projectedValue: Self {
         return self
     }
-    
-    public var binding: Binding<Value> {
-        .init {
-            wrappedValue
-        } set: {
-            wrappedValue = $0
-        }
-    }
 }
 
 public extension View {
-    /// Set/injects an environment via a getter and setter, that can be accesses from
-    /// a view model's `@ModeEnvironment` property
-    func modelEnvironment<Value>(get: @escaping () -> Value, set: @escaping (Value) -> Void = { _ in }) -> some View {
-        modifier(EnvironmentValuesModifier(value: .init(get: get, set: set)))
-    }
-
     /// Set/injects an environment that can be accesses from a view model's `@ModeEnvironment` property
     func modelEnvironment<Value>(_ value: Value) -> some View {
-        modelEnvironment(.constant(value))
-    }
-    
-    /// Set/injects an environment from a binding, that can be accessed from a view model's `@ModeEnvironment` property
-    func modelEnvironment<Value>(_ value: Binding<Value>) -> some View {
-        modelEnvironment(get: { value.wrappedValue }, set: { value.wrappedValue = $0 })
+        modifier(EnvironmentValuesModifier(value: value))
     }
 }
 
 private extension ModelEnvironment {
-    var environmentBinding: EnvironmentBinding<Value> {
-        let binding = modelEnvironments[ObjectIdentifier(Value.self)]
-            .map {
-                $0 as! EnvironmentBinding<Value>
-            } ?? shared.fallbackValue.map { value in
-                EnvironmentBinding(get: { value }, set: { _ in })
-            }
+    var key: ObjectIdentifier { .init(Value.self) }
+}
+
+extension ContextBase {
+    func environmentValue<Value>(fallbackValue: (() -> Value)?) -> Value? {
+        let key = ObjectIdentifier(Value.self)
         
-        guard let binding = binding else {
-            fatalError("No environment has been set for `\(Value.self)`")
-        }
+        var value = localEnvironments[key] ?? viewEnvironments[key]
         
-        return binding
-    }
-    
-    var contextBinding: EnvironmentBinding<Value>? {
-        guard let context = context else {
-            return nil
+        var parent = self.parent
+        while value == nil, let p = parent {
+            value = p.localEnvironments[key]
+            parent = p.parent
         }
 
-        var binding = context.environments[ObjectIdentifier(Value.self)].map { $0 as! EnvironmentBinding<Value> }
-
-        if binding == nil, let fallback = fallbackValue {
-            var value = fallback()
-            binding = .init {
-                value
-            } set: {
-                value = $0
-            }
-            context.environments[ObjectIdentifier(Value.self)] = binding
+        if value == nil, let fallback = fallbackValue {
+            value = fallback()
+            localEnvironments[key] = value
         }
         
-        guard let binding = binding else {
-            if ContextBase.current != nil {
-                fatalError("Not allowed to access a ViewModel's environment from init()")
-            } else if context.hasBeenRemoved {
-                fatalError("The context holding the environment has been removed and is no longer active in any view")
-            } else if context.isFullyInitialized {
-                fatalError("No environment has been set for `\(Value.self)`")
-            } else {
-                fatalError("Not allowed to access a ViewModel's environment when not presented from a view")
-            }
-        }
-        
-        return binding
+        return value.map { $0 as! Value }
     }
 }
 
@@ -152,13 +127,13 @@ private struct ModelEnvironmentsKey: EnvironmentKey {
     static let defaultValue: Environments = [:]
 }
 
-private struct EnvironmentValuesModifier<T>: ViewModifier {
+private struct EnvironmentValuesModifier<Value>: ViewModifier {
     @Environment(\.modelEnvironments) var modelEnvironments
-    var value: EnvironmentBinding<T>
+    var value: Value
     
     var environments: Environments {
         var environments = modelEnvironments
-        environments[(ObjectIdentifier(T.self))] = value
+        environments[(ObjectIdentifier(Value.self))] = value
         return environments
     }
     
@@ -166,9 +141,4 @@ private struct EnvironmentValuesModifier<T>: ViewModifier {
         content
             .environment(\.modelEnvironments, environments)
     }
-}
-
-struct EnvironmentBinding<Value> {
-    let get: () -> Value
-    let set: (Value) -> Void
 }
