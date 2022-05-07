@@ -18,6 +18,26 @@ public protocol StoreViewProvider {
     var storeView: StoreView<Root, State> { get }
 }
 
+public extension StoreViewProvider where State: Equatable {
+    var publisher: AnyPublisher<State, Never> {
+        let view = self.storeView
+        
+        return storeView.context.stateDidUpdate.compactMap { update -> State? in
+            let stateUpdate = StateUpdate(view: view, update: update)
+            
+            let current = stateUpdate.current
+            let previous = stateUpdate.previous
+
+            return  previous != current ? current : nil
+        }.merge(with: Just(value)).eraseToAnyPublisher()
+    }
+    
+    @available(iOS 15, macOS 12,  *)
+    var values: AsyncPublisher<AnyPublisher<Self.State, Never>> {
+        publisher.values
+    }
+}
+
 public extension StoreViewProvider {
     func value<T>(for keyPath: KeyPath<State, T>, shouldUpdateViewModelAccessToViewAccess: Bool = false, isSame: @escaping (T, T) -> Bool) -> T {
         let view = self.storeView
