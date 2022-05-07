@@ -91,7 +91,6 @@ private extension UsingState {
             if anyCancelable == nil {
                 let view = view.storeView
                 context = ChildContext(context: view.context, path: view.path)
-                context.isFullyInitialized = true
                 anyCancelable = context.observedStateDidUpdate.sink { [weak self] in
                     self?.objectWillChange.send()
                 }

@@ -102,12 +102,10 @@ extension Context {
             return _store as! Context<T>
         } else if parent == nil && path == (\State.self as AnyKeyPath) {
             let context = self as! Context<T>
-            context.isFullyInitialized = context.isFullyInitialized || context.isForTesting
             return context
         } else {
             let context = ChildContext(context: self, path: path)
             children[path] = context
-            context.isFullyInitialized = context.isForTesting
             return context
         }
     }
