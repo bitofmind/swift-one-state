@@ -15,7 +15,6 @@ class ContextBase: HoldsLock {
     @Locked var propertyIndex = 0
     @Locked var properties: [Any] = []
     @Locked var anyCancellables: Set<AnyCancellable> = []
-    @Locked var isFullyInitialized: Bool = false
     @Locked var isForTesting = false
     @Locked var hasBeenRemoved = false
     @Locked var refCount = 0
@@ -152,8 +151,6 @@ private extension ContextBase {
 
         if parent != nil {
             hasBeenRemoved = true
-        } else {
-            isFullyInitialized = false
         }
                             
         removeChildren()

@@ -33,17 +33,11 @@ public struct Model<VM: ViewModel>: DynamicProperty {
             fatalError("ViewModel \(type(of: wrappedValue)) must created using `viewModel()` helper")
         }
         
-        if !context.isOverrideStore && !context.isFullyInitialized {
-            context.environments = modelEnvironments
-            context.isFullyInitialized = true
-            
-            Task {
-                await StoreAccess.$viewModel.withValue(.fromViewModel) { @MainActor in
-                    await wrappedValue.onAppear()
-                }
-            }
+        if wrappedValue.context.refCount == 0 {
+            wrappedValue.context.environments = modelEnvironments
         }
-        
+        wrappedValue.retain()
+        shared.context?.releaseFromView()
         shared.context = context
         shared.cancellable = context.observedStateDidUpdate.sink { [weak shared] in
             shared?.objectWillChange.send()
@@ -54,15 +48,10 @@ public struct Model<VM: ViewModel>: DynamicProperty {
 private extension Model {
     final class Shared: ObservableObject {
         var cancellable: AnyCancellable?
-        var context: Context<VM.State>! {
-            willSet {
-                context?.releaseFromView()
-                newValue.retainFromView()
-            }
-        }
+        var context: Context<VM.State>?
 
         deinit {
-            context.releaseFromView()
+            context?.releaseFromView()
         }
     }
 }

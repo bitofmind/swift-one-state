@@ -207,3 +207,22 @@ extension ViewModel {
 extension StoreAccess {
     @TaskLocal static var viewModel: StoreAccess?
 }
+
+extension ViewModel {
+    func retain() {
+        context.retainFromView()
+        guard !context.isOverrideStore, context.refCount == 1 else { return }
+                
+        Task {
+            await ContextBase.$current.withValue(nil) {
+                await StoreAccess.$viewModel.withValue(.fromViewModel) { @MainActor in
+                    await onAppear()
+                }
+            }
+        }
+    }
+    
+    func release() {
+        context.releaseFromView()
+    }
+}
