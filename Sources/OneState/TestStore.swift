@@ -28,17 +28,9 @@ extension TestStore: StoreViewProvider {
 }
 
 public extension TestStore {
-    func modelEnvironment<Value>(get: @escaping () -> Value, set: @escaping (Value) -> Void = { _ in }) -> Self {
-        context.environments[ObjectIdentifier(Value.self)] = EnvironmentBinding(get: get, set: set)
-        return self
-    }
-
     func modelEnvironment<Value>(_ value: Value) -> Self {
-        modelEnvironment(.constant(value))
-    }
-    
-    func modelEnvironment<T>(_ value: Binding<T>) -> Self {
-        modelEnvironment(get: { value.wrappedValue }, set: { value.wrappedValue = $0 })
+        context.localEnvironments[ObjectIdentifier(Value.self)] = value
+        return self
     }
 }
 

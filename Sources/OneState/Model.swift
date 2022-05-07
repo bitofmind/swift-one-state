@@ -22,20 +22,18 @@ public struct Model<VM: ViewModel>: DynamicProperty {
     
     public init(wrappedValue: VM) {
         self.wrappedValue = wrappedValue
+        checkedContext()
     }
 
-    public var wrappedValue: VM
+    public var wrappedValue: VM {
+        didSet { checkedContext() }
+    }
     
     public func update() {
         guard shared.cancellable == nil else { return }
         
-        guard let context = wrappedValue.rawStore else {
-            fatalError("ViewModel \(type(of: wrappedValue)) must created using `viewModel()` helper")
-        }
-        
-        if wrappedValue.context.refCount == 0 {
-            wrappedValue.context.environments = modelEnvironments
-        }
+        let context = checkedContext()
+        context.viewEnvironments = modelEnvironments
         wrappedValue.retain()
         shared.context?.releaseFromView()
         shared.context = context
@@ -53,5 +51,13 @@ private extension Model {
         deinit {
             context?.releaseFromView()
         }
+    }
+    
+    @discardableResult
+    func checkedContext() -> Context<VM.State> {
+        guard let context = wrappedValue.rawStore else {
+            fatalError("ViewModel \(type(of: wrappedValue)) must created using `viewModel()` helper")
+        }
+        return context
     }
 }

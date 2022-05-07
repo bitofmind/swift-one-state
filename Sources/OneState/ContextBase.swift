@@ -11,7 +11,9 @@ class ContextBase: HoldsLock {
     let stateDidUpdate: PassthroughSubject<AnyStateChange, Never>
     let observedStateDidUpdate = PassthroughSubject<(), Never>()
 
-    @Locked var environments: Environments = [:]
+    @Locked var viewEnvironments: Environments = [:]
+    @Locked var localEnvironments: Environments = [:]
+
     @Locked var propertyIndex = 0
     @Locked var properties: [Any] = []
     @Locked var anyCancellables: Set<AnyCancellable> = []
@@ -26,9 +28,6 @@ class ContextBase: HoldsLock {
         if let parent = parent {
             stateDidUpdate = parent.stateDidUpdate
             isForTesting = parent.isForTesting
-            if isForTesting {
-                environments = parent.environments
-            }
         } else {
             stateDidUpdate = .init()
         }
