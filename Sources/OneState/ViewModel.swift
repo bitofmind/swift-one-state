@@ -38,12 +38,12 @@ public protocol ViewModel: StoreViewProvider {
     ///
     /// If more then one view is active for the same state at the same time,
     /// onAppear is only called for the first appeance and similarly any stored
-    /// cancellables is cancelled not until the last view is no longer beeing displayed.
-    func onAppear() async
+    /// cancellables is cancelled not until the last view is no longer being displayed.
+    func onAppear()
 }
 
 public extension ViewModel {
-    func onAppear() async {}
+    func onAppear() {}
 }
 
 public extension ViewModel {
@@ -213,11 +213,9 @@ extension ViewModel {
         context.retainFromView()
         guard !context.isOverrideStore, context.refCount == 1 else { return }
                 
-        Task { @MainActor in
-            await ContextBase.$current.withValue(nil) {
-                await StoreAccess.$viewModel.withValue(.fromViewModel) {
-                    await onAppear()
-                }
+        ContextBase.$current.withValue(nil) {
+            StoreAccess.$viewModel.withValue(.fromViewModel) {
+                onAppear()
             }
         }
     }
