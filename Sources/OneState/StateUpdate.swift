@@ -23,13 +23,9 @@ public struct StateUpdate<Root, State>: Equatable {
     }
 
     public subscript<T: Equatable>(dynamicMember keyPath: WritableKeyPath<State, T?>) -> StateUpdate<Root, T>? {
-        let optionPath = view.path(keyPath)
-        guard let initial = view.context[keyPath: optionPath, access: view.access] else {
-            return nil
-        }
-        
-        let unwrapPath = optionPath.appending(path: \T?[unwrapFallback: .init(initial)])
-        return .init(view: StoreView(context: view.context, path: unwrapPath, access: view.access), update: update)
+        view.containerStoreViewElements(for: keyPath).first.map {
+            .init(view: $0, update: update)
+        }        
     }
 
     public subscript<T: Equatable>(dynamicMember keyPath: KeyPath<State, T>) -> T? {
