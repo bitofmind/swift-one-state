@@ -30,4 +30,9 @@ final class ChildContext<ParentState, State>: Context<State> {
         
         return update
     }
+    
+    override func sendEvent<T>(_ event: Any, path: KeyPath<State, T>, viewModel: Any) {
+        super.sendEvent(event, path: path, viewModel: viewModel)
+        context.sendEvent(event, path: self.path.appending(path: path), viewModel: viewModel)
+    }
 }

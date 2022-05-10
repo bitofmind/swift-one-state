@@ -31,6 +31,9 @@ import Combine
 public protocol ViewModel: StoreViewProvider {
     /// The type of the this view model's state.
     associatedtype State
+
+    /// The type of events that this model can send
+    associatedtype Event = ()
     
     /// Is called when when a SwiftUI view is being displayed using this model
     ///
@@ -174,6 +177,20 @@ public extension ViewModel {
                 let unwrapped = value else { return }
             try await perform(unwrapped)
         }
+    }
+}
+
+public extension ViewModel {
+    func send(_ event: Event) {
+        context.sendEvent(event, viewModel: self)
+    }
+
+    @discardableResult
+    func onEvent<VM: ViewModel>(fromType: VM.Type = VM.self, perform: @escaping (VM.Event, VM) -> Void) -> AnyCancellable {
+        onReceive(context.eventSubject.compactMap {
+            guard let event = $0.event as? VM.Event, let viewModel = $0.viewModel as? VM else { return nil }
+            return (event, viewModel)
+        }, perform: perform)
     }
 }
 
