@@ -4,6 +4,9 @@ import Combine
 class Context<State>: ContextBase {
     var observedStates: [AnyKeyPath: (Context<State>, AnyStateChange) -> Bool] = [:]
 
+    typealias Event = (event: Any, path: PartialKeyPath<State>, viewModel: Any)
+    var eventSubject = PassthroughSubject<Event, Never>()
+
     func getCurrent<T>(access: StoreAccess, path: KeyPath<State, T>) -> T { fatalError() }
     func getShared<T>(shared: AnyObject, path: KeyPath<State, T>) -> T { fatalError() }
     func _modify(access: StoreAccess, updateState: (inout State) throws -> Void) rethrows -> AnyStateChange? { fatalError() }
@@ -12,6 +15,14 @@ class Context<State>: ContextBase {
         guard let update = try _modify(access: access, updateState: updateState) else { return }
         
         notifyObservedUpdateToAllDescendants(update)
+    }
+    
+    func sendEvent<T>(_ event: Any, path: KeyPath<State, T>, viewModel: Any) {
+        eventSubject.send((event: event, path: path, viewModel: viewModel))
+    }
+
+    func sendEvent(_ event: Any, viewModel: Any) {
+        self.sendEvent(event, path: \.self, viewModel: viewModel)
     }
 
     override func notifyObservedStateUpdate(_ update: AnyStateChange) {
