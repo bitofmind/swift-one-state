@@ -1,7 +1,7 @@
 import Foundation
 import Combine
 
-/// Declares a value stored outside of a models store
+/// Declares a value stored outside of a model's store
 ///
 /// This is useful for state that is derived or cached from the models state,
 /// where we don't want the value to refelected in the state it self
@@ -56,7 +56,7 @@ public extension ModelProperty where Value: ViewModel {
         self.init { context in
             let context = context as! Context<Root>
             let view = StoreView(context: context, path: path, access: .fromViewModel)
-            let model = view.viewModel(model())
+            let model = Value(view)
             
             model.retain()
             
@@ -75,7 +75,7 @@ public extension ModelProperty {
             let context = context as! Context<Root>
             let rootView = StoreView(context: context, path: \.self, access: .fromViewModel)
             let view = rootView.storeView(for: path)
-            var currentModel = view?.viewModel(model())
+            var currentModel = view.map(Model.init)
             
             let publisher = context.stateDidUpdate
                 .map { _ in
@@ -84,7 +84,7 @@ public extension ModelProperty {
                 .merge(with: Just(currentModel != nil))
                 .removeDuplicates()
                 .map { _ in
-                    rootView.storeView(for: path)?.viewModel(model())
+                    rootView.storeView(for: path).map(Model.init)
                 }
             
             publisher.sink { model in
