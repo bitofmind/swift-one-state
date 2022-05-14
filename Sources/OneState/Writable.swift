@@ -1,6 +1,7 @@
 import Foundation
 
 @propertyWrapper
+@dynamicMemberLookup
 public struct Writable<Value> {
     public var wrappedValue: Value
     
@@ -11,6 +12,11 @@ public struct Writable<Value> {
     public var projectedValue: Writable {
         get { self }
         set { self = newValue }
+    }
+
+    subscript<T>(dynamicMember path: WritableKeyPath<Value, T>) -> Writable<T> {
+        get { .init(wrappedValue:  wrappedValue[keyPath: path]) }
+        set { wrappedValue[keyPath: path] = newValue.wrappedValue }
     }
 }
 
@@ -25,6 +31,12 @@ extension Writable: Decodable where Value: Decodable {
 extension Writable: Encodable where Value: Encodable {
     public func encode(to encoder: Encoder) throws {
         try wrappedValue.encode(to: encoder)
+    }
+}
+
+extension Writable: CustomStringConvertible {
+    public var description: String {
+        String(describing: wrappedValue)
     }
 }
 
