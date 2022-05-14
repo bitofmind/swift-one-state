@@ -252,6 +252,11 @@ extension ViewModel {
     }
 }
 
+public struct EmptyModel<State>: ViewModel {
+    @ModelState var state: State
+    public init() {}
+}
+
 extension StoreAccess {
     @TaskLocal static var viewModel: StoreAccess?
 }

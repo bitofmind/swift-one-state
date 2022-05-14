@@ -1,16 +1,27 @@
 import Foundation
-import SwiftUI
+import Combine
 
-public final class TestStore<State> {
-    fileprivate var context: RootContext<State>
-    fileprivate var environments: Environments = [:]
-    
-    private var onTestFailure: (TestFailure<State>) -> Void
+public final class TestStore<Model: ViewModel> {
+    public typealias State = Model.State
+
+    var context: RootContext<State>
+    var environments: Environments = [:]
+    var onTestFailure: (TestFailure<State>) -> Void
 
     public init(state: State, onTestFailure: @escaping (TestFailure<State>) -> Void) {
         context = .init(state: state)
         context.isForTesting = true
         self.onTestFailure = onTestFailure
+    }
+}
+
+public extension TestStore {
+    convenience init<T>(state: T, onTestFailure: @escaping (TestFailure<State>) -> Void) where Model == EmptyModel<T> {
+        self.init(state: state, onTestFailure: onTestFailure)
+    }
+
+    var model: Model {
+        Model(self)
     }
 }
 
@@ -35,25 +46,44 @@ public extension TestStore {
 }
 
 public extension TestStore where State: Equatable {
-    func test(file: StaticString = #file, line: UInt = #line, _ block: @escaping (inout State) throws -> Void) rethrows {
-        var state = context[keyPath: \.self, access: .test]
-        try block(&state)
+    func test(timeout: TimeInterval = 1.0, file: StaticString = #file, line: UInt = #line, _ block: @escaping (inout State) async throws -> Void) async rethrows {
 
-        guard state != context[keyPath: \.self, access: .test] else { return }
-        
-        onTestFailure(.init(
-            expected: state,
-            actual: context[keyPath: \.self, access: .test],
-            file: file,
-            line: line
-        ))
-    }
-
-    func test(file: StaticString = #file, line: UInt = #line, _ block: @escaping (inout State) async throws -> Void) async rethrows {
         var state = context[keyPath: \.self, access: .test]
         try await block(&state)
-            
-        guard state != context[keyPath: \.self, access: .test] else { return }
+
+        let didPass = await withThrowingTaskGroup(of: Bool.self, returning: Bool.self) { [state] group in
+            group.addTask {
+                await AsyncStream<Bool> { cont in
+                    let cancellable = self.context.stateDidUpdate
+                        .map { _ in }
+                        .merge(with: Just(()))
+                        .filter { self.context[keyPath: \.self, access: .test] == state }
+                        .sink {
+                            cont.yield(true)
+                        }
+
+                    cont.onTermination = { _ in
+                        cont.yield(false)
+                        cancellable.cancel()
+                    }
+                }.first { _ in true }!
+            }
+
+            group.addTask {
+                try await Task.sleep(nanoseconds: NSEC_PER_MSEC * UInt64(timeout * 1_000))
+                return false
+            }
+
+            do {
+                let result = try await group.first { _ in true }!
+                group.cancelAll()
+                return result
+            } catch {
+                return false
+            }
+        }
+
+        guard !didPass else { return }
         
         onTestFailure(.init(
             expected: state,
