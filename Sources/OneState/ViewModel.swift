@@ -14,7 +14,13 @@ import Combine
 ///
 /// To access a model state and methods from a view it should be declared using `@Model`:
 ///
-
+///     struct MyView: View {
+///         @Model var model: MyModel
+///
+///         var body: some View {
+///             Text("count \(model.count)")
+///         }
+///     }
 ///
 /// Further a model needs to be set up from some store or a store's sub-state using `viewModel()`:
 ///
@@ -34,6 +40,8 @@ public protocol ViewModel: StoreViewProvider {
 
     /// The type of events that this model can send
     associatedtype Event = ()
+
+    init()
     
     /// Is called when when a SwiftUI view is being displayed using this model
     ///
@@ -47,6 +55,27 @@ public protocol ViewModel: StoreViewProvider {
 
 public extension ViewModel {
     func onAppear() {}
+}
+
+public extension ViewModel {
+    /// Constructs a view model with a view into a store's state
+    ///
+    /// A view modal is required to be constructed from a view into a store's state for
+    /// its `@ModelState` and other dependencies such as `@ModelEnvironment` to be
+    /// set up correclty.
+    init<Provider: StoreViewProvider>(_ viewStore: Provider) where Provider.State == State {
+        let view = viewStore.storeView
+        let context = view.context.context(at: view.path)
+
+        context.propertyIndex = 0
+        self = ContextBase.$current.withValue(context) {
+             Self()
+        }
+
+        if context.isForTesting {
+            self.retain()
+        }
+    }
 }
 
 public extension ViewModel {
@@ -181,12 +210,14 @@ public extension ViewModel {
 }
 
 public extension ViewModel {
+    /// Sends an event to self and ancestors
     func send(_ event: Event) {
         context.sendEvent(event, viewModel: self)
     }
 
+    /// Recieve events of type `eventType` from self or descendants
     @discardableResult
-    func onEvent<VM: ViewModel>(fromType: VM.Type = VM.self, perform: @escaping (VM.Event, VM) -> Void) -> AnyCancellable {
+    func onEvent<VM: ViewModel>(ofType eventType: VM.Type = VM.self, perform: @escaping (VM.Event, VM) -> Void) -> AnyCancellable {
         onReceive(context.eventSubject.compactMap {
             guard let event = $0.event as? VM.Event, let viewModel = $0.viewModel as? VM else { return nil }
             return (event, viewModel)
