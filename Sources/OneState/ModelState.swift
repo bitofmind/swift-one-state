@@ -2,7 +2,6 @@ import SwiftUI
 import Combine
 
 @propertyWrapper
-@dynamicMemberLookup
 public struct ModelState<State> {
     let context: Context<State>
     let isSame: (State, State) -> Bool
@@ -32,12 +31,6 @@ public struct ModelState<State> {
     
     public var projectedValue: ModelState {
         self
-    }
-}
-
-extension ModelState: StoreViewProvider {
-    public var storeView: StoreView<State, State> {
-        .init(context: context, path: \.self, access: access)
     }
 }
 
