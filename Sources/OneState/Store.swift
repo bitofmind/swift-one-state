@@ -10,11 +10,11 @@ import Combine
 /// Typically you setup you store in your App scene:
 ///
 ///     struct MyApp: App {
-///         @Store var store = AppView.State()
+///         @Store<AppView> var store = .init()
 ///
 ///         var body: some Scene {
 ///             WindowGroup {
-///                 AppViewView(model: $store.viewModel(AppModel()))
+///                 AppViewView(model: $store.model)
 ///             }
 ///         }
 ///     }
@@ -22,37 +22,49 @@ import Combine
 ///  A store could also be statically setup for use in e.g. previews:
 ///
 ///     struct MainView_Previews: PreviewProvider {
-///         @Store static var store = MainModel.State()
+///         @Store<MainModel> static var store = .init()
 ///
 ///         static var previews: some View {
-///             MainView(model: $store.viewModel(.init()))
+///             MainView(model: $store.model)
 ///         }
 ///     }
 @dynamicMemberLookup @propertyWrapper
-public struct Store<State>: DynamicProperty {
+public struct Store<Model: ViewModel>: DynamicProperty {
     @StateObject private var shared = Shared()
     private var viewContext = ViewContext()
 
+    public typealias State = Model.State
+
     public let wrappedValue: State
-    
+
     public init(wrappedValue: State) {
         self.wrappedValue = wrappedValue
     }
-    
-    public var projectedValue: Store<State> {
+
+    public var projectedValue: Store {
         self
     }
-    
+
     public func update() {
         if shared.context == nil {
             shared.context = viewContext.context ?? .init(state: wrappedValue)
-            
+
             shared.cancellable = shared.context.observedStateDidUpdate.sink { [weak shared] in
                 shared?.objectWillChange.send()
             }
         }
-        
+
         viewContext.context = shared.context
+    }
+}
+
+public extension Store {
+    init<T>(wrappedValue: T) where Model == EmptyModel<T> {
+        self.wrappedValue = wrappedValue
+    }
+
+    var model: Model {
+        Model(self)
     }
 }
 
