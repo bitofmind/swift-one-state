@@ -101,7 +101,7 @@ extension ContextBase {
         
         var parent = self.parent
         while value == nil, let p = parent {
-            value = p.localEnvironments[key]
+            value = p.localEnvironments[key] ?? viewEnvironments[key]
             parent = p.parent
         }
 
