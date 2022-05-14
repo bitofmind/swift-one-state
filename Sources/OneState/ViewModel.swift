@@ -25,16 +25,16 @@ import Combine
 /// Further a model needs to be set up from some store or a store's sub-state using `viewModel()`:
 ///
 ///     struct MyApp: App {
-///         @Store var store = MyView.State()
+///         @Store<MyView> var store = .init()
 ///
 ///         var body: some Scene {
 ///             WindowGroup {
-///                 MyView(model: $store.viewModel(MyModel()))
+///                 MyView(model: $store.model)
 ///             }
 ///         }
 ///     }
 @dynamicMemberLookup
-public protocol ViewModel: StoreViewProvider {
+public protocol ViewModel: ModelContainer, StoreViewProvider {
     /// The type of the this view model's state.
     associatedtype State
 
