@@ -2,19 +2,15 @@ import Foundation
 import Combine
 
 class Context<State>: ContextBase {
-    var observedStates: [AnyKeyPath: (Context<State>, AnyStateChange) -> Bool] = [:]
-
     typealias Event = (event: Any, path: PartialKeyPath<State>, viewModel: Any)
     var eventSubject = PassthroughSubject<Event, Never>()
 
-    func getCurrent<T>(access: StoreAccess, path: KeyPath<State, T>) -> T { fatalError() }
+    func getCurrent<T>(atPath path: KeyPath<State, T>, access: StoreAccess?) -> T { fatalError() }
     func getShared<T>(shared: AnyObject, path: KeyPath<State, T>) -> T { fatalError() }
-    func _modify(access: StoreAccess, updateState: (inout State) throws -> Void) rethrows -> AnyStateChange? { fatalError() }
+    func _modify(fromContext: ContextBase, access: StoreAccess?, updateState: (inout State) throws -> Void) rethrows { fatalError() }
     
-    func modify(access: StoreAccess, updateState: (inout State) throws -> Void) rethrows {
-        guard let update = try _modify(access: access, updateState: updateState) else { return }
-        
-        notifyObservedUpdateToAllDescendants(update)
+    func modify(access: StoreAccess?, updateState: (inout State) throws -> Void) rethrows {
+        try _modify(fromContext: self, access: access, updateState: updateState)
     }
     
     func sendEvent<T>(_ event: Any, path: KeyPath<State, T>, viewModel: Any) {
@@ -24,86 +20,48 @@ class Context<State>: ContextBase {
     func sendEvent(_ event: Any, viewModel: Any) {
         self.sendEvent(event, path: \.self, viewModel: viewModel)
     }
-
-    override func notifyObservedStateUpdate(_ update: AnyStateChange) {
-        let wasUpdated: Bool = lock {
-            for equal in observedStates.values {
-                guard equal(self, update) else {
-#if false
-                    let previous = getShared(shared: update.previous, path: \State.self)
-                    let current = getShared(shared: update.current, path: \State.self)
-                    print("previous", previous)
-                    print("current", current)
-#endif
-                    return true
-                }
-            }
-            return false
-        }
-
-        guard wasUpdated else { return }
-        
-        if Thread.isMainThread {
-            observedStateDidUpdate.send()
-        } else {
-            DispatchQueue.main.async {
-                self.observedStateDidUpdate.send()
-            }
-        }
-    }
     
     override var isStateOverridden: Bool {
         parent?.isStateOverridden ?? false
     }
 }
 
-enum StoreAccess {
-    case fromView
-    case fromViewModel
-    case test
+class StoreAccess {
+    func willAccess<Root, State>(path: KeyPath<Root, State>, context: Context<Root>, isSame: @escaping (State, State) -> Bool) { fatalError() }
+
+    var allowAccessToBeOverridden: Bool { fatalError() }
+
+    @TaskLocal static var current: StoreAccess?
+    @TaskLocal static var isInViewModelContext = false
 }
 
 extension Context {
-    subscript<T>(keyPath keyPath: WritableKeyPath<State, T>, access access: StoreAccess) -> T {
+    subscript<T>(path path: WritableKeyPath<State, T>, access access: StoreAccess?) -> T {
         get {
-            getCurrent(access: access, path: keyPath)
+            getCurrent(atPath: path, access: access)
         }
         set {
             modify(access: access) { state in
-                state[keyPath: keyPath] = newValue
+                state[keyPath: path] = newValue
             }
         }
     }
     
-    subscript<T>(keyPath keyPath: KeyPath<State, T>, access access: StoreAccess) -> T {
-        getCurrent(access: access, path: keyPath)
+    subscript<T>(path path: KeyPath<State, T>, access access: StoreAccess?) -> T {
+        getCurrent(atPath: path, access: access)
     }
 }
 
 extension Context {
-    func value<T>(for keyPath: KeyPath<State, T>, access: StoreAccess, isSame: @escaping (T, T) -> Bool) -> T {
-        if access == .fromView {
-            lock {
-                if observedStates.index(forKey: keyPath) == nil {
-                    observedStates[keyPath] = { context, update in
-                        isSame(
-                            context.getShared(shared: update.current, path: keyPath),
-                            context.getShared(shared: update.previous, path: keyPath)
-                        )
-                    }
-                }
-            }
+    func value<T>(for path: KeyPath<State, T>, access: StoreAccess?, isSame: @escaping (T, T) -> Bool) -> T {
+        if !StoreAccess.isInViewModelContext {
+            access?.willAccess(path: path, context: self, isSame: isSame)
         }
-        
-        return self[keyPath: keyPath, access: access]
+        return self[path: path, access: access]
     }
     
-    func value<T: Equatable>(for keyPath: KeyPath<State, T>, access: StoreAccess) -> T {
-        value(for: keyPath, access: access, isSame: ==)
-    }
-
-    func value<T>(for keyPath: KeyPath<State, T>, access: StoreAccess) -> T {
-        value(for: keyPath, access: access, isSame: { _, _ in false })
+    func value<T: Equatable>(for path: KeyPath<State, T>, access: StoreAccess?) -> T {
+        value(for: path, access: access, isSame: ==)
     }
 }
 

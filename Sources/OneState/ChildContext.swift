@@ -11,28 +11,26 @@ final class ChildContext<ParentState, State>: Context<State> {
         super.init(parent: context)
     }
     
-    override func getCurrent<T>(access: StoreAccess, path: KeyPath<State, T>) -> T {
-        context.getCurrent(access: access, path: self.path.appending(path: path))
+    override func getCurrent<T>(atPath path: KeyPath<State, T>, access: StoreAccess?) -> T {
+        context.getCurrent(atPath: self.path.appending(path: path), access: access)
     }
     
     override func getShared<T>(shared: AnyObject, path: KeyPath<State, T>) -> T {
         context.getShared(shared: shared, path: self.path.appending(path: path))
     }
     
-    override func _modify(access: StoreAccess, updateState: (inout State) throws -> Void) rethrows -> AnyStateChange? {
-        let update = try context._modify(access: access) { parent in
+    override func _modify(fromContext: ContextBase, access: StoreAccess?, updateState: (inout State) throws -> Void) rethrows {
+        try context._modify(fromContext: fromContext, access: access) { parent in
             try updateState(&parent[keyPath: path])
         }
-        
-        if let update = update {
-            notifyObservedStateUpdate(update)
-        }
-        
-        return update
     }
     
     override func sendEvent<T>(_ event: Any, path: KeyPath<State, T>, viewModel: Any) {
         super.sendEvent(event, path: path, viewModel: viewModel)
         context.sendEvent(event, path: self.path.appending(path: path), viewModel: viewModel)
+    }
+
+    override func forceStateUpdate() {
+        context.forceStateUpdate()
     }
 }

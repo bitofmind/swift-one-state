@@ -8,8 +8,7 @@ class ContextBase: HoldsLock {
     private var _children: [AnyKeyPath: ContextBase] = [:]
     private var _overrideChildren: [AnyKeyPath: ContextBase] = [:]
     
-    let stateDidUpdate: PassthroughSubject<AnyStateChange, Never>
-    let observedStateDidUpdate = PassthroughSubject<(), Never>()
+    let stateDidUpdate = PassthroughSubject<AnyStateChange, Never>()
 
     @Locked var viewEnvironments: Environments = [:]
     @Locked var localEnvironments: Environments = [:]
@@ -26,10 +25,7 @@ class ContextBase: HoldsLock {
     init(parent: ContextBase?) {
         self.parent = parent
         if let parent = parent {
-            stateDidUpdate = parent.stateDidUpdate
             isForTesting = parent.isForTesting
-        } else {
-            stateDidUpdate = .init()
         }
     }
     
@@ -79,30 +75,35 @@ class ContextBase: HoldsLock {
             child.onRemovalFromView()
         }
     }
-    
-    func notifyObservedStateUpdate(_ update: AnyStateChange) {
-        fatalError()
+
+    func notifyAncestors(_ update: AnyStateChange) {
+        parent?.notifyAncestors(update)
+        parent?.stateDidUpdate.send(update)
     }
     
-    func notifyObservedUpdateToAllDescendants(_ update: AnyStateChange) {
+    func notifyDescendants(_ update: AnyStateChange) {
         let (children, overrideChildren) = lock {
             (_children.values, _overrideChildren.values)
         }
-        
+
         for child in children {
-            child.notifyObservedStateUpdate(update)
-            child.notifyObservedUpdateToAllDescendants(update)
+            child.stateDidUpdate.send(update)
+            child.notifyDescendants(update)
         }
-        
+
         for child in overrideChildren {
             if update.isOverrideUpdate {
-                child.notifyObservedStateUpdate(update)
+                child.stateDidUpdate.send(update)
             }
-            child.notifyObservedUpdateToAllDescendants(update)
+            child.notifyDescendants(update)
         }
     }
     
     var isStateOverridden: Bool {
+        fatalError()
+    }
+
+    func forceStateUpdate() {
         fatalError()
     }
 }

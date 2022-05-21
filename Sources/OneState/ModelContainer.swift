@@ -14,7 +14,7 @@ extension ViewModel where StateContainer == State, ModelElement == Self {
     }
 
     public var stateContainer: StateContainer {
-        value(for: \.self)
+        nonObservableState
     }
 }
 
@@ -26,7 +26,7 @@ extension Optional: ModelContainer where Wrapped: ViewModel {
     }
 
     public var stateContainer: StateContainer {
-        map { $0.value(for: \.self) }
+        map { $0.nonObservableState }
     }
 }
 
@@ -38,6 +38,6 @@ extension Array: ModelContainer where Element: ViewModel, Element.State: Identif
     }
 
     public var stateContainer: StateContainer {
-        map { $0.value(for: \.self) }
+        map { $0.nonObservableState }
     }
 }

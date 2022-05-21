@@ -30,7 +30,7 @@ import Combine
 ///     }
 @dynamicMemberLookup @propertyWrapper
 public struct Store<Model: ViewModel>: DynamicProperty {
-    @StateObject private var shared = Shared()
+    @StateObject private var access = ModelAccess<Model.State>()
     private var viewContext = ViewContext()
 
     public typealias State = Model.State
@@ -45,16 +45,14 @@ public struct Store<Model: ViewModel>: DynamicProperty {
         self
     }
 
-    public func update() {
-        if shared.context == nil {
-            shared.context = viewContext.context ?? .init(state: wrappedValue)
+    public mutating func update() {
+        viewContext.context = access.context
 
-            shared.cancellable = shared.context.observedStateDidUpdate.sink { [weak shared] in
-                shared?.objectWillChange.send()
-            }
-        }
+        guard !access.isObservering else { return }
 
-        viewContext.context = shared.context
+        access.context = viewContext.context ?? RootContext(state: wrappedValue)
+        viewContext.context = access.context
+        access.startObserve()
     }
 }
 
@@ -70,7 +68,7 @@ public extension Store {
 
 extension Store: StoreViewProvider {
     public var storeView: StoreView<State, State> {
-        .init(context: context, path: \.self, access: .fromView)
+        .init(context: context, path: \.self, access: access)
     }
 }
 
@@ -90,17 +88,12 @@ public extension Store {
 private extension Store {
     var context: RootContext<State> {
         if viewContext.context == nil { // Static use for previews
-            viewContext.context = .init(state: wrappedValue)
+            viewContext.context = RootContext(state: wrappedValue)
         }
-        return viewContext.context
-    }
-    
-    class Shared: ObservableObject {
-        var cancellable: AnyCancellable?
-        var context: RootContext<State>!
+        return viewContext.context as! RootContext<State>
     }
 
     class ViewContext {
-        var context: RootContext<State>!
+        var context: Context<State>!
     }
 }
