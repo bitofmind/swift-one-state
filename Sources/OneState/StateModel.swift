@@ -43,7 +43,7 @@ extension StateModel: CustomStringConvertible {
     }
 }
 
-public extension StoreViewProvider {
+public extension StoreViewProvider where Access == Write {
     @MainActor
     subscript<VM: ViewModel>(dynamicMember path: WritableKeyPath<State, StateModel<VM>>) -> VM where VM.StateContainer == VM.State {
         VM(storeView(for: path.appending(path: \.wrappedValue)))
@@ -136,7 +136,7 @@ public extension ViewModel {
 
 public extension ViewModel {
     @discardableResult @MainActor
-    func activate<P: StoreViewProvider, Models>(_ view: P) -> AnyCancellable where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.StateContainer: Equatable {
+    func activate<P: StoreViewProvider, Models>(_ view: P) -> AnyCancellable where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.StateContainer: Equatable, P.Access == Write {
         let containerView = view.storeView(for: \.wrappedValue)
 
         typealias ActivedModels = [WritableKeyPath<Models.StateContainer, Models.StateContainer.Element>: Models.ModelElement]

@@ -64,7 +64,7 @@ public extension ViewModel {
     /// its `@ModelState` and other dependencies such as `@ModelEnvironment` to be
     /// set up correclty.
     @MainActor
-    init<Provider: StoreViewProvider>(_ viewStore: Provider) where Provider.State == State {
+    init<Provider: StoreViewProvider>(_ viewStore: Provider) where Provider.State == State, Provider.Access == Write {
         let view = viewStore.storeView
         let context = view.context.context(at: view.path)
 
@@ -81,7 +81,7 @@ public extension ViewModel {
 
 public extension ViewModel {
     /// Conformance to `StoreViewProvider`
-    var storeView: StoreView<State, State> {
+    var storeView: StoreView<State, State, Write> {
         let modelState = self.modelState
         guard let context = modelState?.context as? Context<State> else {
             fatalError("ViewModel \(type(of: self)) is used before fully initialized")
@@ -204,25 +204,26 @@ public extension ViewModel {
             await context { predicate() }
         }
     }
-    
+
     /// Listen on model state changes for the life time of the model
     ///
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult @MainActor
-    func onChange<T: Equatable>(of keyPath: KeyPath<State, T>, perform: @escaping @MainActor (T) -> Void) -> AnyCancellable {
-        onReceive(stateDidUpdatePublisher) { change in
-            guard let value = change[dynamicMember: keyPath] else { return }
+    func onChange<Provider>(of provider: Provider, perform: @escaping @MainActor (Provider.State) -> Void) -> AnyCancellable where Provider: StoreViewProvider, Provider.State: Equatable {
+        onReceive(provider.stateDidUpdatePublisher) { change in
+            guard let value = change[dynamicMember: \.self] else { return }
             perform(value)
         }
     }
+
     
     /// Receive updates when a model state becomes equal to the provided `value`
     ///
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult
-    func onChange<T: Equatable>(of keyPath: KeyPath<State, T>, to value: T, perform: @escaping @MainActor () async throws -> Void) -> AnyCancellable {
-        onReceive(stateDidUpdatePublisher) { change in
-            guard let val = change[dynamicMember: keyPath], val == value else { return }
+    func onChange<Provider>(of provider: Provider, to value: Provider.State, perform: @escaping @MainActor () async throws -> Void) -> AnyCancellable where Provider: StoreViewProvider, Provider.State: Equatable {
+        onReceive(provider.stateDidUpdatePublisher) { change in
+            guard let val = change[dynamicMember: \.self], val == value else { return }
             try await perform()
         }
     }
@@ -231,9 +232,9 @@ public extension ViewModel {
     ///
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult
-    func onChange<T: Equatable>(ofUnwrapped keyPath: KeyPath<State, T?>, perform: @escaping @MainActor (T) async throws -> Void) -> AnyCancellable {
-        onReceive(stateDidUpdatePublisher) { update in
-            guard let value = update[dynamicMember: keyPath],
+    func onChange<Provider, T>(ofUnwrapped provider: Provider, perform: @escaping @MainActor (T) async throws -> Void) -> AnyCancellable where Provider: StoreViewProvider, Provider.State == T?, T: Equatable {
+        onReceive(provider.stateDidUpdatePublisher) { update in
+            guard let value: T? = update[dynamicMember: \.self],
                 let unwrapped = value else { return }
             try await perform(unwrapped)
         }

@@ -33,7 +33,7 @@ public struct TestFailure<State> {
 }
 
 extension TestStore: StoreViewProvider {
-    public var storeView: StoreView<State, State> {
+    public var storeView: StoreView<State, State, Write> {
         .init(context: context, path: \.self, access: nil)
     }
 }
