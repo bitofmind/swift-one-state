@@ -56,14 +56,8 @@ public extension MutableCollection where Element: Identifiable {
 extension Array: StateContainer where Element: Identifiable {}
 
 public extension StoreViewProvider {
-    func containerView<Container>(for path: WritableKeyPath<State, Container>) -> StoreView<Root, Container> {
-        let view = storeView
-        let access = view.access == .fromViewModel ? .fromView: view.access
-        return StoreView(context: view.context, path: view.path(path), access: access)
-    }
-    
     func containerStoreViewElements<Container: MutableCollection>(for path: WritableKeyPath<State, Container>) -> [StoreView<Root, Container.Element>] where Container.Element: Identifiable {
-        let containerView = containerView(for: path)
+        let containerView = storeView(for: path)
         let container = containerView.value(for: \.self, isSame: Container.hasSameStructure)
         return container.elementKeyPaths.map { path in
             containerView.storeView(for: path)
@@ -71,7 +65,7 @@ public extension StoreViewProvider {
     }
     
     func containerStoreViewElements<Container: StateContainer>(for path: WritableKeyPath<State, Container>) -> [StoreView<Root, Container.Element>] {
-        let containerView = containerView(for: path)
+        let containerView = storeView(for: path)
         let container = containerView.value(for: \.self, isSame: Container.hasSameStructure)
         return container.elementKeyPaths.map { path in
             containerView.storeView(for: path)
@@ -82,34 +76,20 @@ public extension StoreViewProvider {
         containerStoreViewElements(for: path).first
     }
     
-    subscript<C>(dynamicMember keyPath: WritableKeyPath<State, C>) -> [IdentifiableStoreView<Root, C.Element, C.Element.ID>] where C: MutableCollection, C: Equatable, C.Element: Identifiable {
+    subscript<C>(dynamicMember keyPath: WritableKeyPath<State, C>) -> [IdentifiableStoreView<Root, C.Element, C.Element.ID>] where C: MutableCollection, C.Element: Identifiable {
         containerStoreViewElements(for: keyPath).map { view in
             IdentifiableStoreView(context: view.context, path: view.path, idPath: \.id, access: view.access)
         }
     }
     
     func id<ID>(_ idPath: KeyPath<State.Element, ID>) -> [IdentifiableStoreView<Root, State.Element, ID>] where State: MutableCollection, ID: Hashable {
-        let containerView = containerView(for: \.self)
-        let container = containerView.value(for: \.self, isSame: {
+        let container = value(for: \.self, isSame: {
             State.hasSameStructure(lhs: $0, rhs: $1, id: { $0[keyPath: idPath] })
         })
         return container.elementKeyPaths(idPath: idPath).map { path in
-            let view = containerView.storeView(for: path)
+            let view = storeView(for: path)
             return IdentifiableStoreView(context: view.context, path: view.path, idPath: idPath, access: view.access)
         }
-    }
-}
-
-extension StoreViewProvider {
-    func value<T>(for keyPath: KeyPath<State, T>, shouldUpdateViewModelAccessToViewAccess: Bool = false, isSame: @escaping (T, T) -> Bool) -> T {
-        let view = self.storeView
-        
-        var access = view.access
-        if shouldUpdateViewModelAccessToViewAccess, access == .fromViewModel {
-            access = .fromView
-        }
-
-        return view.context.value(for: view.path.appending(path: keyPath), access: access, isSame: isSame)
     }
 }
     

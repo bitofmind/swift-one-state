@@ -6,18 +6,18 @@ import Combine
 public struct StoreView<Root, State> {
     var context: Context<Root>
     var path: WritableKeyPath<Root, State>
-    var access: StoreAccess
+    var access: StoreAccess?
 }
 
 extension StoreView: Identifiable where State: Identifiable {
     public var id: State.ID {
-        context[keyPath: path.appending(path: \.id), access: access]
+        context[path: path.appending(path: \.id), access: access]
     }
 }
 
 extension StoreView: Equatable where State: Equatable {
     public static func == (lhs: StoreView<Root, State>, rhs: StoreView<Root, State>) -> Bool {
-        lhs.context[keyPath: lhs.path, access: lhs.access] == rhs.context[keyPath: rhs.path, access: lhs.access]
+        lhs.context[path: lhs.path, access: lhs.access] == rhs.context[path: rhs.path, access: lhs.access]
     }
 }
 
@@ -33,15 +33,15 @@ extension StoreView {
 
 extension StoreView: CustomStringConvertible where State: CustomStringConvertible {
     public var description: String {
-        context[keyPath: path.appending(path: \.description), access: .fromView]
+        let view = storeView
+        return context.value(for: view.path(\.description), access: view.access)
     }
 }
 
 public extension LocalizedStringKey.StringInterpolation {
     // TODO: Add more support
     mutating func appendInterpolation<P>(_ string: P) where P: StoreViewProvider, P.State == String {
-        let view = string.storeView
-        return appendInterpolation(view.context[keyPath: view.path, access: view.access])
+        appendInterpolation(string.value)
     }
 }
 
@@ -50,10 +50,10 @@ public struct IdentifiableStoreView<Root, State, ID: Hashable>: Identifiable, St
     var context: Context<Root>
     var path: WritableKeyPath<Root, State>
     var idPath: KeyPath<State, ID>
-    var access: StoreAccess
+    var access: StoreAccess?
 
     public var id: ID {
-        context[keyPath: path.appending(path: idPath), access: access]
+        context[path: path.appending(path: idPath), access: access]
     }
     
     public var storeView: StoreView<Root, State> { .init(context: context, path: path, access: access) }

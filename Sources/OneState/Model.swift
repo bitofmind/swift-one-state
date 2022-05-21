@@ -23,8 +23,8 @@ import Combine
 @propertyWrapper
 public struct Model<VM: ViewModel>: DynamicProperty {
     @Environment(\.modelEnvironments) private var modelEnvironments
-    @StateObject private var shared = Shared()
-    
+    @StateObject private var access = ModelAccess<VM.State>()
+
     public init(wrappedValue: VM) {
         self.wrappedValue = wrappedValue
         checkedContext()
@@ -34,34 +34,33 @@ public struct Model<VM: ViewModel>: DynamicProperty {
         didSet { checkedContext() }
     }
     
-    public func update() {
-        guard shared.cancellable == nil else { return }
-        
+    public mutating func update() {
         let context = checkedContext()
+        let prevContext = access.context
+        access.context = context
+        if wrappedValue.modelState?.storeAccess !== access {
+            StoreAccess.$current.withValue(access) {
+                context.propertyIndex = 0
+                ContextBase.$current.withValue(context) {
+                    wrappedValue = VM()
+                }
+            }
+        }
+
+        guard context !== prevContext else { return }
+
+        prevContext?.releaseFromView()
         context.viewEnvironments = modelEnvironments
         wrappedValue.retain()
-        shared.context?.releaseFromView()
-        shared.context = context
-        shared.cancellable = context.observedStateDidUpdate.sink { [weak shared] in
-            shared?.objectWillChange.send()
-        }
+        access.startObserve()
     }
 }
 
 private extension Model {
-    final class Shared: ObservableObject {
-        var cancellable: AnyCancellable?
-        var context: Context<VM.State>?
-
-        deinit {
-            context?.releaseFromView()
-        }
-    }
-    
     @discardableResult
     func checkedContext() -> Context<VM.State> {
-        guard let context = wrappedValue.rawStore else {
-            fatalError("ViewModel \(type(of: wrappedValue)) must created using `viewModel()` helper")
+        guard let context = wrappedValue.modelState?.context as? Context<VM.State> else {
+            fatalError("ViewModel \(type(of: wrappedValue)) must be created via a @StateModel or the provide initializer taking a ViewStore. This is required for the view models state to be hooked up to view into a store.")
         }
         return context
     }

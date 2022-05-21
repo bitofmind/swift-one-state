@@ -2,16 +2,22 @@ import SwiftUI
 import Combine
 
 @propertyWrapper
+@dynamicMemberLookup
 public struct ModelState<State> {
-    let context: Context<State>
-    let isSame: (State, State) -> Bool
-    
-    public init(isSame: @escaping (State, State) -> Bool = { _, _ in false }) {
-        guard let context = ContextBase.current as? Context<State> else {
-            fatalError("ModelState can only be used from a ViewModel created via viewModel()")
-        }
+    let context: ContextBase
+    weak var storeAccess: StoreAccess?
+    let get: (StoreAccess?) -> State
+    let set: (State, StoreAccess?) -> Void
+
+    init(context: ContextBase, storeAccess: StoreAccess? = nil, get: @escaping (StoreAccess?) -> State, set: @escaping (State, StoreAccess?) -> Void) {
         self.context = context
-        self.isSame = isSame
+        self.storeAccess = storeAccess
+        self.get = get
+        self.set = set
+    }
+
+    public init() {
+        self.init(isSame: { _, _ in false })
     }
 
     public init() where State: Equatable {
@@ -19,78 +25,69 @@ public struct ModelState<State> {
     }
 
     public var wrappedValue: State {
-        get {
-            context[keyPath: \.self, access: access]
-        }
-        
-        nonmutating set {
-            guard !isSame(wrappedValue, newValue) else { return }
-            context[keyPath: \.self, access: access] = newValue
-        }
+        get { get(nil) }
+        nonmutating set { set(newValue, nil) }
     }
     
-    public var projectedValue: ModelState {
+    public var projectedValue: Self {
         self
     }
 }
 
 public extension ModelState {
-    var view: StateView<State, State> {
-        .init(context: context, path: \.self)
+    subscript<T>(dynamicMember path: WritableKeyPath<State, T>) -> ModelState<T> {
+        .init(
+            context: context,
+            storeAccess: storeAccess,
+            get: { self.get($0)[keyPath: path] },
+            set:  { newValue, access in
+                var value = self.get(access)
+                value[keyPath: path] = newValue
+                self.set(value, access)
+            }
+        )
     }
 
-    func view<T>(_ path: WritableKeyPath<State, T>) -> StateView<State, T> {
-        .init(context: context, path: path)
-    }
-
-    var binding: Binding<State> {
-        binding(\.self)
-    }
-
-    func binding<T>(_ path: WritableKeyPath<State, T>) -> Binding<T> {
-        .init {
-            context.value(for: path, access: access)
-        } set: {
-            context[keyPath: path, access: access] = $0
-        }
-    }
-
-    func binding<T: Equatable>(_ path: WritableKeyPath<State, T>) -> Binding<T> {
-        .init {
-            context.value(for: path, access: access)
-        } set: {
-            guard context[keyPath: path, access: access] != $0 else { return }
-            context[keyPath: path, access: access] = $0
-        }
-    }
-}
-
-public extension ModelState {
-    func transaction<T>(_ perform: @escaping (inout State) throws -> T) rethrows -> T {
-        var result: T!
-        _ = try context.modify(access: .fromViewModel) { state in
-            result = try perform(&state)
-        }
-        return result
-    }
-    
-    func transaction<T>(_ perform: @escaping (inout State) async throws -> T) async rethrows -> T {
-        var state = context[keyPath: \.self, access: access]
-        defer {
-            context[keyPath: \.self, access: access] = state
-        }
-        return try await perform(&state)
-    }
-}
-
-public extension ModelState {
     var isStateOverridden: Bool {
         context.isStateOverridden
     }
 }
 
-private extension ModelState {
-    var access: StoreAccess {
-        StoreAccess.viewModel ?? .fromView
+extension ModelState: Publisher where State: Equatable {
+    public typealias Output = State
+    public typealias Failure = Never
+
+    public func receive<S>(subscriber: S) where S : Subscriber, S.Input == State, S.Failure == Never {
+        context.stateDidUpdate.map { _ in
+            get(nil)
+        }
+        .merge(with: Just(get(nil)))
+        .removeDuplicates()
+        .receive(subscriber: subscriber)
     }
 }
+
+public extension Binding {
+    init(_ modelState: ModelState<Value>) {
+        self.init(
+            get: { modelState.get(modelState.storeAccess) },
+            set: { modelState.set($0, modelState.storeAccess) }
+        )
+    }
+}
+
+extension ModelState {
+    init(isSame: @escaping (State, State) -> Bool) {
+        guard let context = ContextBase.current as? Context<State> else {
+            fatalError("ModelState can only be used from a ViewModel that has been created with a view into a store")
+        }
+        self.context = context
+        storeAccess = StoreAccess.current
+        get = { context[path: \.self, access: $0] }
+        set = { newValue, access in
+            guard !isSame(context[path: \.self, access: access], newValue) else { return }
+            context[path: \.self, access: access] = newValue
+        }
+    }
+}
+

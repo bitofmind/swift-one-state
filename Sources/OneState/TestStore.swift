@@ -20,7 +20,7 @@ public extension TestStore {
         self.init(state: state, onTestFailure: onTestFailure)
     }
 
-    var model: Model {
+    @MainActor var model: Model {
         Model(self)
     }
 }
@@ -34,7 +34,7 @@ public struct TestFailure<State> {
 
 extension TestStore: StoreViewProvider {
     public var storeView: StoreView<State, State> {
-        .init(context: context, path: \.self, access: .test)
+        .init(context: context, path: \.self, access: nil)
     }
 }
 
@@ -48,16 +48,16 @@ public extension TestStore {
 public extension TestStore where State: Equatable {
     func test(timeout: TimeInterval = 1.0, file: StaticString = #file, line: UInt = #line, _ block: @escaping (inout State) async throws -> Void) async rethrows {
 
-        var state = context[keyPath: \.self, access: .test]
+        var state = context[path: \.self, access: nil]
         try await block(&state)
 
         let didPass = await withThrowingTaskGroup(of: Bool.self, returning: Bool.self) { [state] group in
-            group.addTask {
+            group.addTask { @MainActor in
                 await AsyncStream<Bool> { cont in
                     let cancellable = self.context.stateDidUpdate
                         .map { _ in }
                         .merge(with: Just(()))
-                        .filter { self.context[keyPath: \.self, access: .test] == state }
+                        .filter { self.context[path: \.self, access: nil] == state }
                         .sink {
                             cont.yield(true)
                         }
@@ -87,7 +87,7 @@ public extension TestStore where State: Equatable {
         
         onTestFailure(.init(
             expected: state,
-            actual: context[keyPath: \.self, access: .test],
+            actual: context[path: \.self, access: nil],
             file: file,
             line: line
         ))

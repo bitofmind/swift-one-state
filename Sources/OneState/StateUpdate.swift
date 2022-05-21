@@ -39,15 +39,9 @@ public struct StateUpdate<Root, State>: Equatable {
 
 public extension StoreViewProvider {
     var stateDidUpdatePublisher: AnyPublisher<StateUpdate<Root, State>, Never> {
-        var view = self.storeView
-        view.access = StoreAccess.viewModel ?? view.access
+        let view = self.storeView
         return view.context.stateDidUpdate.filter { update in
-            switch (view.context.isStateOverridden, update.isOverrideUpdate, view.access) {
-            case (false, false, _): return true
-            case (true, false, .fromViewModel): return true
-            case (true, true, .fromView): return true
-            default: return false
-            }
+            !update.isOverrideUpdate
         }.map {
             StateUpdate(view: view, update: $0)
         }.eraseToAnyPublisher()
