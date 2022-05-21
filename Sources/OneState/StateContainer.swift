@@ -56,7 +56,29 @@ public extension MutableCollection where Element: Identifiable {
 extension Array: StateContainer where Element: Identifiable {}
 
 public extension StoreViewProvider {
-    func containerStoreViewElements<Container: MutableCollection>(for path: WritableKeyPath<State, Container>) -> [StoreView<Root, Container.Element>] where Container.Element: Identifiable {
+    func containerStoreViewElements<Container: MutableCollection>(for path: KeyPath<State, Container>) -> [StoreView<Root, Container.Element, Read>] where Container.Element: Identifiable {
+        let containerView = storeView(for: path)
+        let container = containerView.value(for: \.self, isSame: Container.hasSameStructure)
+        return container.elementKeyPaths.map { path in
+            containerView.storeView(for: path)
+        }
+    }
+
+    func containerStoreViewElements<Container: StateContainer>(for path: KeyPath<State, Container>) -> [StoreView<Root, Container.Element, Read>] {
+        let containerView = storeView(for: path)
+        let container = containerView.value(for: \.self, isSame: Container.hasSameStructure)
+        return container.elementKeyPaths.map { path in
+            containerView.storeView(for: path)
+        }
+    }
+
+    func storeView<T>(for path: KeyPath<State, T?>) -> StoreView<Root, T, Read>? {
+        containerStoreViewElements(for: path).first
+    }
+}
+
+public extension StoreViewProvider where Access == Write {
+    func containerStoreViewElements<Container: MutableCollection>(for path: WritableKeyPath<State, Container>) -> [StoreView<Root, Container.Element, Write>] where Container.Element: Identifiable {
         let containerView = storeView(for: path)
         let container = containerView.value(for: \.self, isSame: Container.hasSameStructure)
         return container.elementKeyPaths.map { path in
@@ -64,31 +86,31 @@ public extension StoreViewProvider {
         }
     }
     
-    func containerStoreViewElements<Container: StateContainer>(for path: WritableKeyPath<State, Container>) -> [StoreView<Root, Container.Element>] {
+    func containerStoreViewElements<Container: StateContainer>(for path: WritableKeyPath<State, Container>) -> [StoreView<Root, Container.Element, Write>] {
         let containerView = storeView(for: path)
         let container = containerView.value(for: \.self, isSame: Container.hasSameStructure)
         return container.elementKeyPaths.map { path in
             containerView.storeView(for: path)
         }
     }
-    
-    func storeView<T>(for path: WritableKeyPath<State, T?>) -> StoreView<Root, T>? {
+
+    func storeView<T>(for path: WritableKeyPath<State, T?>) -> StoreView<Root, T, Write>? {
         containerStoreViewElements(for: path).first
     }
     
-    subscript<C>(dynamicMember keyPath: WritableKeyPath<State, C>) -> [IdentifiableStoreView<Root, C.Element, C.Element.ID>] where C: MutableCollection, C.Element: Identifiable {
+    subscript<C>(dynamicMember keyPath: WritableKeyPath<State, C>) -> [IdentifiableStoreView<Root, C.Element, Write, C.Element.ID>] where C: MutableCollection, C.Element: Identifiable {
         containerStoreViewElements(for: keyPath).map { view in
-            IdentifiableStoreView(context: view.context, path: view.path, idPath: \.id, access: view.access)
+            IdentifiableStoreView(storeView: view, idPath: \.id)
         }
     }
     
-    func id<ID>(_ idPath: KeyPath<State.Element, ID>) -> [IdentifiableStoreView<Root, State.Element, ID>] where State: MutableCollection, ID: Hashable {
+    func id<ID>(_ idPath: KeyPath<State.Element, ID>) -> [IdentifiableStoreView<Root, State.Element, Write, ID>] where State: MutableCollection, ID: Hashable {
         let container = value(for: \.self, isSame: {
             State.hasSameStructure(lhs: $0, rhs: $1, id: { $0[keyPath: idPath] })
         })
         return container.elementKeyPaths(idPath: idPath).map { path in
             let view = storeView(for: path)
-            return IdentifiableStoreView(context: view.context, path: view.path, idPath: idPath, access: view.access)
+            return IdentifiableStoreView(storeView: view, idPath: idPath)
         }
     }
 }

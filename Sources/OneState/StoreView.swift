@@ -2,11 +2,51 @@ import SwiftUI
 import Combine
 
 // A view into a store's state
+// A view into a store's state
 @dynamicMemberLookup
-public struct StoreView<Root, State> {
+public struct StoreView<Root, State, Access> {
     var context: Context<Root>
-    var path: WritableKeyPath<Root, State>
+    private var _path: KeyPath<Root, State>
     var access: StoreAccess?
+}
+
+public enum Read {}
+public enum Write {}
+
+extension StoreView where Access == Read {
+    init(context: Context<Root>, path: KeyPath<Root, State>, access: StoreAccess?) {
+        self.context = context
+        self._path = path
+        self.access = access
+    }
+}
+
+extension StoreView where Access == Write {
+    init(context: Context<Root>, path: WritableKeyPath<Root, State>, access: StoreAccess?) {
+        self.context = context
+        self._path = path
+        self.access = access
+    }
+}
+
+extension StoreView {
+    typealias Path = KeyPath<Root, State>
+
+    var path: KeyPath<Root, State> {
+        _path
+    }
+}
+
+extension StoreView where Access == Write {
+    typealias Path = WritableKeyPath<Root, State>
+
+    var path: WritableKeyPath<Root, State> {
+        _path as! WritableKeyPath<Root, State>
+    }
+}
+
+extension StoreView: StoreViewProvider {
+    public var storeView: Self { self }
 }
 
 extension StoreView: Identifiable where State: Identifiable {
@@ -16,17 +56,19 @@ extension StoreView: Identifiable where State: Identifiable {
 }
 
 extension StoreView: Equatable where State: Equatable {
-    public static func == (lhs: StoreView<Root, State>, rhs: StoreView<Root, State>) -> Bool {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.context[path: lhs.path, access: lhs.access] == rhs.context[path: rhs.path, access: lhs.access]
     }
 }
 
 extension StoreView {
-    func path<T>(_ keyPath: WritableKeyPath<State, T>) -> WritableKeyPath<Root, T>{
+    func path<T>(_ keyPath: KeyPath<State, T>) -> KeyPath<Root, T>{
         storeView.path.appending(path: keyPath)
     }
+}
 
-    func path<T>(_ keyPath: KeyPath<State, T>) -> KeyPath<Root, T>{
+extension StoreView where Access == Write {
+    func path<T>(_ keyPath: WritableKeyPath<State, T>) -> WritableKeyPath<Root, T>{
         storeView.path.appending(path: keyPath)
     }
 }
@@ -46,20 +88,13 @@ public extension LocalizedStringKey.StringInterpolation {
 }
 
 @dynamicMemberLookup
-public struct IdentifiableStoreView<Root, State, ID: Hashable>: Identifiable, StoreViewProvider {
-    var context: Context<Root>
-    var path: WritableKeyPath<Root, State>
+public struct IdentifiableStoreView<Root, State, Access, ID: Hashable>: Identifiable, StoreViewProvider {
+    public var storeView: StoreView<Root, State, Access>
     var idPath: KeyPath<State, ID>
-    var access: StoreAccess?
 
     public var id: ID {
-        context[path: path.appending(path: idPath), access: access]
+        storeView.context[path: storeView.path(idPath), access: storeView.access]
     }
-    
-    public var storeView: StoreView<Root, State> { .init(context: context, path: path, access: access) }
 }
 
-extension StoreView: StoreViewProvider {
-    public var storeView: Self { self }
-}
 

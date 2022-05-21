@@ -8,7 +8,7 @@ final class RootContext<State>: Context<State> {
     private var previousState: Shared<State>
     private var currentState: Shared<State>
 
-    private var currentOverride: StateUpdate<State, State>?
+    private var currentOverride: StateUpdate<State, State, Write>?
     private var updateTask: Task<(), Never>?
     private var lastFromContext: ContextBase?
 
@@ -95,14 +95,14 @@ final class RootContext<State>: Context<State> {
 }
 
 extension RootContext {
-    var latestUpdate: StateUpdate<State, State> {
+    var latestUpdate: StateUpdate<State, State, Write> {
         let view = StoreView(context: self, path: \.self, access: nil)
         return .init(view: view, update: stateLock {
             .init(previous: previousState, current: previousState, isStateOverridden: currentOverride != nil, isOverrideUpdate: false)
         })
     }
 
-    var stateOverride: StateUpdate<State, State>? {
+    var stateOverride: StateUpdate<State, State, Write>? {
         get {
             stateLock { currentOverride }
         }

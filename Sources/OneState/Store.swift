@@ -67,19 +67,19 @@ public extension Store {
 }
 
 extension Store: StoreViewProvider {
-    public var storeView: StoreView<State, State> {
+    public var storeView: StoreView<State, State, Write> {
         .init(context: context, path: \.self, access: access)
     }
 }
 
 public extension Store {
     /// Access the the lastest update useful for debugging or initial state for state recording
-    var latestUpdate: StateUpdate<State, State> {
+    var latestUpdate: StateUpdate<State, State, Write> {
         context.latestUpdate
     }
 
     /// Used to override state when replaying recorded state
-    var stateOverride: StateUpdate<State, State>? {
+    var stateOverride: StateUpdate<State, State, Write>? {
         get { context.stateOverride }
         set { context.stateOverride = newValue }
     }
