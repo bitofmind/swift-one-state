@@ -130,6 +130,7 @@ public extension ViewModel {
     where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Equatable {
         onEvent(from: view) { aEvent, model in
             guard aEvent == event else { return }
+            perform(model)
         }
     }
 }
