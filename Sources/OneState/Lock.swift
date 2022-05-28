@@ -35,15 +35,15 @@ struct Locked<Value> {
         wrapped wrappedKeyPath: ReferenceWritableKeyPath<T, Value>,
         storage storageKeyPath: ReferenceWritableKeyPath<T, Self>
     ) -> Value {
-        get {
-            instance.lock {
-                instance[keyPath: storageKeyPath]._wrappedValue
-            }
+        _read {
+            instance.lock.lock()
+            defer { instance.lock.unlock() }
+            yield instance[keyPath: storageKeyPath]._wrappedValue
         }
-        set {
-            instance.lock {
-                instance[keyPath: storageKeyPath]._wrappedValue = newValue
-            }
+        _modify {
+            instance.lock.lock()
+            defer { instance.lock.unlock() }
+            yield &instance[keyPath: storageKeyPath]._wrappedValue
         }
     }
     

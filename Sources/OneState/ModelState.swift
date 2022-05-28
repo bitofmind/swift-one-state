@@ -1,23 +1,19 @@
-import SwiftUI
-import Combine
+import Foundation
 
 @propertyWrapper
 @dynamicMemberLookup
 public struct ModelState<State> {
-    let context: ContextBase
+    let context: Context<State>
     weak var storeAccess: StoreAccess?
-    let get: (StoreAccess?) -> State
-    let set: (State, StoreAccess?) -> Void
+    let isSame: (State, State) -> Bool
 
-    init(context: ContextBase, storeAccess: StoreAccess? = nil, get: @escaping (StoreAccess?) -> State, set: @escaping (State, StoreAccess?) -> Void) {
+    public init(isSame: @escaping (State, State) -> Bool = { _, _ in false }) {
+        guard let context = ContextBase.current as? Context<State> else {
+            fatalError("ModelState can only be used from a ViewModel created via viewModel()")
+        }
         self.context = context
-        self.storeAccess = storeAccess
-        self.get = get
-        self.set = set
-    }
-
-    public init() {
-        self.init(isSame: { _, _ in false })
+        storeAccess = StoreAccess.current
+        self.isSame = isSame
     }
 
     public init() where State: Equatable {
@@ -25,69 +21,53 @@ public struct ModelState<State> {
     }
 
     public var wrappedValue: State {
-        get { get(nil) }
-        nonmutating set { set(newValue, nil) }
+        get {
+            context[path: \.self, access: storeAccess]
+        }
+
+        nonmutating set {
+            guard !isSame(wrappedValue, newValue) else { return }
+            context[path: \.self, access: storeAccess] = newValue
+        }
     }
-    
-    public var projectedValue: Self {
+
+    public var projectedValue: ModelState {
         self
     }
 }
 
-public extension ModelState {
-    subscript<T>(dynamicMember path: WritableKeyPath<State, T>) -> ModelState<T> {
-        .init(
-            context: context,
-            storeAccess: storeAccess,
-            get: { self.get($0)[keyPath: path] },
-            set:  { newValue, access in
-                var value = self.get(access)
-                value[keyPath: path] = newValue
-                self.set(value, access)
-            }
-        )
+extension ModelState: StoreViewProvider {
+    public var storeView: StoreView<State, State, Write> {
+        .init(context: context, path: \.self, access: storeAccess)
     }
+}
 
+public extension ModelState where State: Equatable {
+    var stateView: StateView<State> {
+        .init(didUpdate: values) {
+            wrappedValue
+        } set: {
+            wrappedValue = $0
+        }
+    }
+}
+
+public extension ModelState {
     var isStateOverridden: Bool {
         context.isStateOverridden
     }
 }
 
-extension ModelState: Publisher where State: Equatable {
-    public typealias Output = State
-    public typealias Failure = Never
+#if canImport(SwiftUI)
+import SwiftUI
 
-    public func receive<S>(subscriber: S) where S : Subscriber, S.Input == State, S.Failure == Never {
-        context.stateDidUpdate.map { _ in
-            get(nil)
-        }
-        .merge(with: Just(get(nil)))
-        .removeDuplicates()
-        .receive(subscriber: subscriber)
-    }
-}
-
-public extension Binding {
+public extension Binding where Value: Equatable {
     init(_ modelState: ModelState<Value>) {
         self.init(
-            get: { modelState.get(modelState.storeAccess) },
-            set: { modelState.set($0, modelState.storeAccess) }
+            get: { modelState.context.value(for: \.self, access: modelState.storeAccess) },
+            set: { modelState.wrappedValue = $0 }
         )
     }
 }
 
-extension ModelState {
-    init(isSame: @escaping (State, State) -> Bool) {
-        guard let context = ContextBase.current as? Context<State> else {
-            fatalError("ModelState can only be used from a ViewModel that has been created with a view into a store")
-        }
-        self.context = context
-        storeAccess = StoreAccess.current
-        get = { context[path: \.self, access: $0] }
-        set = { newValue, access in
-            guard !isSame(context[path: \.self, access: access], newValue) else { return }
-            context[path: \.self, access: access] = newValue
-        }
-    }
-}
-
+#endif

@@ -8,7 +8,7 @@ class ContextBase: HoldsLock {
     private var _children: [AnyKeyPath: ContextBase] = [:]
     private var _overrideChildren: [AnyKeyPath: ContextBase] = [:]
     
-    let stateDidUpdate = PassthroughSubject<AnyStateChange, Never>()
+    let stateUpdates = AsyncPassthroughSubject<AnyStateChange>()
 
     @Locked var viewEnvironments: Environments = [:]
     @Locked var localEnvironments: Environments = [:]
@@ -78,7 +78,7 @@ class ContextBase: HoldsLock {
 
     func notifyAncestors(_ update: AnyStateChange) {
         parent?.notifyAncestors(update)
-        parent?.stateDidUpdate.send(update)
+        parent?.stateUpdates.yield(update)
     }
     
     func notifyDescendants(_ update: AnyStateChange) {
@@ -87,23 +87,19 @@ class ContextBase: HoldsLock {
         }
 
         for child in children {
-            child.stateDidUpdate.send(update)
+            child.stateUpdates.yield(update)
             child.notifyDescendants(update)
         }
 
         for child in overrideChildren {
             if update.isOverrideUpdate {
-                child.stateDidUpdate.send(update)
+                child.stateUpdates.yield(update)
             }
             child.notifyDescendants(update)
         }
     }
     
     var isStateOverridden: Bool {
-        fatalError()
-    }
-
-    func forceStateUpdate() {
         fatalError()
     }
 }

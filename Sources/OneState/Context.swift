@@ -1,9 +1,8 @@
 import Foundation
-import Combine
 
 class Context<State>: ContextBase {
-    typealias Event = (event: Any, path: PartialKeyPath<State>, viewModel: Any)
-    var eventSubject = PassthroughSubject<Event, Never>()
+    typealias Event = (event: Any, path: PartialKeyPath<State>, viewModel: Any, callContext: CallContext?)
+    let events = AsyncPassthroughSubject<Event>()
 
     func getCurrent<T>(atPath path: KeyPath<State, T>, access: StoreAccess?) -> T { fatalError() }
     func getShared<T>(shared: AnyObject, path: KeyPath<State, T>) -> T { fatalError() }
@@ -13,12 +12,12 @@ class Context<State>: ContextBase {
         try _modify(fromContext: self, access: access, updateState: updateState)
     }
     
-    func sendEvent<T>(_ event: Any, path: KeyPath<State, T>, viewModel: Any) {
-        eventSubject.send((event: event, path: path, viewModel: viewModel))
+    func sendEvent<T>(_ event: Any, path: KeyPath<State, T>, viewModel: Any, callContext: CallContext?) {
+        events.yield((event: event, path: path, viewModel: viewModel, callContext: callContext))
     }
 
-    func sendEvent(_ event: Any, viewModel: Any) {
-        self.sendEvent(event, path: \.self, viewModel: viewModel)
+    func sendEvent(_ event: Any, viewModel: Any, callContext: CallContext?) {
+        self.sendEvent(event, path: \.self, viewModel: viewModel, callContext: callContext)
     }
     
     override var isStateOverridden: Bool {
@@ -33,6 +32,18 @@ class StoreAccess {
 
     @TaskLocal static var current: StoreAccess?
     @TaskLocal static var isInViewModelContext = false
+}
+
+struct CallContext {
+    let perform: (() -> Void) -> Void
+
+    func callAsFunction(_ action: () -> Void) {
+        perform(action)
+    }
+
+    @TaskLocal static var current: CallContext?
+
+    static let empty = Self { $0() }
 }
 
 extension Context {

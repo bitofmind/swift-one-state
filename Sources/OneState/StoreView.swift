@@ -2,7 +2,6 @@ import SwiftUI
 import Combine
 
 // A view into a store's state
-// A view into a store's state
 @dynamicMemberLookup
 public struct StoreView<Root, State, Access> {
     var context: Context<Root>
@@ -77,13 +76,6 @@ extension StoreView: CustomStringConvertible where State: CustomStringConvertibl
     public var description: String {
         let view = storeView
         return context.value(for: view.path(\.description), access: view.access)
-    }
-}
-
-public extension LocalizedStringKey.StringInterpolation {
-    // TODO: Add more support
-    mutating func appendInterpolation<P>(_ string: P) where P: StoreViewProvider, P.State == String {
-        appendInterpolation(string.value)
     }
 }
 

@@ -1,5 +1,5 @@
 import Foundation
-import Combine
+import AsyncAlgorithms
 
 /// Declares a value stored outside of a model's store
 ///
@@ -11,7 +11,6 @@ import Combine
 public struct ModelProperty<Value> {
     let context: ContextBase
     let index: Int
-    typealias Subject = CurrentValueSubject<Value, Never>
 
     public init(wrappedValue: @escaping @autoclosure () -> Value) {
         guard let ctx = ContextBase.current else {
@@ -23,20 +22,17 @@ public struct ModelProperty<Value> {
         context.propertyIndex += 1
 
         if index == context.properties.count {
-            context.properties.append(Subject(wrappedValue()))
+            context.properties.append(Box(wrappedValue()))
         }
-    }
-
-    var subject: Subject {
-        context.properties[index] as! Subject
     }
 
     public var wrappedValue: Value {
         get {
-            subject.value
+            box.value
         }
         nonmutating set {
-            subject.value = newValue
+            box.value = newValue
+            box.subject.yield(newValue)
         }
     }
 
@@ -45,11 +41,37 @@ public struct ModelProperty<Value> {
     }
 }
 
-extension ModelProperty: Publisher {
-    public typealias Output = Value
-    public typealias Failure = Never
-    
-    public func receive<S>(subscriber: S) where S : Subscriber, S.Input == Value, S.Failure == Never {
-        subject.receive(subscriber: subscriber)
+extension ModelProperty: AsyncSequence {
+    public typealias AsyncIterator = AsyncStream<Value>.AsyncIterator
+    public typealias Element = Value
+
+    public func makeAsyncIterator() -> AsyncStream<Value>.AsyncIterator {
+        AsyncStream(chain([wrappedValue].async, box.subject)).makeAsyncIterator()
     }
 }
+
+public extension ModelProperty where Value: Equatable {
+    var stateView: StateView<Value> {
+        .init(didUpdate: .init(self)) {
+            wrappedValue
+        } set: {
+            wrappedValue = $0
+        }
+    }
+}
+
+extension ModelProperty {
+    class Box {
+        let subject = AsyncPassthroughSubject<Value>()
+        var value: Value
+
+        init(_ value: Value) {
+            self.value = value
+        }
+    }
+
+    var box: Box {
+        context.properties[index] as! Box
+    }
+}
+

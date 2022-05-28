@@ -1,6 +1,4 @@
 import Foundation
-import Combine
-import CoreMedia
 
 final class RootContext<State>: Context<State> {
     private var stateLock = Lock()
@@ -49,7 +47,7 @@ final class RootContext<State>: Context<State> {
 
         let lastContext: ContextBase? = stateLock { lastFromContext }
 
-        if let last = lastContext, last !== fromContext {
+        if let last = lastContext, last !== fromContext, CallContext.current != nil {
             notify(context: last)
         }
 
@@ -62,8 +60,16 @@ final class RootContext<State>: Context<State> {
         }
 
         updateTask?.cancel()
-        updateTask = Task { @MainActor in
-            notify(context: fromContext)
+
+        if let callContext = CallContext.current {
+            callContext {
+                notify(context: fromContext)
+            }
+        } else {
+            updateTask = Task { @MainActor in
+                guard !Task.isCancelled else { return }
+                notify(context: fromContext)
+            }
         }
     }
 
@@ -78,19 +84,14 @@ final class RootContext<State>: Context<State> {
             lastFromContext = nil
 
             defer { previousState = state }
-            return .init(previous: previousState, current: state, isStateOverridden: currentOverride != nil, isOverrideUpdate: false)
+            return .init(previous: previousState, current: state, isStateOverridden: currentOverride != nil, isOverrideUpdate: false, callContext: .current)
         }
 
         guard let update = update else { return }
 
         context.notifyAncestors(update)
-        context.stateDidUpdate.send(update)
+        context.stateUpdates.yield(update)
         context.notifyDescendants(update)
-    }
-
-    override func forceStateUpdate() {
-        guard let context = lastFromContext else { return }
-        notify(context: context)
     }
 }
 
@@ -119,7 +120,7 @@ extension RootContext {
 
             guard let update = update else { return }
 
-            stateDidUpdate.send(update)
+            stateUpdates.yield(update)
             notifyDescendants(update)
         }
     }
@@ -138,4 +139,5 @@ struct AnyStateChange {
     var current: AnyObject
     var isStateOverridden: Bool
     var isOverrideUpdate: Bool
+    var callContext: CallContext?
 }
