@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 import SwiftUI
 
 /// Holds a model that drives SwiftUI views
@@ -89,29 +88,19 @@ public extension ViewModel where State: Identifiable {
     }
 }
 
-public extension Cancellable {
-    /// Cancellables stored in a view model will be cancelled once the last view using the model for the
-    /// same underlying state is non longer being displayed
-    func store<VM: ViewModel>(in viewModel: VM) {
-        store(in: &viewModel.context.anyCancellables)
-    }
-}
-
 public extension ViewModel {
     /// Add an action to be called once the view goes away
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult
-    func onDisappear(_ perform: @escaping () -> Void) -> AnyCancellable {
-        let cancellable = AnyCancellable(perform)
-        cancellable.store(in: self)
-        return cancellable
+    func onDisappear(_ perform: @escaping () -> Void) -> Cancellable {
+        AnyCancellable(onCancel: perform).store(in: self)
     }
 
     /// Perform a task for the life time of the model
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult
-    func task(_ operation: @escaping @MainActor () async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> AnyCancellable {
-        let task = Task { @MainActor in
+    func task(_ operation: @escaping @MainActor () async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable {
+        Task { @MainActor in
             do {
                 try await context {
                     guard !Task.isCancelled else { return }
@@ -120,9 +109,7 @@ public extension ViewModel {
             } catch {
                 `catch`?(error)
             }
-        }
-        
-        return onDisappear(task.cancel)
+        }.store(in: self)
     }
 
     /// Iterate an async sequence for the life time of the model
@@ -131,7 +118,7 @@ public extension ViewModel {
     /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult
-    func forEach<S: AsyncSequence>(_ sequence: S, cancelPrevious: Bool = false, perform: @escaping @MainActor (S.Element) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> AnyCancellable {
+    func forEach<S: AsyncSequence>(_ sequence: S, cancelPrevious: Bool = false, perform: @escaping @MainActor (S.Element) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable {
         task({
             guard cancelPrevious else {
                 for try await value in sequence {
@@ -180,7 +167,7 @@ public extension ViewModel {
     /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult @MainActor
-    func onChange<Provider>(of provider: Provider, cancelPrevious: Bool = false, perform: @escaping @MainActor (Provider.State) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> AnyCancellable where Provider: StoreViewProvider, Provider.State: Equatable {
+    func onChange<Provider>(of provider: Provider, cancelPrevious: Bool = false, perform: @escaping @MainActor (Provider.State) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable where Provider: StoreViewProvider, Provider.State: Equatable {
         forEach(provider.values.dropFirst(), cancelPrevious: cancelPrevious, perform: perform, catch: `catch`)
     }
     
@@ -191,7 +178,7 @@ public extension ViewModel {
     /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult
-    func onChange<Provider>(of provider: Provider, to value: Provider.State, cancelPrevious: Bool = false, perform: @escaping @MainActor () async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> AnyCancellable where Provider: StoreViewProvider, Provider.State: Equatable {
+    func onChange<Provider>(of provider: Provider, to value: Provider.State, cancelPrevious: Bool = false, perform: @escaping @MainActor () async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable where Provider: StoreViewProvider, Provider.State: Equatable {
         forEach(provider.values.dropFirst().filter { $0 == value }.map { _ in () }, cancelPrevious: cancelPrevious, perform: perform, catch: `catch`)
     }
 
@@ -200,7 +187,7 @@ public extension ViewModel {
     /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult
-    func onChange<Provider, T>(ofUnwrapped provider: Provider, perform: @escaping @MainActor (T) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> AnyCancellable where Provider: StoreViewProvider, Provider.State == T?, T: Equatable {
+    func onChange<Provider, T>(ofUnwrapped provider: Provider, perform: @escaping @MainActor (T) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable where Provider: StoreViewProvider, Provider.State == T?, T: Equatable {
         forEach(provider.values.dropFirst().compacted(), perform: perform, catch: `catch`)
     }
 }
@@ -217,7 +204,7 @@ public extension ViewModel {
     ///
     ///     }
     @discardableResult @MainActor
-    func onEvent<VM: ViewModel>(fromType modelType: VM.Type = VM.self, perform: @escaping @MainActor (VM.Event, VM) -> Void) -> AnyCancellable {
+    func onEvent<VM: ViewModel>(fromType modelType: VM.Type = VM.self, perform: @escaping @MainActor (VM.Event, VM) -> Void) -> Cancellable {
         forEach(context.events.compactMap {
             guard let event = $0.event as? VM.Event, let viewModel = $0.viewModel as? VM else { return nil }
             return (event, viewModel)
@@ -230,7 +217,7 @@ public extension ViewModel {
     ///
     ///     }
     @discardableResult @MainActor
-    func onEvent<VM: ViewModel>(_ event: VM.Event, fromType modelType: VM.Type = VM.self, perform: @escaping @MainActor (VM) -> Void) -> AnyCancellable where VM.Event: Equatable  {
+    func onEvent<VM: ViewModel>(_ event: VM.Event, fromType modelType: VM.Type = VM.self, perform: @escaping @MainActor (VM) -> Void) -> Cancellable where VM.Event: Equatable  {
         onEvent { (aEvent, model: VM) in
             guard aEvent == event else { return }
             perform(model)
@@ -241,7 +228,7 @@ public extension ViewModel {
 public extension ViewModel {
     @discardableResult
     @MainActor
-    func activate<VM: ViewModel>(_ viewModel: VM) -> AnyCancellable {
+    func activate<VM: ViewModel>(_ viewModel: VM) -> Cancellable {
         viewModel.retain()
         let cancellable = AnyCancellable {
             viewModel.context.releaseFromView()
@@ -318,6 +305,22 @@ public extension ViewModel {
     }
 }
 
+public protocol Cancellable {
+    func cancel()
+}
+
+public extension Cancellable {
+    /// Cancellables stored in a view model will be cancelled once the last view using the model for the
+    /// same underlying state is non longer being displayed
+    @discardableResult
+    func store<VM: ViewModel>(in viewModel: VM) -> Cancellable {
+        viewModel.context.cancellables.append(self)
+        return self
+    }
+}
+
+extension Task: Cancellable { }
+
 public struct EmptyModel<State>: ViewModel {
     public typealias State = State
     @ModelState var state: State
@@ -385,4 +388,10 @@ extension ViewModel {
     func release() {
         context.releaseFromView()
     }
+}
+
+struct AnyCancellable: Cancellable {
+    var onCancel: () -> Void
+
+    func cancel() { onCancel() }
 }

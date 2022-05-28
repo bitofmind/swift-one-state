@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 import SwiftUI
 
 /// Declare what model to used to represent a models states variable
@@ -88,7 +87,7 @@ public extension ViewModel {
 public extension ViewModel {
     /// Recieve events of from the `model`
     @discardableResult @MainActor
-    func onEvent<VM: ViewModel>(from model: VM, perform: @escaping @MainActor (VM.Event) -> Void) -> AnyCancellable where VM.StateContainer == VM.State {
+    func onEvent<VM: ViewModel>(from model: VM, perform: @escaping @MainActor (VM.Event) -> Void) -> Cancellable where VM.StateContainer == VM.State {
         return forEach(context.events.compactMap {
             guard let event = $0.event as? VM.Event, let viewModel = $0.viewModel as? VM, viewModel.context === model.context else {
                 return nil
@@ -99,7 +98,7 @@ public extension ViewModel {
 
     /// Recieve events of `event`from `model´`
     @discardableResult @MainActor
-    func onEvent<VM: ViewModel>(_ event: VM.Event, from model: VM, perform: @escaping @MainActor () -> Void) -> AnyCancellable where VM.StateContainer == VM.State, VM.Event: Equatable {
+    func onEvent<VM: ViewModel>(_ event: VM.Event, from model: VM, perform: @escaping @MainActor () -> Void) -> Cancellable where VM.StateContainer == VM.State, VM.Event: Equatable {
         return forEach(context.events.compactMap {
             guard let aEvent = $0.event as? VM.Event, aEvent == event, let viewModel = $0.viewModel as? VM, viewModel.context === model.context else {
                 return nil
@@ -110,7 +109,7 @@ public extension ViewModel {
 
     /// Recieve events of from `models`
     @discardableResult @MainActor
-    func onEvent<P: StoreViewProvider, Models>(from models: P, perform: @escaping @MainActor (Models.ModelElement.Event, Models.ModelElement) -> Void) -> AnyCancellable
+    func onEvent<P: StoreViewProvider, Models>(from models: P, perform: @escaping @MainActor (Models.ModelElement.Event, Models.ModelElement) -> Void) -> Cancellable
     where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
         let containerView = models.storeView(for: \.wrappedValue)
 
@@ -134,7 +133,7 @@ public extension ViewModel {
 
     /// Recieve events of `event` from `models`
     @discardableResult @MainActor
-    func onEvent<P: StoreViewProvider, Models>(_ event: Models.ModelElement.Event, from view: P, perform: @escaping @MainActor (Models.ModelElement) -> Void) -> AnyCancellable
+    func onEvent<P: StoreViewProvider, Models>(_ event: Models.ModelElement.Event, from view: P, perform: @escaping @MainActor (Models.ModelElement) -> Void) -> Cancellable
     where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Equatable {
         onEvent(from: view) { aEvent, model in
             guard aEvent == event else { return }
@@ -145,7 +144,7 @@ public extension ViewModel {
 
 public extension ViewModel {
     @discardableResult @MainActor
-    func activate<P: StoreViewProvider, Models>(_ view: P) -> AnyCancellable where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.StateContainer: Equatable, P.Access == Write {
+    func activate<P: StoreViewProvider, Models>(_ view: P) -> Cancellable where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.StateContainer: Equatable, P.Access == Write {
         let containerView = view.storeView(for: \.wrappedValue)
 
         typealias ActivedModels = [WritableKeyPath<Models.StateContainer, Models.StateContainer.Element>: Models.ModelElement]

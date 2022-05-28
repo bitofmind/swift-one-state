@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 
 class ContextBase: HoldsLock {
     var lock = Lock()
@@ -15,7 +14,7 @@ class ContextBase: HoldsLock {
 
     @Locked var propertyIndex = 0
     @Locked var properties: [Any] = []
-    @Locked var anyCancellables: Set<AnyCancellable> = []
+    @Locked var cancellables: [Cancellable] = []
     @Locked var isForTesting = false
     @Locked var hasBeenRemoved = false
     @Locked var refCount = 0
@@ -135,9 +134,9 @@ private extension ContextBase {
             return
         }
         
-        let cancellables = anyCancellables
+        let cancellables = self.cancellables
         guard cancellables.isEmpty else {
-            anyCancellables.removeAll()
+            self.cancellables.removeAll()
             for cancellable in cancellables {
                 cancellable.cancel()
             }

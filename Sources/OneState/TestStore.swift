@@ -1,5 +1,4 @@
 import Foundation
-import Combine
 
 public final class TestStore<Model: ViewModel> {
     public typealias State = Model.State
