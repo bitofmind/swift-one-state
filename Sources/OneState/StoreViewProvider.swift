@@ -1,5 +1,5 @@
 import SwiftUI
-import Combine
+import AsyncAlgorithms
 
 /// Conforming types exposes a view into the store holding its state
 ///
@@ -20,32 +20,16 @@ public protocol StoreViewProvider {
 }
 
 public extension StoreViewProvider where State: Equatable {
-    var publisher: AnyPublisher<State, Never> {
+    var values: AsyncStream<State> {
         let view = self.storeView
-        
-        return storeView.context.stateDidUpdate.compactMap { update -> State? in
+        return .init(chain([nonObservableState].async, view.context.stateUpdates.compactMap { update -> State? in
             let stateUpdate = StateUpdate(view: view, update: update)
-            
+
             let current = stateUpdate.current
             let previous = stateUpdate.previous
 
             return previous != current ? current : nil
-        }.merge(with: Just(value)).eraseToAnyPublisher()
-    }
-    
-    @available(iOS 15, macOS 12,  *)
-    var values: AsyncPublisher<AnyPublisher<Self.State, Never>> {
-        publisher.values
-    }
-}
-
-public extension StoreViewProvider {
-    func withAnimation<Result>(_ animation: Animation? = .default, _ body: () throws -> Result) rethrows -> Result {
-        try SwiftUI.withAnimation(animation) {
-            let result = try body()
-            storeView.context.forceStateUpdate()
-            return result
-        }
+        }))
     }
 }
 
@@ -54,11 +38,13 @@ public extension StoreViewProvider {
         let view = self.storeView
         return view.context.value(for: view.path.appending(path: keyPath), access: view.access, isSame: isSame)
     }
-    
+
     func value<T: Equatable>(for keyPath: KeyPath<State, T>) -> T {
         value(for: keyPath, isSame: ==)
     }
+}
 
+public extension StoreViewProvider {
     func storeView<T>(for keyPath: KeyPath<State, T>) -> StoreView<Root, T, Read> {
         let view = storeView
         return StoreView(context: view.context, path: view.path(keyPath), access: view.access)
@@ -77,17 +63,7 @@ public extension StoreViewProvider where Access == Write {
     }
 }
 
-public extension StoreViewProvider where State: Equatable {
-    var value: State {
-        value(for: \.self)
-    }
-}
-
 public extension StoreViewProvider {
-    subscript<T: Equatable>(dynamicMember path: KeyPath<State, T>) -> T {
-        value(for: path)
-    }
-
     subscript<T>(dynamicMember path: KeyPath<State, T>) -> StoreView<Root, T, Read> {
         storeView(for: path)
     }
@@ -106,23 +82,10 @@ public extension StoreViewProvider {
 }
 
 public extension StoreViewProvider where Access == Write {
-    subscript<T: Equatable>(dynamicMember path: WritableKeyPath<State, T>) -> T {
-        value(for: path)
-    }
-
     subscript<T>(dynamicMember path: WritableKeyPath<State, T>) -> StoreView<Root, T, Write> {
         storeView(for: path)
     }
-    
-    subscript<T: Equatable>(dynamicMember keyPath: WritableKeyPath<State, Writable<T>>) -> Binding<T> {
-        let storeView = self.storeView
-        return .init {
-            storeView.value(for: keyPath).wrappedValue
-        } set: { newValue in
-            storeView.setValue(newValue, at: keyPath)
-        }
-    }
-    
+
     subscript<T>(dynamicMember path: WritableKeyPath<State, Writable<T?>>) -> Binding<StoreView<Root, T, Write>?> {
         let view = self.storeView
         return .init {
@@ -133,22 +96,9 @@ public extension StoreViewProvider where Access == Write {
             }, at: path)
         }
     }
-
-    subscript<T>(dynamicMember path: WritableKeyPath<State, T?>) -> StoreView<Root, T, Write>? {
-        storeView(for: path)
-    }
-
-    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T>) -> StoreView<Root, T, Write>? where State == S? {
-        storeView(for: \.self)?.storeView(for: path)
-    }
-
-    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T?>) -> StoreView<Root, T, Write>? where State == S? {
-        storeView(for: \.self)?.storeView(for: path)
-    }
 }
 
-
-public extension StoreViewProvider {
+extension StoreViewProvider {
     var nonObservableState: State {
         let view = self.storeView
         return view.context[path: view.path, access: view.access]

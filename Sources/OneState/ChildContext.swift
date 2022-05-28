@@ -25,12 +25,8 @@ final class ChildContext<ParentState, State>: Context<State> {
         }
     }
     
-    override func sendEvent<T>(_ event: Any, path: KeyPath<State, T>, viewModel: Any) {
-        super.sendEvent(event, path: path, viewModel: viewModel)
-        context.sendEvent(event, path: self.path.appending(path: path), viewModel: viewModel)
-    }
-
-    override func forceStateUpdate() {
-        context.forceStateUpdate()
+    override func sendEvent<T>(_ event: Any, path: KeyPath<State, T>, viewModel: Any, callContext: CallContext?) {
+        super.sendEvent(event, path: path, viewModel: viewModel, callContext: callContext)
+        context.sendEvent(event, path: self.path.appending(path: path), viewModel: viewModel, callContext: callContext)
     }
 }

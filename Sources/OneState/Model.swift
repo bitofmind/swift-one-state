@@ -21,6 +21,7 @@ import Combine
 ///     let subModel = model.$sub
 ///
 @propertyWrapper
+@dynamicMemberLookup
 public struct Model<VM: ViewModel>: DynamicProperty {
     @Environment(\.modelEnvironments) private var modelEnvironments
     @StateObject private var access = ModelAccess<VM.State>()
@@ -33,7 +34,11 @@ public struct Model<VM: ViewModel>: DynamicProperty {
     public var wrappedValue: VM {
         didSet { checkedContext() }
     }
-    
+
+    public var projectedValue: Self {
+        self
+    }
+
     public mutating func update() {
         let context = checkedContext()
         let prevContext = access.context
@@ -53,6 +58,12 @@ public struct Model<VM: ViewModel>: DynamicProperty {
         context.viewEnvironments = modelEnvironments
         wrappedValue.retain()
         access.startObserve()
+    }
+}
+
+extension Model: StoreViewProvider {
+    public var storeView: StoreView<VM.State, VM.State, Write> {
+        wrappedValue.storeView
     }
 }
 

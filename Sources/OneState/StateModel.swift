@@ -43,10 +43,12 @@ extension StateModel: CustomStringConvertible {
     }
 }
 
-public extension StoreViewProvider where Access == Write {
+public extension ViewModel {
     @MainActor
     subscript<VM: ViewModel>(dynamicMember path: WritableKeyPath<State, StateModel<VM>>) -> VM where VM.StateContainer == VM.State {
-        VM(storeView(for: path.appending(path: \.wrappedValue)))
+        StoreAccess.$current.withValue(modelState?.storeAccess) {
+            VM(storeView(for: path.appending(path: \.wrappedValue)))
+        }
     }
 
     @MainActor
@@ -59,19 +61,21 @@ public extension StoreViewProvider where Access == Write {
     }
 
     @MainActor
-    subscript<Models>(dynamicMember path: WritableKeyPath<State, StateModel<Models>>) -> Models where Models.StateContainer: StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
+    subscript<Models>(dynamicMember path: WritableKeyPath<State, StateModel<Models>>) -> Models where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
         let view = storeView
         let containerView = StoreView(context: view.context, path: view.path(path.appending(path: \.wrappedValue)), access: view.access)
         let container = containerView.value(for: \.self, isSame: Models.StateContainer.hasSameStructure)
         let elementPaths = container.elementKeyPaths
-        let models = elementPaths.map { path in
-            Models.ModelElement(containerView.storeView(for: path))
+        let models =  StoreAccess.$current.withValue(modelState?.storeAccess) {
+            elementPaths.map { path in
+                Models.ModelElement(containerView.storeView(for: path))
+            }
         }
         return Models.modelContainer(from: models)
     }
 
     @MainActor
-    subscript<Models>(dynamicMember path: WritableKeyPath<State, Writable<StateModel<Models>>>) -> Binding<Models> where Models.StateContainer: StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
+    subscript<Models>(dynamicMember path: WritableKeyPath<State, Writable<StateModel<Models>>>) -> Binding<Models> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
         .init {
             self[dynamicMember: path.appending(path: \.wrappedValue)]
         } set: { models in
@@ -85,7 +89,7 @@ public extension ViewModel {
     /// Recieve events of from the `model`
     @discardableResult @MainActor
     func onEvent<VM: ViewModel>(from model: VM, perform: @escaping @MainActor (VM.Event) -> Void) -> AnyCancellable where VM.StateContainer == VM.State {
-        return onReceive(context.eventSubject.compactMap {
+        return forEach(context.events.compactMap {
             guard let event = $0.event as? VM.Event, let viewModel = $0.viewModel as? VM, viewModel.context === model.context else {
                 return nil
             }
@@ -96,7 +100,7 @@ public extension ViewModel {
     /// Recieve events of `event`from `model´`
     @discardableResult @MainActor
     func onEvent<VM: ViewModel>(_ event: VM.Event, from model: VM, perform: @escaping @MainActor () -> Void) -> AnyCancellable where VM.StateContainer == VM.State, VM.Event: Equatable {
-        return onReceive(context.eventSubject.compactMap {
+        return forEach(context.events.compactMap {
             guard let aEvent = $0.event as? VM.Event, aEvent == event, let viewModel = $0.viewModel as? VM, viewModel.context === model.context else {
                 return nil
             }
@@ -110,7 +114,7 @@ public extension ViewModel {
     where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
         let containerView = models.storeView(for: \.wrappedValue)
 
-        return onReceive(context.eventSubject) { anyEvent, eventPath, viewModel in
+        return forEach(context.events) { anyEvent, eventPath, viewModel, callContext in
             guard let event = anyEvent as? Models.ModelElement.Event else { return }
 
             let container = containerView.nonObservableState
@@ -118,7 +122,11 @@ public extension ViewModel {
                 let elementPath = models.storeView.path.appending(path: \.wrappedValue).appending(path: path)
 
                 if elementPath == eventPath {
-                    perform(event, viewModel as! Models.ModelElement)
+                    (callContext ?? .empty) {
+                        CallContext.$current.withValue(callContext) {
+                            perform(event, viewModel as! Models.ModelElement)
+                        }
+                    }
                 }
             }
         }
@@ -149,34 +157,33 @@ public extension ViewModel {
             return (key, model)
         })
 
-        let publisher = containerView.stateDidUpdatePublisher
-            .handleEvents(receiveCancel: {
-                for model in activatedModels.values {
-                    model.context.releaseFromView()
+        return task {
+            for await update in containerView.stateUpdates {
+                let previous = update.previous
+                let current = update.current
+                let isSame = Models.StateContainer.hasSameStructure(lhs: previous, rhs: current)
+                guard !isSame else { continue }
+
+                let previousKeys = Set(previous.elementKeyPaths)
+                let currentKeys = Set(current.elementKeyPaths)
+
+                for newKey in currentKeys.subtracting(previousKeys) {
+                    let view = containerView.storeView(for: newKey)
+                    let model = Models.ModelElement(view)
+                    model.retain()
+                    activatedModels[newKey] = model
                 }
-            })
 
-        return onReceive(publisher) { update in
-            let previous = update.previous
-            let current = update.current
-            let isSame = Models.StateContainer.hasSameStructure(lhs: previous, rhs: current)
-            guard !isSame else { return }
-
-            let previousKeys = Set(previous.elementKeyPaths)
-            let currentKeys = Set(current.elementKeyPaths)
-
-            for newKey in currentKeys.subtracting(previousKeys) {
-                let view = containerView.storeView(for: newKey)
-                let model = Models.ModelElement(view)
-                model.retain()
-                activatedModels[newKey] = model
+                for oldKey in previousKeys.subtracting(currentKeys) {
+                    let model = activatedModels[oldKey]
+                    assert(model != nil)
+                    model?.context.releaseFromView()
+                    activatedModels[oldKey] = nil
+                }
             }
 
-            for oldKey in previousKeys.subtracting(currentKeys) {
-                let model = activatedModels[oldKey]
-                assert(model != nil)
-                model?.context.releaseFromView()
-                activatedModels[oldKey] = nil
+            for model in activatedModels.values {
+                model.context.releaseFromView()
             }
         }
     }

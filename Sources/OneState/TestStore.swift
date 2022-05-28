@@ -53,20 +53,7 @@ public extension TestStore where State: Equatable {
 
         let didPass = await withThrowingTaskGroup(of: Bool.self, returning: Bool.self) { [state] group in
             group.addTask { @MainActor in
-                await AsyncStream<Bool> { cont in
-                    let cancellable = self.context.stateDidUpdate
-                        .map { _ in }
-                        .merge(with: Just(()))
-                        .filter { self.context[path: \.self, access: nil] == state }
-                        .sink {
-                            cont.yield(true)
-                        }
-
-                    cont.onTermination = { _ in
-                        cont.yield(false)
-                        cancellable.cancel()
-                    }
-                }.first { _ in true }!
+                await self.values.first { $0 == state } != nil
             }
 
             group.addTask {

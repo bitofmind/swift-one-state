@@ -11,10 +11,15 @@ let package = Package(
     products: [
         .library(name: "OneState", targets: ["OneState"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "0.0.0"),
+    ],
     targets: [
         .target(
             name: "OneState",
-            dependencies: []
+            dependencies: [
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
+            ]
         )
     ]
 )

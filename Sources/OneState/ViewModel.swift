@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 /// Holds a model that drives SwiftUI views
 ///
@@ -34,7 +35,7 @@ import Combine
 ///         }
 ///     }
 @dynamicMemberLookup
-public protocol ViewModel: ModelContainer, StoreViewProvider {
+public protocol ViewModel: ModelContainer {
     /// The type of the this view model's state.
     associatedtype State
 
@@ -76,17 +77,6 @@ public extension ViewModel {
         if context.isForTesting {
             self.retain()
         }
-    }
-}
-
-public extension ViewModel {
-    /// Conformance to `StoreViewProvider`
-    var storeView: StoreView<State, State, Write> {
-        let modelState = self.modelState
-        guard let context = modelState?.context as? Context<State> else {
-            fatalError("ViewModel \(type(of: self)) is used before fully initialized")
-        }
-        return .init(context: context, path: \.self, access: modelState?.storeAccess)
     }
 }
 
@@ -138,113 +128,87 @@ public extension ViewModel {
     /// Iterate an async sequence for the life time of the model
     ///
     /// - Parameter catch: Called if the sequence throws an error
+    /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult
-    func forEach<S: AsyncSequence>(_ sequence: S, perform: @escaping @MainActor (S.Element) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> AnyCancellable {
+    func forEach<S: AsyncSequence>(_ sequence: S, cancelPrevious: Bool = false, perform: @escaping @MainActor (S.Element) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> AnyCancellable {
         task({
+            guard cancelPrevious else {
+                for try await value in sequence {
+                    try await perform(value)
+                }
+                return
+            }
+
+            var task: Task<(), Error>?
+            var caughtError: Error? = nil
             for try await value in sequence {
-                try await perform(value)
+                guard caughtError == nil, !Task.isCancelled else { return }
+
+                if let task = task {
+                    task.cancel()
+                    try? await task.value
+                }
+
+                task = Task {
+                    guard !Task.isCancelled else { return }
+                    do {
+                        try await self.context {
+                            try await perform(value)
+                        }
+                    } catch is CancellationError {
+                    } catch {
+                        caughtError = error
+                        `catch`?(error)
+                    }
+                }
             }
         }, catch: `catch`)
     }
 
-    /// Receive updates from a publisher for the life time of the model
-    ///
-    /// - Parameter catch: Called if the sequence throws an error
-    /// - Returns: A cancellable to optionally allow cancelling before a view goes away
-    @discardableResult @MainActor
-    func onReceive<P: Publisher>(_ publisher: P, perform: @escaping @MainActor (P.Output) -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> AnyCancellable {
-        let cancellable = publisher.sink(receiveCompletion: { completion in
-            if case let .failure(error) = completion {
-                `catch`?(error)
-            }
-        }, receiveValue: { value in
-            perform(value)
-        })
-
-        cancellable.store(in: self)
-        return cancellable
-    }
-
-    /// Receive updates from a publisher for the life time of the model
-    ///
-    /// - Parameter catch: Called if the sequence throws an error
-    /// - Returns: A cancellable to optionally allow cancelling before a view goes away
-    @discardableResult
-    func onReceive<P: Publisher>(_ publisher: P, perform: @escaping @MainActor (P.Output) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> AnyCancellable {
-        if #available(iOS 15, macOS 12,  *) {
-            return forEach(publisher.values, perform: perform, catch: `catch`)
-        } else {
-            let stream = AsyncStream<P.Output> { cont in
-                let cancellable = publisher.sink(receiveCompletion: { completion in
-                    if case let .failure(error) = completion {
-                        Task { @MainActor in
-                            `catch`?(error)
-                        }
-                    }
-                      
-                    cont.finish()
-                }, receiveValue: { value in
-                    cont.yield(value)
-                })
-                
-                cont.onTermination = { _ in
-                    cancellable.cancel()
-                }
-            }
-
-            return forEach(stream, perform: perform, catch: `catch`)
-        }
-    }
-
     /// Wait until the predicate based on the models state is fullfilled
-    @available(iOS 15, macOS 12,  *)
     func waitUntil(_ predicate: @autoclosure @escaping () -> Bool) async {
-        _ = await context.stateDidUpdate.values.first { _ in
+        _ = await context.stateUpdates.first { _ in
             await context { predicate() }
         }
     }
 
     /// Listen on model state changes for the life time of the model
     ///
+    ///     onChange(of: $state.count) { count in
+    ///
+    /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult @MainActor
-    func onChange<Provider>(of provider: Provider, perform: @escaping @MainActor (Provider.State) -> Void) -> AnyCancellable where Provider: StoreViewProvider, Provider.State: Equatable {
-        onReceive(provider.stateDidUpdatePublisher) { change in
-            guard let value = change[dynamicMember: \.self] else { return }
-            perform(value)
-        }
+    func onChange<Provider>(of provider: Provider, cancelPrevious: Bool = false, perform: @escaping @MainActor (Provider.State) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> AnyCancellable where Provider: StoreViewProvider, Provider.State: Equatable {
+        forEach(provider.values.dropFirst(), cancelPrevious: cancelPrevious, perform: perform, catch: `catch`)
     }
-
     
     /// Receive updates when a model state becomes equal to the provided `value`
     ///
+    ///     onChange(of: $state.isActive, to: true) {
+    ///
+    /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult
-    func onChange<Provider>(of provider: Provider, to value: Provider.State, perform: @escaping @MainActor () async throws -> Void) -> AnyCancellable where Provider: StoreViewProvider, Provider.State: Equatable {
-        onReceive(provider.stateDidUpdatePublisher) { change in
-            guard let val = change[dynamicMember: \.self], val == value else { return }
-            try await perform()
-        }
+    func onChange<Provider>(of provider: Provider, to value: Provider.State, cancelPrevious: Bool = false, perform: @escaping @MainActor () async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> AnyCancellable where Provider: StoreViewProvider, Provider.State: Equatable {
+        forEach(provider.values.dropFirst().filter { $0 == value }.map { _ in () }, cancelPrevious: cancelPrevious, perform: perform, catch: `catch`)
     }
 
     /// Receive updates when a model state becomes non-nil
     ///
+    /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult
-    func onChange<Provider, T>(ofUnwrapped provider: Provider, perform: @escaping @MainActor (T) async throws -> Void) -> AnyCancellable where Provider: StoreViewProvider, Provider.State == T?, T: Equatable {
-        onReceive(provider.stateDidUpdatePublisher) { update in
-            guard let value: T? = update[dynamicMember: \.self],
-                let unwrapped = value else { return }
-            try await perform(unwrapped)
-        }
+    func onChange<Provider, T>(ofUnwrapped provider: Provider, perform: @escaping @MainActor (T) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> AnyCancellable where Provider: StoreViewProvider, Provider.State == T?, T: Equatable {
+        forEach(provider.values.dropFirst().compacted(), perform: perform, catch: `catch`)
     }
 }
 
 public extension ViewModel {
     /// Sends an event to self and ancestors
     func send(_ event: Event) {
-        context.sendEvent(event, viewModel: self)
+        context.sendEvent(event, viewModel: self, callContext: .current)
     }
 
     /// Recieve events of type `modelType` from self or descendants
@@ -254,7 +218,7 @@ public extension ViewModel {
     ///     }
     @discardableResult @MainActor
     func onEvent<VM: ViewModel>(fromType modelType: VM.Type = VM.self, perform: @escaping @MainActor (VM.Event, VM) -> Void) -> AnyCancellable {
-        onReceive(context.eventSubject.compactMap {
+        forEach(context.events.compactMap {
             guard let event = $0.event as? VM.Event, let viewModel = $0.viewModel as? VM else { return nil }
             return (event, viewModel)
         }, perform: perform)
@@ -287,6 +251,72 @@ public extension ViewModel {
     }
 }
 
+public extension ViewModel {
+    subscript<T: Equatable>(dynamicMember path: KeyPath<State, T>) -> T {
+        value(for: path)
+    }
+
+    subscript<T: Equatable>(dynamicMember path: WritableKeyPath<State, T>) -> T {
+        value(for: path)
+    }
+
+    subscript<S, T: Equatable>(dynamicMember path: WritableKeyPath<S, T>) -> T?  where State == S? {
+        _ = value(for: \.self, isSame: State.hasSameStructure) // To trigger update once optional toggles
+        guard let path  = nonObservableState.elementKeyPaths.first?.appending(path: path) else { return nil }
+        return value(for: path)
+    }
+
+    subscript<S, T: Equatable>(dynamicMember path: WritableKeyPath<S, T?>) -> T?  where State == S? {
+        _ = value(for: \.self, isSame: State.hasSameStructure) // To trigger update once optional toggles
+        guard let path = nonObservableState.elementKeyPaths.first?.appending(path: path) else { return nil }
+        return value(for: path)
+    }
+
+    subscript<T: Equatable>(dynamicMember keyPath: WritableKeyPath<State, Writable<T>>) -> Binding<T> {
+        let storeView = self.storeView
+        return .init {
+            storeView.value(for: keyPath).wrappedValue
+        } set: { newValue in
+            storeView.setValue(newValue, at: keyPath)
+        }
+    }
+
+    var nonObservableState: State {
+        let view = self.storeView
+        return view.context[path: view.path, access: view.access]
+    }
+}
+
+public extension ViewModel where State: Equatable {
+    var value: State {
+        value(for: \.self)
+    }
+}
+
+public extension ViewModel {
+    func value<T>(for keyPath: KeyPath<State, T>, isSame: @escaping (T, T) -> Bool) -> T {
+        let view = self.storeView
+        return view.context.value(for: view.path.appending(path: keyPath), access: view.access, isSame: isSame)
+    }
+
+    func value<T: Equatable>(for keyPath: KeyPath<State, T>) -> T {
+        value(for: keyPath, isSame: ==)
+    }
+}
+
+public extension ViewModel {
+    func withAnimation<Result>(_ animation: Animation? = .default, _ body: () throws -> Result) rethrows -> Result {
+        let callContext = CallContext { action in
+            SwiftUI.withAnimation(animation) {
+                action()
+            }
+        }
+
+        return try CallContext.$current.withValue(callContext) {
+            try body()
+        }
+    }
+}
 
 public struct EmptyModel<State>: ViewModel {
     public typealias State = State
@@ -295,8 +325,28 @@ public struct EmptyModel<State>: ViewModel {
 }
 
 extension ViewModel {
-    var context: Context<State> {
+    var storeView: StoreView<State, State, Write> {
+        let modelState = self.modelState
         guard let context = modelState?.context as? Context<State> else {
+            fatalError("ViewModel \(type(of: self)) is used before fully initialized")
+        }
+        return .init(context: context, path: \.self, access: modelState?.storeAccess)
+    }
+
+    func storeView<T>(for keyPath: WritableKeyPath<State, T>) -> StoreView<State, T, Write> {
+        let view = storeView
+        return StoreView(context: view.context, path: view.path(keyPath), access: view.access)
+    }
+
+    func setValue<T>(_ value: T, at keyPath: WritableKeyPath<State, Writable<T>>) {
+        let view = storeView
+        return view.context[path: view.path(keyPath), access: view.access] = .init(wrappedValue: value)
+    }
+}
+
+extension ViewModel {
+    var context: Context<State> {
+        guard let context = modelState?.context else {
             fatalError("ViewModel \(type(of: self)) is used before fully initialized")
         }
 
