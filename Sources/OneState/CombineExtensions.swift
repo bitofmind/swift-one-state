@@ -9,7 +9,7 @@ public extension ViewModel {
     /// - Parameter catch: Called if the sequence throws an error
     /// - Returns: A cancellable to optionally allow cancelling before a view goes away
     @discardableResult @MainActor
-    func onReceive<P: Publisher>(_ publisher: P, perform: @escaping @MainActor (P.Output) -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> AnyCancellable {
+    func onReceive<P: Publisher>(_ publisher: P, perform: @escaping @MainActor (P.Output) -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable {
         let cancellable = publisher.sink(receiveCompletion: { completion in
             if case let .failure(error) = completion {
                 `catch`?(error)
@@ -66,5 +66,7 @@ extension PassthroughSubject where Failure == Never {
         }
     }
 }
+
+extension Combine.AnyCancellable: Cancellable {}
 
 #endif
