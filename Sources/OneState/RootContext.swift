@@ -47,7 +47,7 @@ final class RootContext<State>: Context<State> {
 
         let lastContext: ContextBase? = stateLock { lastFromContext }
 
-        if let last = lastContext, last !== fromContext, CallContext.current != nil {
+        if let last = lastContext, (last !== fromContext || CallContext.current != nil) {
             notify(context: last)
         }
 
