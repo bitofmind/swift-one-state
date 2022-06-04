@@ -1,5 +1,3 @@
-import SwiftUI
-
 // A view into a store's state
 @dynamicMemberLookup
 public struct StoreView<Root, State, Access> {

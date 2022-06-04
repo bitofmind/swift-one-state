@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 
 /// Holds a model that drives SwiftUI views
 ///
@@ -253,15 +252,6 @@ public extension ViewModel {
         return value(for: path)
     }
 
-    subscript<T: Equatable>(dynamicMember keyPath: WritableKeyPath<State, Writable<T>>) -> Binding<T> {
-        let storeView = self.storeView
-        return .init {
-            storeView.value(for: keyPath).wrappedValue
-        } set: { newValue in
-            storeView.setValue(newValue, at: keyPath)
-        }
-    }
-
     var nonObservableState: State {
         let view = self.storeView
         return view.context[path: view.path, access: view.access]
@@ -282,20 +272,6 @@ public extension ViewModel {
 
     func value<T: Equatable>(for keyPath: KeyPath<State, T>) -> T {
         value(for: keyPath, isSame: ==)
-    }
-}
-
-public extension ViewModel {
-    func withAnimation<Result>(_ animation: Animation? = .default, _ body: () throws -> Result) rethrows -> Result {
-        let callContext = CallContext { action in
-            SwiftUI.withAnimation(animation) {
-                action()
-            }
-        }
-
-        return try CallContext.$current.withValue(callContext) {
-            try body()
-        }
     }
 }
 

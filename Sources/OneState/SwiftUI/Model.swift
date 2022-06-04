@@ -1,3 +1,4 @@
+#if canImport(SwiftUI)
 import SwiftUI
 
 /// Declares a view models state
@@ -84,3 +85,5 @@ public struct UsingModel<VM: ViewModel, Content: View>: View {
         content(model)
     }
 }
+
+#endif

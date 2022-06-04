@@ -1,4 +1,3 @@
-import SwiftUI
 import AsyncAlgorithms
 
 /// Conforming types exposes a view into the store holding its state
@@ -90,17 +89,6 @@ public extension StoreViewProvider {
 public extension StoreViewProvider where Access == Write {
     subscript<T>(dynamicMember path: WritableKeyPath<State, T>) -> StoreView<Root, T, Write> {
         storeView(for: path)
-    }
-
-    subscript<T>(dynamicMember path: WritableKeyPath<State, Writable<T?>>) -> Binding<StoreView<Root, T, Write>?> {
-        let view = self.storeView
-        return .init {
-            view.storeView(for: path.appending(path: \.wrappedValue))
-        } set: { newValue in
-            view.setValue(newValue.map {
-                $0.context[path: $0.path, access: view.access]
-            }, at: path)
-        }
     }
 }
 

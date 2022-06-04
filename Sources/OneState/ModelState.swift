@@ -50,17 +50,3 @@ public extension ModelState {
         context.isStateOverridden
     }
 }
-
-#if canImport(SwiftUI)
-import SwiftUI
-
-public extension Binding where Value: Equatable {
-    init(_ modelState: ModelState<Value>) {
-        self.init(
-            get: { modelState.context.value(for: \.self, access: modelState.storeAccess) },
-            set: { modelState.wrappedValue = $0 }
-        )
-    }
-}
-
-#endif
