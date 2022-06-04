@@ -66,16 +66,7 @@ public extension ViewModel {
     @MainActor
     init<Provider: StoreViewProvider>(_ viewStore: Provider) where Provider.State == State, Provider.Access == Write {
         let view = viewStore.storeView
-        let context = view.context.context(at: view.path)
-
-        context.propertyIndex = 0
-        self = ContextBase.$current.withValue(context) {
-             Self()
-        }
-
-        if context.isForTesting {
-            self.retain()
-        }
+        self.init(context: view.context.context(at: view.path))
     }
 }
 
@@ -154,10 +145,11 @@ public extension ViewModel {
     }
 
     /// Wait until the predicate based on the models state is fullfilled
-    func waitUntil(_ predicate: @autoclosure @escaping () -> Bool) async {
+    func waitUntil(_ predicate: @autoclosure @escaping () -> Bool) async throws {
         _ = await context.stateUpdates.first { _ in
             await context { predicate() }
         }
+        try Task.checkCancellation()
     }
 
     /// Listen on model state changes for the life time of the model
@@ -226,15 +218,17 @@ public extension ViewModel {
 }
 
 public extension ViewModel {
-    @discardableResult
-    @MainActor
-    func activate<VM: ViewModel>(_ viewModel: VM) -> Cancellable {
-        viewModel.retain()
-        let cancellable = AnyCancellable {
-            viewModel.context.releaseFromView()
+    @discardableResult @MainActor
+    func activate() -> Cancellable {
+        retain()
+        return AnyCancellable {
+            context.releaseFromView()
         }
-        cancellable.store(in: self)
-        return cancellable
+    }
+
+    @discardableResult @MainActor
+    func activate<VM: ViewModel>(_ viewModel: VM) -> Cancellable {
+        viewModel.activate().store(in: self)
     }
 }
 
@@ -305,22 +299,6 @@ public extension ViewModel {
     }
 }
 
-public protocol Cancellable {
-    func cancel()
-}
-
-public extension Cancellable {
-    /// Cancellables stored in a view model will be cancelled once the last view using the model for the
-    /// same underlying state is non longer being displayed
-    @discardableResult
-    func store<VM: ViewModel>(in viewModel: VM) -> Cancellable {
-        viewModel.context.cancellables.append(self)
-        return self
-    }
-}
-
-extension Task: Cancellable { }
-
 public struct EmptyModel<State>: ViewModel {
     public typealias State = State
     @ModelState var state: State
@@ -348,6 +326,18 @@ extension ViewModel {
 }
 
 extension ViewModel {
+    @MainActor
+    init(context: Context<State>) {
+        context.propertyIndex = 0
+        self = ContextBase.$current.withValue(context) {
+             Self()
+        }
+
+        if context.isForTesting {
+            self.retain()
+        }
+    }
+    
     var context: Context<State> {
         guard let context = modelState?.context else {
             fatalError("ViewModel \(type(of: self)) is used before fully initialized")
@@ -388,10 +378,4 @@ extension ViewModel {
     func release() {
         context.releaseFromView()
     }
-}
-
-struct AnyCancellable: Cancellable {
-    var onCancel: () -> Void
-
-    func cancel() { onCancel() }
 }

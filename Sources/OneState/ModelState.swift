@@ -5,29 +5,22 @@ import Foundation
 public struct ModelState<State> {
     let context: Context<State>
     weak var storeAccess: StoreAccess?
-    let isSame: (State, State) -> Bool
 
-    public init(isSame: @escaping (State, State) -> Bool = { _, _ in false }) {
+    public init() {
         guard let context = ContextBase.current as? Context<State> else {
-            fatalError("ModelState can only be used from a ViewModel created via viewModel()")
+            fatalError("ModelState can only be used from a ViewModel with an injected view.")
         }
         self.context = context
         storeAccess = StoreAccess.current
-        self.isSame = isSame
-    }
-
-    public init() where State: Equatable {
-        self.init(isSame: ==)
     }
 
     public var wrappedValue: State {
-        get {
-            context[path: \.self, access: storeAccess]
+        _read {
+            yield context[path: \.self, access: storeAccess]
         }
 
-        nonmutating set {
-            guard !isSame(wrappedValue, newValue) else { return }
-            context[path: \.self, access: storeAccess] = newValue
+        nonmutating _modify {
+            yield &context[path: \.self, access: storeAccess]
         }
     }
 

@@ -3,20 +3,19 @@ import Foundation
 public final class TestStore<Model: ViewModel> {
     public typealias State = Model.State
 
-    var context: RootContext<State>
-    var environments: Environments = [:]
+    var store: Store<Model>
     var onTestFailure: (TestFailure<State>) -> Void
 
-    public init(state: State, onTestFailure: @escaping (TestFailure<State>) -> Void) {
-        context = .init(state: state)
-        context.isForTesting = true
+    public init(initialState: State, environments: [Any] = [], onTestFailure: @escaping (TestFailure<State>) -> Void) {
+        store = .init(initialState: initialState, environments: environments)
+        store.context.isForTesting = true
         self.onTestFailure = onTestFailure
     }
 }
 
 public extension TestStore {
-    convenience init<T>(state: T, onTestFailure: @escaping (TestFailure<State>) -> Void) where Model == EmptyModel<T> {
-        self.init(state: state, onTestFailure: onTestFailure)
+    convenience init<T>(initialState: T, environments: [Any] = [], onTestFailure: @escaping (TestFailure<State>) -> Void) where Model == EmptyModel<T> {
+        self.init(initialState: initialState, environments: environments, onTestFailure: onTestFailure)
     }
 
     @MainActor var model: Model {
@@ -33,21 +32,20 @@ public struct TestFailure<State> {
 
 extension TestStore: StoreViewProvider {
     public var storeView: StoreView<State, State, Write> {
-        .init(context: context, path: \.self, access: nil)
+        store.storeView
     }
 }
 
 public extension TestStore {
-    func modelEnvironment<Value>(_ value: Value) -> Self {
-        context.localEnvironments[ObjectIdentifier(Value.self)] = value
-        return self
+    func updateEnvironment<Value>(_ value: Value) {
+        store.updateEnvironment(value)
     }
 }
 
 public extension TestStore where State: Equatable {
     func test(timeout: TimeInterval = 1.0, file: StaticString = #file, line: UInt = #line, _ block: @escaping (inout State) async throws -> Void) async rethrows {
 
-        var state = context[path: \.self, access: nil]
+        var state = store.state
         try await block(&state)
 
         let didPass = await withThrowingTaskGroup(of: Bool.self, returning: Bool.self) { [state] group in
@@ -73,7 +71,7 @@ public extension TestStore where State: Equatable {
         
         onTestFailure(.init(
             expected: state,
-            actual: context[path: \.self, access: nil],
+            actual: store.context[path: \.self, access: nil],
             file: file,
             line: line
         ))

@@ -19,17 +19,23 @@ public protocol StoreViewProvider {
     var storeView: StoreView<Root, State, Access> { get }
 }
 
-public extension StoreViewProvider where State: Equatable {
-    var values: AsyncStream<State> {
+public extension StoreViewProvider {
+    func values(isSame: @escaping (State, State) -> Bool) -> AsyncStream<State> {
         let view = self.storeView
-        return .init(chain([nonObservableState].async, view.context.stateUpdates.compactMap { update -> State? in
-            let stateUpdate = StateUpdate(view: view, update: update)
+        return .init(chain([nonObservableState].async, view.context.stateUpdates.compactMap { stateChange -> State? in
+            let stateUpdate = StateUpdate(stateChange: stateChange, provider: view)
 
             let current = stateUpdate.current
             let previous = stateUpdate.previous
 
-            return previous != current ? current : nil
+            return !isSame(previous, current) ? current : nil
         }))
+    }
+}
+
+public extension StoreViewProvider where State: Equatable {
+    var values: AsyncStream<State> {
+        values(isSame: ==)
     }
 }
 
