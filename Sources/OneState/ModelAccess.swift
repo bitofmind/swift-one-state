@@ -14,27 +14,40 @@ class ModelAccess<State>: StoreAccess, ObservableObject {
 
     override func willAccess<Root, State>(path: KeyPath<Root, State>, context: Context<Root>, isSame: @escaping (State, State) -> Bool) {
         lock {
-            if observedStates.index(forKey: path) == nil {
-                //print("will start observing:", path, type(of: self))
+            guard observedStates.index(forKey: path) == nil else { return }
 
-                observedStates[path] = { [weak context] update in
-                    guard let context = context else { return false }
+            observedStates[path] = { [weak context] update in
+                guard let context = context else { return false }
 
-                    return isSame(
-                        context.getShared(shared: update.current, path: path),
-                        context.getShared(shared: update.previous, path: path)
-                    )
-                }
+                return isSame(
+                    context[path: path, shared: update.current],
+                    context[path: path, shared: update.previous]
+                )
             }
         }
     }
 
     override var allowAccessToBeOverridden: Bool { true }
+}
+
+extension ModelAccess {
+    func startObserve() {
+        observationTask?.cancel()
+        wasStateOverriden = context.isStateOverridden
+        observationTask = Task { @MainActor [weak self] in
+            guard let updates = self?.context.stateUpdates else { return }
+            for await update in updates {
+                self?.handle(update: update)
+            }
+        }
+    }
 
     var isObservering: Bool {
         observationTask != nil
     }
+}
 
+private extension ModelAccess {
     func handle(update: AnyStateChange) {
         guard update.isStateOverridden == update.isOverrideUpdate else { return }
 
@@ -47,32 +60,19 @@ class ModelAccess<State>: StoreAccess, ObservableObject {
             for equal in observedStates.values {
                 guard equal(update) else {
 #if false
-                    let previous = context.getShared(shared: update.previous, path: \State.self)
-                    let current = context.getShared(shared: update.current, path: \State.self)
-                    print("previous", previous)
-                    print("current", current)
+                    print("previous", update.previous)
+                    print("current", update.current)
 #endif
                     return true
                 }
             }
+
             return false
         }
 
-        if wasUpdated {
-            (update.callContext ?? .empty) {
-                objectWillChange.send()
-            }
-        }
-    }
+        guard wasUpdated else { return }
 
-    func startObserve() {
-        observationTask?.cancel()
-        wasStateOverriden = context.isStateOverridden
-        observationTask = Task { @MainActor [weak self] in
-            guard let updates = self?.context.stateUpdates else { return }
-            for await update in updates {
-                self?.handle(update: update)
-            }
-        }
+        let callContext = update.callContext ?? .empty
+        callContext(objectWillChange.send)
     }
 }

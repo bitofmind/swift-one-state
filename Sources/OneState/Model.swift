@@ -22,7 +22,6 @@ import SwiftUI
 @propertyWrapper
 @dynamicMemberLookup
 public struct Model<VM: ViewModel>: DynamicProperty {
-    @Environment(\.modelEnvironments) private var modelEnvironments
     @StateObject private var access = ModelAccess<VM.State>()
 
     public init(wrappedValue: VM) {
@@ -44,17 +43,13 @@ public struct Model<VM: ViewModel>: DynamicProperty {
         access.context = context
         if wrappedValue.modelState?.storeAccess !== access {
             StoreAccess.$current.withValue(access) {
-                context.propertyIndex = 0
-                ContextBase.$current.withValue(context) {
-                    wrappedValue = VM()
-                }
+                wrappedValue = VM(context: context)
             }
         }
 
         guard context !== prevContext else { return }
 
         prevContext?.releaseFromView()
-        context.viewEnvironments = modelEnvironments
         wrappedValue.retain()
         access.startObserve()
     }

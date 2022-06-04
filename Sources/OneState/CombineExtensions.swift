@@ -24,7 +24,7 @@ public extension ViewModel {
 }
 
 public extension StoreViewProvider {
-    var stateUpdatePublisher: AnyPublisher<StateUpdate<Root, State, Access>, Never> {
+    var stateUpdatePublisher: AnyPublisher<StateUpdate<State>, Never> {
         PassthroughSubject(stateUpdates).eraseToAnyPublisher()
     }
 }
@@ -68,5 +68,7 @@ extension PassthroughSubject where Failure == Never {
 }
 
 extension Combine.AnyCancellable: Cancellable {}
+
+extension Store: ObservableObject {}
 
 #endif

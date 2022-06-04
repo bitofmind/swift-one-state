@@ -1,16 +1,16 @@
-import Foundation
-
 class ContextBase: HoldsLock {
     var lock = Lock()
     private(set) weak var parent: ContextBase?
 
     private var _children: [AnyKeyPath: ContextBase] = [:]
     private var _overrideChildren: [AnyKeyPath: ContextBase] = [:]
-    
+
     let stateUpdates = AsyncPassthroughSubject<AnyStateChange>()
 
-    @Locked var viewEnvironments: Environments = [:]
-    @Locked var localEnvironments: Environments = [:]
+    typealias Event = (event: Any, path: AnyKeyPath, viewModel: Any, callContext: CallContext?)
+    let events = AsyncPassthroughSubject<Event>()
+
+    @Locked var environments: Environments = [:]
 
     @Locked var propertyIndex = 0
     @Locked var properties: [Any] = []
@@ -27,12 +27,21 @@ class ContextBase: HoldsLock {
             isForTesting = parent.isForTesting
         }
     }
-    
+
     deinit {
         onRemoval()
     }
-    
-    var children: [AnyKeyPath: ContextBase] {
+
+    var regularChildren: [AnyKeyPath: ContextBase] {
+        get {
+            return lock { _children }
+        }
+        set {
+            lock { _children = newValue }
+        }
+    }
+
+    var allChildren: [AnyKeyPath: ContextBase] {
         get {
             let isStateOverridden = isStateOverridden
             return lock { isStateOverridden ? _overrideChildren : _children }
@@ -48,28 +57,28 @@ class ContextBase: HoldsLock {
             }
         }
     }
-    
-    func removeChildStore(_ storeTorRemove: ContextBase) {
+
+    func removeChildStore(_ storeToRemove: ContextBase) {
         lock {
-            for (path, context) in _overrideChildren where context === storeTorRemove {
+            for (path, context) in _overrideChildren where context === storeToRemove {
                 _overrideChildren[path] = nil
                 return
             }
-            
-            for (path, context) in _children where context === storeTorRemove {
+
+            for (path, context) in _children where context === storeToRemove {
                 _children[path] = nil
                 return
             }
-            
+
             fatalError("Failed to remove context")
         }
     }
-    
+
     func removeChildren() {
         let children: [ContextBase] = lock {
             Array(_overrideChildren.values) + _children.values
         }
-        
+
         for child in children {
             child.onRemovalFromView()
         }
@@ -79,7 +88,7 @@ class ContextBase: HoldsLock {
         parent?.notifyAncestors(update)
         parent?.stateUpdates.yield(update)
     }
-    
+
     func notifyDescendants(_ update: AnyStateChange) {
         let (children, overrideChildren) = lock {
             (_children.values, _overrideChildren.values)
@@ -97,8 +106,18 @@ class ContextBase: HoldsLock {
             child.notifyDescendants(update)
         }
     }
-    
+
+    func notify(_ update: AnyStateChange) {
+        notifyAncestors(update)
+        stateUpdates.yield(update)
+        notifyDescendants(update)
+    }
+
     var isStateOverridden: Bool {
+        fatalError()
+    }
+
+    func sendEvent(_ event: Any, path: AnyKeyPath, viewModel: Any, callContext: CallContext?) {
         fatalError()
     }
 }
@@ -109,11 +128,11 @@ extension ContextBase {
             parent?._overrideChildren.values.contains { $0 === self } ?? false
         }
     }
-    
+
     func retainFromView() {
         refCount += 1
     }
-    
+
     func releaseFromView() {
         refCount -= 1
         if refCount == 0 {
@@ -125,33 +144,32 @@ extension ContextBase {
 private extension ContextBase {
     func onRemovalFromView() {
         if isStateOverridden && !isOverrideStore { return }
-        
+
         onRemoval()
     }
-    
+
     func onRemoval() {
         guard !hasBeenRemoved else {
             return
         }
-        
+
         let cancellables = self.cancellables
         guard cancellables.isEmpty else {
             self.cancellables.removeAll()
             for cancellable in cancellables {
                 cancellable.cancel()
             }
-            
+
             return onRemoval() // Call recursively in case more actions has been added while cancelling
         }
 
         if parent != nil {
             hasBeenRemoved = true
         }
-                            
+
         removeChildren()
         if let parent = parent {
             parent.removeChildStore(self)
         }
     }
 }
-

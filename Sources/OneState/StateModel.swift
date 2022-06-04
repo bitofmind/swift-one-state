@@ -22,7 +22,17 @@ import SwiftUI
 ///     appModel.$mains // [MainModel]
 @propertyWrapper
 public struct StateModel<Container: ModelContainer> {
-    public var wrappedValue: Container.StateContainer
+    var _wrappedValue: Container.StateContainer
+
+    public var wrappedValue: Container.StateContainer {
+        get {
+            threadState.stateModelCount += 1
+            return _wrappedValue
+        }
+        set {
+            _wrappedValue = newValue
+        }
+    }
 
     public var projectedValue: Self {
         get { self }
@@ -30,7 +40,7 @@ public struct StateModel<Container: ModelContainer> {
     }
 
     public init(wrappedValue: Container.StateContainer) {
-        self.wrappedValue = wrappedValue
+        _wrappedValue = wrappedValue
     }
 }
 
@@ -114,13 +124,14 @@ public extension ViewModel {
         let containerView = models.storeView(for: \.wrappedValue)
 
         return forEach(context.events) { anyEvent, eventPath, viewModel, callContext in
-            guard let event = anyEvent as? Models.ModelElement.Event else { return }
+            guard let event = anyEvent as? Models.ModelElement.Event,
+                  let containerPath = containerView.context.storePath.appending(path: containerView.path)
+            else { return }
 
             let container = containerView.nonObservableState
-            for path in container.elementKeyPaths {
-                let elementPath = models.storeView.path.appending(path: \.wrappedValue).appending(path: path)
 
-                if elementPath == eventPath {
+            for path in container.elementKeyPaths {
+                if let elementPath = containerPath.appending(path: path), elementPath == eventPath {
                     (callContext ?? .empty) {
                         CallContext.$current.withValue(callContext) {
                             perform(event, viewModel as! Models.ModelElement)
