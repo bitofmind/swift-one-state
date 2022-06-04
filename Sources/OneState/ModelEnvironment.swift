@@ -1,5 +1,3 @@
-import SwiftUI
-
 /// Declares a dependency on an enviroment
 ///
 /// A view model access it's enviroment, i.e. external depenencies,
@@ -16,14 +14,6 @@ import SwiftUI
 ///             await myServer.hello()
 ///         }
 ///     }
-///
-/// An enviroment is set (injected) via a SwiftUI View's
-///  `modelEnvironment()` method, typically from the root view
-///
-///     $store.viewModel(AppModel())
-///         .modelEnvironment(MyServer(
-///             hello: { print("Hello") }
-///         ))
 @propertyWrapper
 public struct ModelEnvironment<Value> {
     let context: ContextBase

@@ -1,5 +1,4 @@
 import Foundation
-import SwiftUI
 
 /// Declare what model to used to represent a models states variable
 ///
@@ -61,15 +60,6 @@ public extension ViewModel {
     }
 
     @MainActor
-    subscript<VM: ViewModel>(dynamicMember path: WritableKeyPath<State, Writable<StateModel<VM>>>) -> Binding<VM> where VM.StateContainer == VM.State {
-        .init {
-            self[dynamicMember: path.appending(path: \.wrappedValue)]
-        } set: { models in
-            setValue(StateModel<VM>(wrappedValue: models.stateContainer), at: path)
-        }
-    }
-
-    @MainActor
     subscript<Models>(dynamicMember path: WritableKeyPath<State, StateModel<Models>>) -> Models where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
         let view = storeView
         let containerView = StoreView(context: view.context, path: view.path(path.appending(path: \.wrappedValue)), access: view.access)
@@ -81,16 +71,6 @@ public extension ViewModel {
             }
         }
         return Models.modelContainer(from: models)
-    }
-
-    @MainActor
-    subscript<Models>(dynamicMember path: WritableKeyPath<State, Writable<StateModel<Models>>>) -> Binding<Models> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
-        .init {
-            self[dynamicMember: path.appending(path: \.wrappedValue)]
-        } set: { models in
-            let stateModel = StateModel<Models>(wrappedValue: models.stateContainer)
-            setValue(stateModel, at: path)
-        }
     }
 }
 
