@@ -3,7 +3,7 @@
 public struct StoreView<Root, State, Access> {
     var context: Context<Root>
     private var _path: KeyPath<Root, State>
-    var access: StoreAccess?
+    weak var access: StoreAccess?
 }
 
 public enum Read {}

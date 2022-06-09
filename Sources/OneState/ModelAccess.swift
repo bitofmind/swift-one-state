@@ -60,8 +60,8 @@ private extension ModelAccess {
             for equal in observedStates.values {
                 guard equal(update) else {
 #if false
-                    print("previous", update.previous)
-                    print("current", update.current)
+                    print("previous", context[path: \.self, shared: update.previous])
+                    print("current", context[path: \.self, shared: update.current])
 #endif
                     return true
                 }
