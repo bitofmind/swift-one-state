@@ -130,10 +130,14 @@ extension ContextBase {
     }
 
     func retainFromView() {
+        if isStateOverridden && !isOverrideStore { return }
+
         refCount += 1
     }
 
     func releaseFromView() {
+        if isStateOverridden && !isOverrideStore { return }
+
         refCount -= 1
         if refCount == 0 {
             onRemovalFromView()
@@ -143,8 +147,6 @@ extension ContextBase {
 
 private extension ContextBase {
     func onRemovalFromView() {
-        if isStateOverridden && !isOverrideStore { return }
-
         onRemoval()
     }
 
