@@ -10,7 +10,7 @@ public extension Binding where Value: Equatable {
     }
 }
 
-public extension ViewModel {
+public extension Model {
     subscript<T: Equatable>(dynamicMember keyPath: WritableKeyPath<State, Writable<T>>) -> Binding<T> {
         let storeView = self.storeView
         return .init {
@@ -21,11 +21,11 @@ public extension ViewModel {
     }
 
     @MainActor
-    subscript<VM: ViewModel>(dynamicMember path: WritableKeyPath<State, Writable<StateModel<VM>>>) -> Binding<VM> where VM.StateContainer == VM.State {
+    subscript<M: Model>(dynamicMember path: WritableKeyPath<State, Writable<StateModel<M>>>) -> Binding<M> where M.StateContainer == M.State {
         .init {
             self[dynamicMember: path.appending(path: \.wrappedValue)]
         } set: { models in
-            setValue(StateModel<VM>(wrappedValue: models.stateContainer), at: path)
+            setValue(StateModel<M>(wrappedValue: models.stateContainer), at: path)
         }
     }
 
@@ -41,7 +41,7 @@ public extension ViewModel {
     }
 }
 
-public extension ViewModel {
+public extension Model {
     func withAnimation<Result>(_ animation: Animation? = .default, _ body: () throws -> Result) rethrows -> Result {
         let callContext = CallContext { action in
             SwiftUI.withAnimation(animation) {

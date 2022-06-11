@@ -1,16 +1,16 @@
 /// Declares a dependency on an enviroment
 ///
-/// A view model access it's enviroment, i.e. external depenencies,
+/// A  model access it's enviroment, i.e. external depenencies,
 /// by declaring @ModelEnvironment with a matching type
 ///
 ///     struct MyServer {
 ///         var hello: () async -> ()
 ///     }
 ///
-///     struct MyModel: ViewModel {
+///     struct MyModel: Model {
 ///         @ModelEnvironment myServer: MyServer
 ///
-///         func onAppear() async {
+///         func onActivate() async {
 ///             await myServer.hello()
 ///         }
 ///     }
@@ -21,7 +21,7 @@ public struct ModelEnvironment<Value> {
 
     public init() {
         guard let context = ContextBase.current else {
-            fatalError("ModelEnvironment can only be used from a ViewModel with an injected view.")
+            fatalError("ModelEnvironment can only be used from a Model with an injected view.")
         }
 
         self.context = context
@@ -30,7 +30,7 @@ public struct ModelEnvironment<Value> {
     
     public init(wrappedValue: @escaping @autoclosure () -> Value) {
         guard let context = ContextBase.current else {
-            fatalError("ModelEnvironment can only be used from a ViewModel with an injected view.")
+            fatalError("ModelEnvironment can only be used from a Model with an injected view.")
         }
 
         self.context = context

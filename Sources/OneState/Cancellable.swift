@@ -3,10 +3,10 @@ public protocol Cancellable {
 }
 
 public extension Cancellable {
-    /// Cancellables stored in a view model will be cancelled once the last view using the model for the
+    /// Cancellables stored in a model will be cancelled once the last view using the model for the
     /// same underlying state is non longer being displayed
     @discardableResult
-    func store<VM: ViewModel>(in viewModel: VM) -> Cancellable {
+    func store<M: Model>(in viewModel: M) -> Cancellable {
         viewModel.context.cancellables.append(self)
         return self
     }

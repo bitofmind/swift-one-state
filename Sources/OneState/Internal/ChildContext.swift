@@ -1,10 +1,10 @@
-final class ChildContext<VM: ViewModel, State>: Context<State> {
-    typealias Root = VM.State
+final class ChildContext<M: Model, State>: Context<State> {
+    typealias Root = M.State
 
-    let store: Store<VM>
+    let store: Store<M>
     let path: WritableKeyPath<Root, State>
 
-    init(store: Store<VM>, path: WritableKeyPath<Root, State>, parent: ContextBase?) {
+    init(store: Store<M>, path: WritableKeyPath<Root, State>, parent: ContextBase?) {
         self.store = store
         self.path = path
         super.init(parent: parent)
@@ -64,7 +64,7 @@ final class ChildContext<VM: ViewModel, State>: Context<State> {
             _ = contextValue[keyPath: path]
             assert(threadState.stateModelCount <= 1, "Don't skip middle models when accessing sub model")
 
-            let context = ChildContext<VM, T>(store: store, path: self.path.appending(path: path), parent: self)
+            let context = ChildContext<M, T>(store: store, path: self.path.appending(path: path), parent: self)
 
             if isInViewModelContext {
                 regularChildren[path] = context

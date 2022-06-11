@@ -1,14 +1,32 @@
 import Foundation
 
-@propertyWrapper
-@dynamicMemberLookup
+/// Declares a view models state
+///
+/// A model conforming to `Model` must declare its state  using `@ModelState` where
+/// the type is matching its associatedtype `State`.
+///
+///     struct MyModel: Model {
+///         @ModelState private var state: State
+///     }
+///
+/// You then can create an instance by providing a store or a view into a store:
+///
+///     let model = MyModel($store)
+///
+///     let subModel = SubModel(model.sub)
+///
+/// Or by declaring you sub state using `@ModelState`:
+///
+///     let subModel = model.$sub
+///
+@propertyWrapper @dynamicMemberLookup
 public struct ModelState<State> {
     let context: Context<State>
     weak var storeAccess: StoreAccess?
 
     public init() {
         guard let context = ContextBase.current as? Context<State> else {
-            fatalError("ModelState can only be used from a ViewModel with an injected view.")
+            fatalError("ModelState can only be used from a Model with an injected view.")
         }
         self.context = context
         storeAccess = StoreAccess.current
