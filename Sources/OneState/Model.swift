@@ -2,29 +2,29 @@ import Foundation
 
 /// Holds a model that drives SwiftUI views
 ///
-/// A minimal view model must at least declare its state using `@ModelState`
+/// A minimal  model must at least declare its state using `@ModelState`
 ///
-///     struct MyModel: ViewModel {
+///     struct MyModel: Model {
 ///         struct State: Equatable {
 ///             var count = 0
 ///         }
 ///         @ModelState state: State
 ///     }
 ///
-/// To access a model state and methods from a view it should be declared using `@Model`:
+/// To access a model state and methods from a view it should be declared using `@ObservedModel`:
 ///
 ///     struct MyView: View {
-///         @Model var model: MyModel
+///         @ObservedModel var model: MyModel
 ///
 ///         var body: some View {
 ///             Text("count \(model.count)")
 ///         }
 ///     }
 ///
-/// Further a model needs to be set up from some store or a store's sub-state using `viewModel()`:
+/// Further a model needs to be set up from some store or a store's sub-state:
 ///
 ///     struct MyApp: App {
-///         @Store<MyView> var store = .init()
+///         let store = Store<MyView>(initialState: .init())
 ///
 ///         var body: some Scene {
 ///             WindowGroup {
@@ -33,7 +33,7 @@ import Foundation
 ///         }
 ///     }
 @dynamicMemberLookup
-public protocol ViewModel: ModelContainer {
+public protocol Model: ModelContainer {
     /// The type of the this view model's state.
     associatedtype State
 
@@ -42,22 +42,22 @@ public protocol ViewModel: ModelContainer {
 
     init()
     
-    /// Is called when when a SwiftUI view is being displayed using this model
+    /// Is called when model is being activate
     ///
     /// Useful for handlng the lifetime of a model and set up of longliving tasks.
     ///
     /// If more then one view is active for the same state at the same time,
-    /// onAppear is only called for the first appeance and similarly any stored
+    /// onActivate is only called for the first appeance and similarly any stored
     /// cancellables is cancelled not until the last view is no longer being displayed.
-    @MainActor func onAppear()
+    @MainActor func onActivate()
 }
 
-public extension ViewModel {
-    func onAppear() {}
+public extension Model {
+    func onActivate() {}
 }
 
-public extension ViewModel {
-    /// Constructs a view model with a view into a store's state
+public extension Model {
+    /// Constructs a model with a view into a store's state
     ///
     /// A view modal is required to be constructed from a view into a store's state for
     /// its `@ModelState` and other dependencies such as `@ModelEnvironment` to be
@@ -69,7 +69,7 @@ public extension ViewModel {
     }
 }
 
-public extension ViewModel where State: Identifiable {
+public extension Model where State: Identifiable {
     typealias ID = State.ID
     
     var id: State.ID {
@@ -78,16 +78,16 @@ public extension ViewModel where State: Identifiable {
     }
 }
 
-public extension ViewModel {
-    /// Add an action to be called once the view goes away
-    /// - Returns: A cancellable to optionally allow cancelling before a view goes away
+public extension Model {
+    /// Add an action to be called once the model is deactivated
+    /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
-    func onDisappear(_ perform: @escaping () -> Void) -> Cancellable {
+    func onDeactivate(_ perform: @escaping () -> Void) -> Cancellable {
         AnyCancellable(onCancel: perform).store(in: self)
     }
 
     /// Perform a task for the life time of the model
-    /// - Returns: A cancellable to optionally allow cancelling before a view goes away
+    /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
     func task(_ operation: @escaping @MainActor () async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable {
         Task { @MainActor in
@@ -106,7 +106,7 @@ public extension ViewModel {
     ///
     /// - Parameter catch: Called if the sequence throws an error
     /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
-    /// - Returns: A cancellable to optionally allow cancelling before a view goes away
+    /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
     func forEach<S: AsyncSequence>(_ sequence: S, cancelPrevious: Bool = false, perform: @escaping @MainActor (S.Element) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable {
         task({
@@ -156,7 +156,7 @@ public extension ViewModel {
     ///     onChange(of: $state.count) { count in
     ///
     /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
-    /// - Returns: A cancellable to optionally allow cancelling before a view goes away
+    /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult @MainActor
     func onChange<Provider>(of provider: Provider, cancelPrevious: Bool = false, perform: @escaping @MainActor (Provider.State) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable where Provider: StoreViewProvider, Provider.State: Equatable {
         forEach(provider.values.dropFirst(), cancelPrevious: cancelPrevious, perform: perform, catch: `catch`)
@@ -167,7 +167,7 @@ public extension ViewModel {
     ///     onChange(of: $state.isActive, to: true) {
     ///
     /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
-    /// - Returns: A cancellable to optionally allow cancelling before a view goes away
+    /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
     func onChange<Provider>(of provider: Provider, to value: Provider.State, cancelPrevious: Bool = false, perform: @escaping @MainActor () async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable where Provider: StoreViewProvider, Provider.State: Equatable {
         forEach(provider.values.dropFirst().filter { $0 == value }.map { _ in () }, cancelPrevious: cancelPrevious, perform: perform, catch: `catch`)
@@ -176,14 +176,14 @@ public extension ViewModel {
     /// Receive updates when a model state becomes non-nil
     ///
     /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
-    /// - Returns: A cancellable to optionally allow cancelling before a view goes away
+    /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
     func onChange<Provider, T>(ofUnwrapped provider: Provider, perform: @escaping @MainActor (T) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable where Provider: StoreViewProvider, Provider.State == T?, T: Equatable {
         forEach(provider.values.dropFirst().compacted(), perform: perform, catch: `catch`)
     }
 }
 
-public extension ViewModel {
+public extension Model {
     /// Sends an event to self and ancestors
     func send(_ event: Event) {
         context.sendEvent(event, viewModel: self, callContext: .current)
@@ -195,9 +195,9 @@ public extension ViewModel {
     ///
     ///     }
     @discardableResult @MainActor
-    func onEvent<VM: ViewModel>(fromType modelType: VM.Type = VM.self, perform: @escaping @MainActor (VM.Event, VM) -> Void) -> Cancellable {
+    func onEvent<M: Model>(fromType modelType: M.Type = M.self, perform: @escaping @MainActor (M.Event, M) -> Void) -> Cancellable {
         forEach(context.events.compactMap {
-            guard let event = $0.event as? VM.Event, let viewModel = $0.viewModel as? VM else { return nil }
+            guard let event = $0.event as? M.Event, let viewModel = $0.viewModel as? M else { return nil }
             return (event, viewModel)
         }, perform: perform)
     }
@@ -208,15 +208,15 @@ public extension ViewModel {
     ///
     ///     }
     @discardableResult @MainActor
-    func onEvent<VM: ViewModel>(_ event: VM.Event, fromType modelType: VM.Type = VM.self, perform: @escaping @MainActor (VM) -> Void) -> Cancellable where VM.Event: Equatable  {
-        onEvent { (aEvent, model: VM) in
+    func onEvent<M: Model>(_ event: M.Event, fromType modelType: M.Type = M.self, perform: @escaping @MainActor (M) -> Void) -> Cancellable where M.Event: Equatable  {
+        onEvent { (aEvent, model: M) in
             guard aEvent == event else { return }
             perform(model)
         }
     }
 }
 
-public extension ViewModel {
+public extension Model {
     @discardableResult @MainActor
     func activate() -> Cancellable {
         retain()
@@ -226,12 +226,12 @@ public extension ViewModel {
     }
 
     @discardableResult @MainActor
-    func activate<VM: ViewModel>(_ viewModel: VM) -> Cancellable {
+    func activate<M: Model>(_ viewModel: M) -> Cancellable {
         viewModel.activate().store(in: self)
     }
 }
 
-public extension ViewModel {
+public extension Model {
     subscript<T: Equatable>(dynamicMember path: KeyPath<State, T>) -> T {
         value(for: path)
     }
@@ -258,13 +258,13 @@ public extension ViewModel {
     }
 }
 
-public extension ViewModel where State: Equatable {
+public extension Model where State: Equatable {
     var value: State {
         value(for: \.self)
     }
 }
 
-public extension ViewModel {
+public extension Model {
     func value<T>(for keyPath: KeyPath<State, T>, isSame: @escaping (T, T) -> Bool) -> T {
         let view = self.storeView
         return view.context.value(for: view.path.appending(path: keyPath), access: view.access, isSame: isSame)
@@ -275,17 +275,17 @@ public extension ViewModel {
     }
 }
 
-public struct EmptyModel<State>: ViewModel {
+public struct EmptyModel<State>: Model {
     public typealias State = State
     @ModelState var state: State
     public init() {}
 }
 
-extension ViewModel {
+extension Model {
     var storeView: StoreView<State, State, Write> {
         let modelState = self.modelState
         guard let context = modelState?.context as? Context<State> else {
-            fatalError("ViewModel \(type(of: self)) is used before fully initialized")
+            fatalError("Model \(type(of: self)) is used before fully initialized")
         }
         return .init(context: context, path: \.self, access: modelState?.storeAccess)
     }
@@ -301,7 +301,7 @@ extension ViewModel {
     }
 }
 
-extension ViewModel {
+extension Model {
     @MainActor
     init(context: Context<State>) {
         context.propertyIndex = 0
@@ -316,7 +316,7 @@ extension ViewModel {
     
     var context: Context<State> {
         guard let context = modelState?.context else {
-            fatalError("ViewModel \(type(of: self)) is used before fully initialized")
+            fatalError("Model \(type(of: self)) is used before fully initialized")
         }
 
         return context
@@ -340,14 +340,14 @@ extension ViewModel {
     }
 }
 
-extension ViewModel {
+extension Model {
     @MainActor
     func retain() {
         context.retainFromView()
         guard !context.isOverrideStore, context.refCount == 1 else { return }
                 
         ContextBase.$current.withValue(nil) {
-            onAppear()
+            onActivate()
         }
     }
     

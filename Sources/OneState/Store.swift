@@ -16,8 +16,8 @@ import Foundation
 ///             }
 ///         }
 ///     }
-public final class Store<VM: ViewModel> {
-    public typealias State = VM.State
+public final class Store<M: Model> {
+    public typealias State = M.State
     
     private var lock = Lock()
 
@@ -31,12 +31,13 @@ public final class Store<VM: ViewModel> {
     private var lastFromContext: ContextBase?
     private var lastCallContext: CallContext?
 
-    private(set) var context: ChildContext<VM, State>!
+    private(set) var context: ChildContext<M, State>!
 
     public init(initialState: State, environments: [Any] = []) {
         previousState = Shared(initialState)
         currentState = previousState
         context = nil
+
         context = .init(store: self, path: \.self, parent: nil)
         for environment in environments {
             context.environments[ObjectIdentifier(type(of: environment))] = environment
@@ -45,12 +46,12 @@ public final class Store<VM: ViewModel> {
 }
 
 public extension Store {
-    convenience init<T>(initialState: T, environments: [Any] = []) where VM == EmptyModel<T> {
+    convenience init<T>(initialState: T, environments: [Any] = []) where M == EmptyModel<T> {
         self.init(initialState: initialState, environments: environments)
     }
 
-    @MainActor var model: VM {
-        VM(self)
+    @MainActor var model: M {
+        M(self)
     }
 
     func updateEnvironment<Value>(_ value: Value) {

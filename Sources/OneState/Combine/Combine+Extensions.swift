@@ -3,7 +3,7 @@ import Foundation
 #if canImport(Combine)
 import Combine
 
-public extension ViewModel {
+public extension Model {
     /// Receive updates from a publisher for the life time of the model
     ///
     /// - Parameter catch: Called if the sequence throws an error

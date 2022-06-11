@@ -2,7 +2,7 @@ import Foundation
 
 /// Declare what model to used to represent a models states variable
 ///
-/// Instead of manually creating a `ViewModel` from a `StoreView`you can instead
+/// Instead of manually creating a `Model` from a `StoreView`you can instead
 /// set up a state with `@StateModel` to declare its type:
 ///
 ///     @StateModel<MainModel> var main = .init() // MainModel.State
@@ -13,7 +13,7 @@ import Foundation
 ///     @StateModel<MainModel?> var optMain = nil // MainModel.State?
 ///     @StateModel<[MainModel]> var mains = [] // [MainModel.State]
 ///
-/// Given a `StoreViewProvider` such as a `ViewModel` you can
+/// Given a `StoreViewProvider` such as a `Model` you can
 /// get direct access to a sub model with a given state:
 ///
 ///     appModel.$main // MainModel
@@ -51,11 +51,11 @@ extension StateModel: CustomStringConvertible {
     }
 }
 
-public extension ViewModel {
+public extension Model {
     @MainActor
-    subscript<VM: ViewModel>(dynamicMember path: WritableKeyPath<State, StateModel<VM>>) -> VM where VM.StateContainer == VM.State {
+    subscript<M: Model>(dynamicMember path: WritableKeyPath<State, StateModel<M>>) -> M where M.StateContainer == M.State {
         StoreAccess.$current.withValue(modelState?.storeAccess) {
-            VM(storeView(for: path.appending(path: \.wrappedValue)))
+            M(storeView(for: path.appending(path: \.wrappedValue)))
         }
     }
 
@@ -74,12 +74,12 @@ public extension ViewModel {
     }
 }
 
-public extension ViewModel {
+public extension Model {
     /// Recieve events of from the `model`
     @discardableResult @MainActor
-    func onEvent<VM: ViewModel>(from model: VM, perform: @escaping @MainActor (VM.Event) -> Void) -> Cancellable where VM.StateContainer == VM.State {
+    func onEvent<M: Model>(from model: M, perform: @escaping @MainActor (M.Event) -> Void) -> Cancellable where M.StateContainer == M.State {
         return forEach(context.events.compactMap {
-            guard let event = $0.event as? VM.Event, let viewModel = $0.viewModel as? VM, viewModel.context === model.context else {
+            guard let event = $0.event as? M.Event, let viewModel = $0.viewModel as? M, viewModel.context === model.context else {
                 return nil
             }
             return event
@@ -88,9 +88,9 @@ public extension ViewModel {
 
     /// Recieve events of `event`from `model´`
     @discardableResult @MainActor
-    func onEvent<VM: ViewModel>(_ event: VM.Event, from model: VM, perform: @escaping @MainActor () -> Void) -> Cancellable where VM.StateContainer == VM.State, VM.Event: Equatable {
+    func onEvent<M: Model>(_ event: M.Event, from model: M, perform: @escaping @MainActor () -> Void) -> Cancellable where M.StateContainer == M.State, M.Event: Equatable {
         return forEach(context.events.compactMap {
-            guard let aEvent = $0.event as? VM.Event, aEvent == event, let viewModel = $0.viewModel as? VM, viewModel.context === model.context else {
+            guard let aEvent = $0.event as? M.Event, aEvent == event, let viewModel = $0.viewModel as? M, viewModel.context === model.context else {
                 return nil
             }
             return ()
@@ -133,7 +133,7 @@ public extension ViewModel {
     }
 }
 
-public extension ViewModel {
+public extension Model {
     @discardableResult @MainActor
     func activate<P: StoreViewProvider, Models>(_ view: P) -> Cancellable where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.StateContainer: Equatable, P.Access == Write {
         let containerView = view.storeView(for: \.wrappedValue)
