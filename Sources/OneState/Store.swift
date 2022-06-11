@@ -23,6 +23,7 @@ public final class Store<VM: ViewModel> {
 
     private var previousState: Shared<State>
     private var currentState: Shared<State>
+    private var modifyCount = 0
 
     private var currentOverride: StateUpdate<State>?
 
@@ -134,18 +135,34 @@ extension Store {
             yield &currentState.value[keyPath: path]
             lastFromContext = fromContext
             lastCallContext = CallContext.current
+            modifyCount += 1
 
-            updateTask?.cancel()
-            updateTask = Task { @MainActor in
-                guard !Task.isCancelled else { return }
-                if let callContext = CallContext.current {
-                    callContext {
-                        notify(context: fromContext)
+            if updateTask == nil {
+                // Try to coalesce updates
+                updateTask = Task.detached { @MainActor in
+                    while true {
+                        let count = self.lock { self.modifyCount }
+
+                        await Task.yield()
+
+                        self.lock.lock()
+                        defer { self.lock.unlock() }
+                        if count == self.modifyCount {
+                            self.updateTask = nil
+                            break
+                        }
                     }
-                } else {
-                    notify(context: fromContext)
+
+                    if let callContext = CallContext.current {
+                        callContext {
+                            self.notify(context: fromContext)
+                        }
+                    } else {
+                        self.notify(context: fromContext)
+                    }
                 }
             }
+            
             lock.unlock()
         }
     }
