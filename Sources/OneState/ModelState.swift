@@ -29,7 +29,7 @@ public struct ModelState<State> {
             fatalError("ModelState can only be used from a Model with an injected view.")
         }
         self.context = context
-        storeAccess = StoreAccess.current
+        storeAccess = StoreAccess.current?.value
     }
 
     public var wrappedValue: State {
