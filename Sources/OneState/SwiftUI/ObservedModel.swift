@@ -24,7 +24,7 @@ public struct ObservedModel<M: Model>: DynamicProperty {
         let prevContext = access.context
         access.context = context
         if wrappedValue.modelState?.storeAccess !== access {
-            StoreAccess.$current.withValue(access) {
+            StoreAccess.$current.withValue(Weak(value: access)) {
                 wrappedValue = M(context: context)
             }
         }

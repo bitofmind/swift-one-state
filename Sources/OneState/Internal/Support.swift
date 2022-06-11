@@ -34,8 +34,12 @@ class StoreAccess {
 
     var allowAccessToBeOverridden: Bool { fatalError() }
 
-    @TaskLocal static var current: StoreAccess?
+    @TaskLocal static var current: Weak<StoreAccess>?
     @TaskLocal static var isInViewModelContext = false
+}
+
+struct Weak<T: AnyObject> {
+    weak var value: T?
 }
 
 struct AnyCancellable: Cancellable {

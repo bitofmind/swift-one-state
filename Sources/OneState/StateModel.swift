@@ -54,7 +54,7 @@ extension StateModel: CustomStringConvertible {
 public extension Model {
     @MainActor
     subscript<M: Model>(dynamicMember path: WritableKeyPath<State, StateModel<M>>) -> M where M.StateContainer == M.State {
-        StoreAccess.$current.withValue(modelState?.storeAccess) {
+        StoreAccess.$current.withValue(modelState?.storeAccess.map(Weak.init)) {
             M(storeView(for: path.appending(path: \.wrappedValue)))
         }
     }
@@ -65,7 +65,7 @@ public extension Model {
         let containerView = StoreView(context: view.context, path: view.path(path.appending(path: \.wrappedValue)), access: view.access)
         let container = containerView.value(for: \.self, isSame: Models.StateContainer.hasSameStructure)
         let elementPaths = container.elementKeyPaths
-        let models =  StoreAccess.$current.withValue(modelState?.storeAccess) {
+        let models =  StoreAccess.$current.withValue(modelState?.storeAccess.map(Weak.init)) {
             elementPaths.map { path in
                 Models.ModelElement(containerView.storeView(for: path))
             }
