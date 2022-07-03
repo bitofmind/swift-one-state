@@ -1,4 +1,4 @@
-// swift-tools-version:5.3
+// swift-tools-version:5.6
 
 import PackageDescription
 
@@ -12,7 +12,7 @@ let package = Package(
         .library(name: "OneState", targets: ["OneState"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "0.0.0"),
+        .package(url: "https://github.com/apple/swift-async-algorithms.git", "0.0.0"..<"0.0.2"),
     ],
     targets: [
         .target(
