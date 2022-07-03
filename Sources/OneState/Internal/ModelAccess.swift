@@ -1,15 +1,15 @@
 import Foundation
 
-class ModelAccess<State>: StoreAccess, ObservableObject {
-    var context: Context<State>!
-    var observationTask: Task<(), Never>?
+class ModelAccess: StoreAccess, ObservableObject {
+    var contexts: [ContextBase] = []
+    var observationTasks: [Task<(), Never>] = []
     var lock = Lock()
     var observedStates: [AnyKeyPath: (AnyStateChange) -> Bool] = [:]
     var wasStateOverriden = false
 
     deinit {
-        context?.releaseFromView()
-        observationTask?.cancel()
+        contexts.forEach { $0.releaseFromView() }
+        observationTasks.forEach { $0.cancel() }
     }
 
     override func willAccess<Root, State>(path: KeyPath<Root, State>, context: Context<Root>, isSame: @escaping (State, State) -> Bool) {
@@ -31,19 +31,24 @@ class ModelAccess<State>: StoreAccess, ObservableObject {
 }
 
 extension ModelAccess {
-    func startObserve() {
-        observationTask?.cancel()
-        wasStateOverriden = context.isStateOverridden
-        observationTask = Task { @MainActor [weak self] in
-            guard let updates = self?.context.stateUpdates else { return }
-            for await update in updates {
-                self?.handle(update: update)
+    func startObserving(from contexts: [ContextBase]) {
+        stopObserving()
+        self.contexts = contexts
+        observationTasks = contexts.map { context in
+            Task { @MainActor [weak self] in
+                for await update in context.stateUpdates where !Task.isCancelled {
+                    self?.handle(update: update)
+                }
             }
         }
     }
 
-    var isObservering: Bool {
-        observationTask != nil
+    func stopObserving() {
+        contexts.removeAll()
+        observationTasks.forEach { $0.cancel() }
+        observationTasks.removeAll()
+        observedStates.removeAll()
+        wasStateOverriden = false
     }
 }
 
@@ -59,10 +64,6 @@ private extension ModelAccess {
 
             for equal in observedStates.values {
                 guard equal(update) else {
-#if false
-                    print("previous", context[path: \.self, shared: update.previous])
-                    print("current", context[path: \.self, shared: update.current])
-#endif
                     return true
                 }
             }

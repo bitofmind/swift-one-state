@@ -6,6 +6,7 @@ public protocol ModelContainer {
     
     static func modelContainer(from elements: [ModelElement]) -> Self
     var stateContainer: StateContainer { get }
+    var models: [ModelElement] { get }
 }
 
 extension Model where StateContainer == State, ModelElement == Self {
@@ -15,6 +16,10 @@ extension Model where StateContainer == State, ModelElement == Self {
 
     public var stateContainer: StateContainer {
         nonObservableState
+    }
+
+    public var models: [ModelElement] {
+        [self]
     }
 }
 
@@ -28,6 +33,10 @@ extension Optional: ModelContainer where Wrapped: Model {
     public var stateContainer: StateContainer {
         map { $0.nonObservableState }
     }
+
+    public var models: [ModelElement] {
+        map { [$0] } ?? []
+    }
 }
 
 extension Array: ModelContainer where Element: Model, Element.State: Identifiable, Element: Identifiable {
@@ -39,5 +48,9 @@ extension Array: ModelContainer where Element: Model, Element.State: Identifiabl
 
     public var stateContainer: StateContainer {
         map { $0.nonObservableState }
+    }
+
+    public var models: [ModelElement] {
+        self
     }
 }
