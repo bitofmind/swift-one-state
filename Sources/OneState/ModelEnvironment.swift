@@ -55,6 +55,10 @@ public struct ModelEnvironment<Value> {
     public var projectedValue: Self {
         return self
     }
+
+    public func reset() {
+        context.environments[ObjectIdentifier(Value.self)] = nil
+    }
 }
 
 private extension ModelEnvironment {
