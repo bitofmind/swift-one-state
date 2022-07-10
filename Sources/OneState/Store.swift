@@ -16,7 +16,7 @@ import Foundation
 ///             }
 ///         }
 ///     }
-public final class Store<M: Model> {
+public final class Store<M: Model>: @unchecked Sendable {
     public typealias State = M.State
     
     private var lock = Lock()
@@ -50,7 +50,7 @@ public extension Store {
         self.init(initialState: initialState, environments: environments)
     }
 
-    @MainActor var model: M {
+    var model: M {
         M(self)
     }
 
@@ -140,7 +140,7 @@ extension Store {
 
             if updateTask == nil {
                 // Try to coalesce updates
-                updateTask = Task.detached { @MainActor in
+                updateTask = Task { @MainActor in
                     while true {
                         let count = self.lock { self.modifyCount }
 
@@ -155,7 +155,7 @@ extension Store {
                     }
 
                     if let callContext = CallContext.current {
-                        callContext {
+                        await callContext {
                             self.notify(context: fromContext)
                         }
                     } else {

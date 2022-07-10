@@ -161,7 +161,7 @@ private extension MutableCollection {
 }
 
 // Crash in keypath append if using struct instead of class
-private class UnwrapFallback<Value>: Hashable {
+private class UnwrapFallback<Value>: Hashable, @unchecked Sendable {
     var value: Value
     
     init(value: Value) {
@@ -176,10 +176,10 @@ private class UnwrapFallback<Value>: Hashable {
 }
 
 // Crash in keypath append if using struct instead of class
-private class Cursor<Value, ID: Hashable, Index>: Hashable {
-    var idPath: KeyPath<Value, ID>
-    var id: ID
-    var index: Index
+private class Cursor<Value, ID: Hashable, Index>: Hashable, @unchecked Sendable  {
+    let idPath: KeyPath<Value, ID>
+    let id: ID
+    let index: Index
     var fallback: Value
     
     init(idPath: KeyPath<Value, ID>, id: ID, index: Index, fallback: Value) {

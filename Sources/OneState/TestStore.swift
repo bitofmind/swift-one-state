@@ -1,12 +1,12 @@
 import Foundation
 
-public final class TestStore<M: Model> {
+public final class TestStore<M: Model>: @unchecked Sendable {
     public typealias State = M.State
 
-    var store: Store<M>
-    var onTestFailure: (TestFailure<State>) -> Void
+    let store: Store<M>
+    let onTestFailure: (TestFailure<State>) -> Void
 
-    public init(initialState: State, environments: [Any] = [], onTestFailure: @escaping (TestFailure<State>) -> Void) {
+    public init(initialState: State, environments: [Any] = [], onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void) {
         store = .init(initialState: initialState, environments: environments)
         store.context.isForTesting = true
         self.onTestFailure = onTestFailure
@@ -14,11 +14,11 @@ public final class TestStore<M: Model> {
 }
 
 public extension TestStore {
-    convenience init<T>(initialState: T, environments: [Any] = [], onTestFailure: @escaping (TestFailure<State>) -> Void) where M == EmptyModel<T> {
+    convenience init<T>(initialState: T, environments: [Any] = [], onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void) where M == EmptyModel<T> {
         self.init(initialState: initialState, environments: environments, onTestFailure: onTestFailure)
     }
 
-    @MainActor var model: M {
+    var model: M {
         M(self)
     }
 }
@@ -49,7 +49,7 @@ public extension TestStore where State: Equatable {
         try await block(&state)
 
         let didPass = await withThrowingTaskGroup(of: Bool.self, returning: Bool.self) { [state] group in
-            group.addTask { @MainActor in
+            group.addTask {
                 await self.values.first { $0 == state } != nil
             }
 

@@ -1,4 +1,4 @@
-class ContextBase: HoldsLock {
+class ContextBase: HoldsLock, @unchecked Sendable {
     var lock = Lock()
     private(set) weak var parent: ContextBase?
 
@@ -7,7 +7,7 @@ class ContextBase: HoldsLock {
 
     let stateUpdates = AsyncPassthroughSubject<AnyStateChange>()
 
-    typealias Event = (event: Any, path: AnyKeyPath, viewModel: Any, callContext: CallContext?)
+    typealias Event = (event: Any, path: AnyKeyPath, context: ContextBase, callContext: CallContext?)
     let events = AsyncPassthroughSubject<Event>()
 
     @Locked var environments: Environments = [:]
@@ -117,7 +117,7 @@ class ContextBase: HoldsLock {
         fatalError()
     }
 
-    func sendEvent(_ event: Any, path: AnyKeyPath, viewModel: Any, callContext: CallContext?) {
+    func sendEvent(_ event: Any, path: AnyKeyPath, context: ContextBase, callContext: CallContext?) {
         fatalError()
     }
 }

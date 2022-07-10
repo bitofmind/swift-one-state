@@ -20,6 +20,8 @@ public struct Writable<Value> {
     }
 }
 
+extension Writable: Sendable where Value: Sendable {}
+
 extension Writable: Equatable where Value: Equatable {}
 
 extension Writable: Decodable where Value: Decodable {

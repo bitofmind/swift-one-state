@@ -1,6 +1,6 @@
 import Foundation
 
-final class AsyncPassthroughSubject<Element>: AsyncSequence {
+final class AsyncPassthroughSubject<Element>: AsyncSequence, @unchecked Sendable {
     var lock = Lock()
     var continuations: [UUID: AsyncStream<Element>.Continuation] = [:]
 
@@ -31,10 +31,10 @@ final class AsyncPassthroughSubject<Element>: AsyncSequence {
 }
 
 extension AsyncStream {
-    init<S: AsyncSequence>(_ sequence: S) rethrows where S.Element == Element {
+    init<S: AsyncSequence>(_ sequence: @autoclosure @escaping @Sendable () -> S) rethrows where S.Element == Element {
         self.init { c in
             let task = Task {
-                for try await element in sequence {
+                for try await element in sequence() {
                     c.yield(element)
                 }
 
@@ -45,3 +45,9 @@ extension AsyncStream {
         }
     }
 }
+
+#if swift(<5.7)
+extension AsyncStream: @unchecked Sendable where Element: Sendable {}
+#endif
+
+extension AnyKeyPath: @unchecked Sendable {}

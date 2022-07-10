@@ -1,6 +1,6 @@
 // A view into a store's state
 @dynamicMemberLookup
-public struct StoreView<Root, State, Access> {
+public struct StoreView<Root, State, Access>: @unchecked Sendable {
     var context: Context<Root>
     private var _path: KeyPath<Root, State>
     weak var access: StoreAccess?

@@ -2,8 +2,8 @@ import Foundation
 
 public struct StateUpdate<State>: Identifiable {
     var stateChange: AnyStateChange
-    var getCurrent: (AnyStateChange) -> State
-    var getPrevious: (AnyStateChange) -> State
+    var getCurrent: @Sendable (AnyStateChange) -> State
+    var getPrevious: @Sendable (AnyStateChange) -> State
 
     public var id: ObjectIdentifier { ObjectIdentifier(stateChange.current) }
 
@@ -16,6 +16,14 @@ public struct StateUpdate<State>: Identifiable {
     }
 }
 
+extension StateUpdate: Sendable where State: Sendable {}
+
+extension StateUpdate: Equatable where State: Equatable {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.current == rhs.current && lhs.previous == rhs.previous
+    }
+}
+
 public extension StoreViewProvider {
     var stateUpdates: AsyncStream<StateUpdate<State>> {
         let view = self.storeView
@@ -24,12 +32,6 @@ public extension StoreViewProvider {
         }.map {
             StateUpdate(stateChange: $0, provider: view)
         })
-    }
-}
-
-extension StateUpdate: Equatable where State: Equatable {
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.current == rhs.current && lhs.previous == rhs.previous
     }
 }
 

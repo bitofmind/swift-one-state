@@ -25,7 +25,7 @@ public struct StateModel<Container: ModelContainer> {
 
     public var wrappedValue: Container.StateContainer {
         get {
-            threadState.stateModelCount += 1
+            ThreadState.current.stateModelCount += 1
             return _wrappedValue
         }
         set {
@@ -43,6 +43,8 @@ public struct StateModel<Container: ModelContainer> {
     }
 }
 
+extension StateModel: Sendable where Container.StateContainer: Sendable {}
+
 extension StateModel: Equatable where Container.StateContainer: Equatable {}
 
 extension StateModel: CustomStringConvertible {
@@ -52,14 +54,12 @@ extension StateModel: CustomStringConvertible {
 }
 
 public extension Model {
-    @MainActor
     subscript<M: Model>(dynamicMember path: WritableKeyPath<State, StateModel<M>>) -> M where M.StateContainer == M.State {
         StoreAccess.$current.withValue(modelState?.storeAccess.map(Weak.init)) {
             M(storeView(for: path.appending(path: \.wrappedValue)))
         }
     }
 
-    @MainActor
     subscript<Models>(dynamicMember path: WritableKeyPath<State, StateModel<Models>>) -> Models where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
         let view = storeView
         let containerView = StoreView(context: view.context, path: view.path(path.appending(path: \.wrappedValue)), access: view.access)
@@ -74,80 +74,78 @@ public extension Model {
     }
 }
 
-public extension Model {
-    /// Recieve events of from the `model`
-    @discardableResult @MainActor
-    func onEvent<M: Model>(from model: M, perform: @escaping @MainActor (M.Event) -> Void) -> Cancellable where M.StateContainer == M.State {
-        return forEach(context.events.compactMap {
-            guard let event = $0.event as? M.Event, let viewModel = $0.viewModel as? M, viewModel.context === model.context else {
-                return nil
-            }
-            return event
-        }, perform: perform)
-    }
+public extension StoreViewProvider  {
+    func events<Models: ModelContainer>() -> AsyncStream<(event: Models.ModelElement.Event, model: Models.ModelElement)> where State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable {
+        let containerView = storeView(for: \.wrappedValue)
+        let events = storeView.context.events
 
-    /// Recieve events of `event`from `model´`
-    @discardableResult @MainActor
-    func onEvent<M: Model>(_ event: M.Event, from model: M, perform: @escaping @MainActor () -> Void) -> Cancellable where M.StateContainer == M.State, M.Event: Equatable {
-        return forEach(context.events.compactMap {
-            guard let aEvent = $0.event as? M.Event, aEvent == event, let viewModel = $0.viewModel as? M, viewModel.context === model.context else {
-                return nil
-            }
-            return ()
-        }, perform: perform)
-    }
-
-    /// Recieve events of from `models`
-    @discardableResult @MainActor
-    func onEvent<P: StoreViewProvider, Models>(from models: P, perform: @escaping @MainActor (Models.ModelElement.Event, Models.ModelElement) -> Void) -> Cancellable
-    where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
-        let containerView = models.storeView(for: \.wrappedValue)
-
-        return forEach(context.events) { anyEvent, eventPath, viewModel, callContext in
-            guard let event = anyEvent as? Models.ModelElement.Event,
+        return AsyncStream(events.compactMap { e -> (Models.ModelElement.Event, Models.ModelElement)? in
+            guard let event = e.event as? Models.ModelElement.Event,
                   let containerPath = containerView.context.storePath.appending(path: containerView.path)
-            else { return }
+            else { return nil }
 
             let container = containerView.nonObservableState
 
             for path in container.elementKeyPaths {
-                if let elementPath = containerPath.appending(path: path), elementPath == eventPath {
-                    (callContext ?? .empty) {
-                        CallContext.$current.withValue(callContext) {
-                            perform(event, viewModel as! Models.ModelElement)
+                if let elementPath = containerPath.appending(path: path), elementPath == e.path {
+                    let context = e.context as! Context<Models.ModelElement.State>
+
+                    if let callContext = e.callContext {
+                        await callContext {
+                            CallContext.$current.withValue(callContext) {
+                                return (event, Models.ModelElement(context: context))
+                            }
                         }
+                    } else {
+                        return (event, Models.ModelElement(context: context))
                     }
                 }
             }
-        }
+
+            return nil
+        })
     }
 
-    /// Recieve events of `event` from `models`
-    @discardableResult @MainActor
-    func onEvent<P: StoreViewProvider, Models>(_ event: Models.ModelElement.Event, from view: P, perform: @escaping @MainActor (Models.ModelElement) -> Void) -> Cancellable
-    where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Equatable {
-        onEvent(from: view) { aEvent, model in
-            guard aEvent == event else { return }
-            perform(model)
-        }
+    func events<Models: ModelContainer>(of event: Models.ModelElement.Event) -> AsyncStream<Models.ModelElement> where State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable&Equatable  {
+        let events = events()
+        return AsyncStream(events.compactMap { $0.event == event ? $0.model : nil })
+    }
+
+    func events<M: Model>() -> AsyncStream<M.Event> where State == StateModel<M> {
+        let events = storeView(for: \.wrappedValue).context.events
+
+        return AsyncStream(events.compactMap {
+            guard let e = $0.event as? M.Event else { return nil }
+            return e
+        })
+    }
+
+    func events<M: Model>(of event: M.Event) -> AsyncStream<()> where State == StateModel<M>, M.Event: Equatable&Sendable {
+        let events = storeView(for: \.wrappedValue).context.events
+
+        return AsyncStream(events.compactMap {
+            guard let e = $0.event as? M.Event, e == event else { return nil }
+            return ()
+        })
     }
 }
 
 public extension Model {
-    @discardableResult @MainActor
+    @discardableResult
     func activate<P: StoreViewProvider, Models>(_ view: P) -> Cancellable where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.StateContainer: Equatable, P.Access == Write {
         let containerView = view.storeView(for: \.wrappedValue)
 
         typealias ActivedModels = [WritableKeyPath<Models.StateContainer, Models.StateContainer.Element>: Models.ModelElement]
         let elementPaths = containerView.nonObservableState.elementKeyPaths
-        var activatedModels = ActivedModels(uniqueKeysWithValues: elementPaths.map { key in
-            let view = containerView.storeView(for: key)
-            let model = Models.ModelElement(view)
-            model.retain()
-            return (key, model)
-        })
 
         return task {
+            var activatedModels = ActivedModels(uniqueKeysWithValues: elementPaths.map { key in
+                let view = containerView.storeView(for: key)
+                let model = Models.ModelElement(view)
+                model.retain()
+                return (key, model)
+            })
+
             for await update in containerView.stateUpdates {
                 let previous = update.previous
                 let current = update.current
