@@ -49,7 +49,7 @@ public protocol Model: ModelContainer {
     /// If more then one view is active for the same state at the same time,
     /// onActivate is only called for the first appeance and similarly any stored
     /// cancellables is cancelled not until the last view is no longer being displayed.
-    @MainActor func onActivate()
+    func onActivate()
 }
 
 public extension Model {
@@ -62,7 +62,6 @@ public extension Model {
     /// A view modal is required to be constructed from a view into a store's state for
     /// its `@ModelState` and other dependencies such as `@ModelEnvironment` to be
     /// set up correclty.
-    @MainActor
     init<Provider: StoreViewProvider>(_ viewStore: Provider) where Provider.State == State, Provider.Access == Write {
         let view = viewStore.storeView
         self.init(context: view.context.context(at: view.path))
@@ -89,10 +88,10 @@ public extension Model {
     /// Perform a task for the life time of the model
     /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
-    func task(_ operation: @escaping @MainActor () async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable {
-        Task { @MainActor in
+    func task(priority: TaskPriority? = nil, _ operation: @escaping @Sendable () async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
+        Task(priority: priority) {
             do {
-                try await context {
+                try await inViewModelContext {
                     guard !Task.isCancelled else { return }
                     try await operation()
                 }
@@ -108,10 +107,10 @@ public extension Model {
     /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
     /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
-    func forEach<S: AsyncSequence>(_ sequence: S, cancelPrevious: Bool = false, perform: @escaping @MainActor (S.Element) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable {
-        task({
+    func forEach<S: AsyncSequence>(_ sequence: @autoclosure @escaping @Sendable () -> S, cancelPrevious: Bool = false, priority: TaskPriority? = nil, perform: @escaping @Sendable (S.Element) async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable where S.Element: Sendable {
+        task(priority: priority, {
             guard cancelPrevious else {
-                for try await value in sequence {
+                for try await value in sequence() {
                     try await perform(value)
                 }
                 return
@@ -119,24 +118,28 @@ public extension Model {
 
             var task: Task<(), Error>?
             var caughtError: Error? = nil
-            for try await value in sequence {
+            for try await value in sequence() {
                 guard caughtError == nil, !Task.isCancelled else { return }
 
                 if let task = task {
                     task.cancel()
-                    try? await task.value
+                    do {
+                        try await task.value
+                    } catch {
+                        caughtError = error
+                    }
                 }
 
                 task = Task {
                     guard !Task.isCancelled else { return }
                     do {
-                        try await self.context {
+                        try await inViewModelContext {
                             try await perform(value)
                         }
                     } catch is CancellationError {
                     } catch {
-                        caughtError = error
                         `catch`?(error)
+                        throw error
                     }
                 }
             }
@@ -144,80 +147,60 @@ public extension Model {
     }
 
     /// Wait until the predicate based on the models state is fullfilled
-    func waitUntil(_ predicate: @autoclosure @escaping () -> Bool) async throws {
+    func waitUntil(_ predicate: @autoclosure @escaping @Sendable () -> Bool) async throws {
         _ = await context.stateUpdates.first { _ in
-            await context { predicate() }
+            await inViewModelContext { predicate() }
         }
         try Task.checkCancellation()
-    }
-
-    /// Listen on model state changes for the life time of the model
-    ///
-    ///     onChange(of: $state.count) { count in
-    ///
-    /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
-    /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
-    @discardableResult @MainActor
-    func onChange<Provider>(of provider: Provider, cancelPrevious: Bool = false, perform: @escaping @MainActor (Provider.State) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable where Provider: StoreViewProvider, Provider.State: Equatable {
-        forEach(provider.values.dropFirst(), cancelPrevious: cancelPrevious, perform: perform, catch: `catch`)
-    }
-    
-    /// Receive updates when a model state becomes equal to the provided `value`
-    ///
-    ///     onChange(of: $state.isActive, to: true) {
-    ///
-    /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
-    /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
-    @discardableResult
-    func onChange<Provider>(of provider: Provider, to value: Provider.State, cancelPrevious: Bool = false, perform: @escaping @MainActor () async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable where Provider: StoreViewProvider, Provider.State: Equatable {
-        forEach(provider.values.dropFirst().filter { $0 == value }.map { _ in () }, cancelPrevious: cancelPrevious, perform: perform, catch: `catch`)
-    }
-
-    /// Receive updates when a model state becomes non-nil
-    ///
-    /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
-    /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
-    @discardableResult
-    func onChange<Provider, T>(ofUnwrapped provider: Provider, perform: @escaping @MainActor (T) async throws -> Void, `catch`: (@MainActor (Error) -> Void)? = nil) -> Cancellable where Provider: StoreViewProvider, Provider.State == T?, T: Equatable {
-        forEach(provider.values.dropFirst().compacted(), perform: perform, catch: `catch`)
     }
 }
 
 public extension Model {
     /// Sends an event to self and ancestors
     func send(_ event: Event) {
-        context.sendEvent(event, viewModel: self, callContext: .current)
+        context.sendEvent(event, context: context, callContext: .current)
     }
 
-    /// Recieve events of type `modelType` from self or descendants
-    ///
-    ///     onEvent { (event, fromModel: MainModel) in
-    ///
-    ///     }
-    @discardableResult @MainActor
-    func onEvent<M: Model>(fromType modelType: M.Type = M.self, perform: @escaping @MainActor (M.Event, M) -> Void) -> Cancellable {
-        forEach(context.events.compactMap {
-            guard let event = $0.event as? M.Event, let viewModel = $0.viewModel as? M else { return nil }
-            return (event, viewModel)
-        }, perform: perform)
+    /// Sends an event to self and ancestors
+    func send<E>(_ event: E) {
+        context.sendEvent(event, context: context, callContext: .current)
     }
 
-    /// Recieve events of type `modelType` from self or descendants
-    ///
-    ///     onEvent(.disconnectTapped) { (fromModel: MainModel) in
-    ///
-    ///     }
-    @discardableResult @MainActor
-    func onEvent<M: Model>(_ event: M.Event, fromType modelType: M.Type = M.self, perform: @escaping @MainActor (M) -> Void) -> Cancellable where M.Event: Equatable  {
-        onEvent { (aEvent, model: M) in
-            guard aEvent == event else { return }
-            perform(model)
-        }
+    func events() -> AsyncStream<Event> {
+        let events = context.events
+        return AsyncStream(events.compactMap {
+            guard let e = $0.event as? Event else { return nil }
+            return e
+        })
+    }
+
+    func events(of event: Event) -> AsyncStream<()> where Event: Equatable&Sendable {
+        let events = context.events
+        return AsyncStream(events.compactMap {
+            guard let e = $0.event as? Event, e == event else { return nil }
+            return ()
+        })
+    }
+
+    func events<E: Equatable&Sendable>(of event: E) -> AsyncStream<()> {
+        let events = context.events
+        return AsyncStream(events.compactMap {
+            guard let e = $0.event as? E, e == event else { return nil }
+            return ()
+        })
+    }
+
+    func events<M: Model>(fromType modelType: M.Type = M.self) -> AsyncStream<(event: M.Event, model: M)> {
+        let events = context.events
+        return AsyncStream(events.compactMap {
+            guard let event = $0.event as? M.Event, let context = $0.context as? Context<M.State> else { return nil }
+            return (event, M(context: context))
+        })
     }
 }
 
 public extension Model {
-    @discardableResult @MainActor
+    @discardableResult
     func activate() -> Cancellable {
         retain()
         return AnyCancellable {
@@ -225,7 +208,7 @@ public extension Model {
         }
     }
 
-    @discardableResult @MainActor
+    @discardableResult
     func activate<M: Model>(_ viewModel: M) -> Cancellable {
         viewModel.activate().store(in: self)
     }
@@ -275,11 +258,13 @@ public extension Model {
     }
 }
 
-public struct EmptyModel<State>: Model {
+public struct EmptyModel<State: Sendable>: Model {
     public typealias State = State
     @ModelState var state: State
     public init() {}
 }
+
+extension EmptyModel: Sendable where State: Sendable {}
 
 extension Model {
     var storeView: StoreView<State, State, Write> {
@@ -302,7 +287,6 @@ extension Model {
 }
 
 extension Model {
-    @MainActor
     init(context: Context<State>) {
         context.propertyIndex = 0
         self = ContextBase.$current.withValue(context) {
@@ -332,16 +316,9 @@ extension Model {
 
         return nil
     }
-    
-    @discardableResult func context<T>(@_inheritActorContext _ operation: @escaping @MainActor @Sendable () async throws -> T) async rethrows -> T {
-        try await StoreAccess.$isInViewModelContext.withValue(true) {
-            try await operation()
-        }
-    }
 }
 
 extension Model {
-    @MainActor
     func retain() {
         context.retainFromView()
         guard !context.isOverrideStore, context.refCount == 1 else { return }
@@ -353,5 +330,12 @@ extension Model {
     
     func release() {
         context.releaseFromView()
+    }
+}
+
+@discardableResult nonisolated
+private func inViewModelContext<T: Sendable>(@_inheritActorContext _ operation: @escaping () async throws -> T) async rethrows -> T {
+    try await StoreAccess.$isInViewModelContext.withValue(true) {
+        try await operation()
     }
 }

@@ -17,7 +17,7 @@
 @propertyWrapper
 public struct ModelEnvironment<Value> {
     let context: ContextBase
-    let fallbackValue: (() -> Value)?
+    let fallbackValue: (@Sendable () -> Value)?
 
     public init() {
         guard let context = ContextBase.current else {
@@ -28,7 +28,7 @@ public struct ModelEnvironment<Value> {
         fallbackValue = nil
     }
     
-    public init(wrappedValue: @escaping @autoclosure () -> Value) {
+    public init(wrappedValue: @escaping @Sendable @autoclosure () -> Value) {
         guard let context = ContextBase.current else {
             fatalError("ModelEnvironment can only be used from a Model with an injected view.")
         }
@@ -60,6 +60,8 @@ public struct ModelEnvironment<Value> {
         context.environments[ObjectIdentifier(Value.self)] = nil
     }
 }
+
+extension ModelEnvironment: Sendable where Value: Sendable {}
 
 private extension ModelEnvironment {
     var key: ObjectIdentifier { .init(Value.self) }

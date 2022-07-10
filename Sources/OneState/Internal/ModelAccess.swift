@@ -37,7 +37,7 @@ extension ModelAccess {
         observationTasks = contexts.map { context in
             Task { @MainActor [weak self] in
                 for await update in context.stateUpdates where !Task.isCancelled {
-                    self?.handle(update: update)
+                    await self?.handle(update: update)
                 }
             }
         }
@@ -53,7 +53,7 @@ extension ModelAccess {
 }
 
 private extension ModelAccess {
-    func handle(update: AnyStateChange) {
+    @MainActor func handle(update: AnyStateChange) async {
         guard update.isStateOverridden == update.isOverrideUpdate else { return }
 
         let wasUpdated: Bool = lock {
@@ -73,7 +73,12 @@ private extension ModelAccess {
 
         guard wasUpdated else { return }
 
-        let callContext = update.callContext ?? .empty
-        callContext(objectWillChange.send)
+        if let callContext = update.callContext {
+            await callContext { @Sendable in
+                objectWillChange.send()
+            }
+        } else {
+            objectWillChange.send()
+        }
     }
 }

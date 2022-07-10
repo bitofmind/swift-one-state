@@ -20,7 +20,6 @@ public extension Model {
         }
     }
 
-    @MainActor
     subscript<M: Model>(dynamicMember path: WritableKeyPath<State, Writable<StateModel<M>>>) -> Binding<M> where M.StateContainer == M.State {
         .init {
             self[dynamicMember: path.appending(path: \.wrappedValue)]
@@ -30,7 +29,6 @@ public extension Model {
     }
 
 
-    @MainActor
     subscript<Models>(dynamicMember path: WritableKeyPath<State, Writable<StateModel<Models>>>) -> Binding<Models> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
         .init {
             self[dynamicMember: path.appending(path: \.wrappedValue)]
@@ -42,8 +40,8 @@ public extension Model {
 }
 
 public extension Model {
-    func withAnimation<Result>(_ animation: Animation? = .default, _ body: () throws -> Result) rethrows -> Result {
-        let callContext = CallContext { action in
+    @MainActor func withAnimation<Result>(_ animation: Animation? = .default, _ body: () throws -> Result) rethrows -> Result {
+        let callContext = CallContext { @MainActor action in
             SwiftUI.withAnimation(animation) {
                 action()
             }

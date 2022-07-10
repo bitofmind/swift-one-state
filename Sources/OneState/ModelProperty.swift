@@ -41,22 +41,28 @@ public struct ModelProperty<Value> {
     }
 }
 
+extension ModelProperty: Sendable where Value: Sendable {}
+
 extension ModelProperty: AsyncSequence {
     public typealias AsyncIterator = AsyncStream<Value>.AsyncIterator
     public typealias Element = Value
 
-    public func makeAsyncIterator() -> AsyncStream<Value>.AsyncIterator {
+    public func makeAsyncIterator() -> AsyncStream<Value>.AsyncIterator where Value: Sendable {
         AsyncStream(chain([wrappedValue].async, box.subject)).makeAsyncIterator()
     }
 }
 
-public extension ModelProperty where Value: Equatable {
-    var stateView: StateView<Value> {
-        .init(didUpdate: .init(self)) {
-            wrappedValue
+public extension ModelProperty where Value: Equatable&Sendable {
+    func view<T: Sendable&Equatable>(for path: WritableKeyPath<Value, T>) -> StateView<T> {
+        StateView(didUpdate: AsyncStream(map { $0[keyPath: path] })) {
+            wrappedValue[keyPath: path]
         } set: {
-            wrappedValue = $0
+            wrappedValue[keyPath: path] = $0
         }
+    }
+
+    var view: StateView<Value> {
+        return view(for: \.self)
     }
 }
 

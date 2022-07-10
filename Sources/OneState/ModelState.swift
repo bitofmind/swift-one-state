@@ -47,19 +47,28 @@ public struct ModelState<State> {
     }
 }
 
+extension ModelState: Sendable where State: Sendable {}
+
 extension ModelState: StoreViewProvider {
     public var storeView: StoreView<State, State, Write> {
         .init(context: context, path: \.self, access: storeAccess)
     }
 }
 
-public extension ModelState where State: Equatable {
-    var stateView: StateView<State> {
-        .init(didUpdate: values) {
-            wrappedValue
+public extension ModelState {
+    func view<Value: Sendable&Equatable>(for path: WritableKeyPath<State, Value>) -> StateView<Value> {
+        let view = self[dynamicMember: path]
+        return .init(didUpdate: view.changes) {
+            view.nonObservableState
         } set: {
-            wrappedValue = $0
+            view.context[path: view.path] = $0
         }
+    }
+}
+
+public extension ModelState where State: Sendable&Equatable {
+    var view: StateView<State> {
+        return view(for: \.self)
     }
 }
 

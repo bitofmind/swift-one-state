@@ -2,6 +2,7 @@
 import SwiftUI
 
 @propertyWrapper
+@dynamicMemberLookup
 public struct ObservedModel<M: ModelContainer>: DynamicProperty {
     @StateObject private var access = ModelAccess()
 

@@ -1,16 +1,14 @@
 import Foundation
 
-struct CallContext: Identifiable {
+struct CallContext: Identifiable, Sendable {
     let id = UUID()
-    let perform: (() -> Void) -> Void
+    let perform: @Sendable (@Sendable () -> Void) async -> Void
 
-    func callAsFunction(_ action: () -> Void) {
-        perform(action)
+    func callAsFunction(_ action: @Sendable () -> Void) async {
+        await perform(action)
     }
 
     @TaskLocal static var current: CallContext?
-
-    static let empty = Self { $0() }
 }
 
 final class Shared<Value> {
@@ -21,7 +19,7 @@ final class Shared<Value> {
     }
 }
 
-struct AnyStateChange {
+struct AnyStateChange: @unchecked Sendable {
     var previous: AnyObject
     var current: AnyObject
     var isStateOverridden: Bool
@@ -29,7 +27,7 @@ struct AnyStateChange {
     var callContext: CallContext?
 }
 
-class StoreAccess {
+class StoreAccess: @unchecked Sendable {
     func willAccess<Root, State>(path: KeyPath<Root, State>, context: Context<Root>, isSame: @escaping (State, State) -> Bool) { fatalError() }
 
     var allowAccessToBeOverridden: Bool { fatalError() }
@@ -38,7 +36,7 @@ class StoreAccess {
     @TaskLocal static var isInViewModelContext = false
 }
 
-struct Weak<T: AnyObject> {
+struct Weak<T: AnyObject>: @unchecked Sendable {
     weak var value: T?
 }
 
@@ -48,25 +46,25 @@ struct AnyCancellable: Cancellable {
     func cancel() { onCancel() }
 }
 
-final class ThreadState {
+final class ThreadState: @unchecked Sendable {
     var stateModelCount = 0
     init() {}
-}
 
-var threadState: ThreadState {
-    if let state = pthread_getspecific(threadStateKey) {
-        return Unmanaged<ThreadState>.fromOpaque(state).takeUnretainedValue()
+    static var current: ThreadState {
+        if let state = pthread_getspecific(threadStateKey) {
+            return Unmanaged<ThreadState>.fromOpaque(state).takeUnretainedValue()
+        }
+        let state = ThreadState()
+        pthread_setspecific(threadStateKey, Unmanaged.passRetained(state).toOpaque())
+        return state
     }
-    let state = ThreadState()
-    pthread_setspecific(threadStateKey, Unmanaged.passRetained(state).toOpaque())
-    return state
 }
 
-private var _threadStateKey: pthread_key_t = 0
 private let threadStateKey: pthread_key_t = {
+    var key: pthread_key_t = 0
     let cleanup: @convention(c) (UnsafeMutableRawPointer) -> Void = { state in
-             Unmanaged<ThreadState>.fromOpaque(state).release()
-         }
-    pthread_key_create(&_threadStateKey, cleanup)
-    return _threadStateKey
+        Unmanaged<ThreadState>.fromOpaque(state).release()
+    }
+    pthread_key_create(&key, cleanup)
+    return key
  }()
