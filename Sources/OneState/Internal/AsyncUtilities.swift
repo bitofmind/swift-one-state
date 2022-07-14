@@ -1,8 +1,9 @@
 import Foundation
 
 final class AsyncPassthroughSubject<Element>: AsyncSequence, @unchecked Sendable {
-    var lock = Lock()
-    var continuations: [UUID: AsyncStream<Element>.Continuation] = [:]
+    private var lock = Lock()
+    private var continuations: [Int: AsyncStream<Element>.Continuation] = [:]
+    private var nextKey = 0
 
     init() {}
 
@@ -16,15 +17,16 @@ final class AsyncPassthroughSubject<Element>: AsyncSequence, @unchecked Sendable
 
     func makeAsyncIterator() -> AsyncStream<Element>.Iterator {
         AsyncStream(Element.self) { continuation in
-            let key = UUID()
+            let key: Int = lock {
+                nextKey += 1;
+                continuations[nextKey] = continuation
+                return nextKey
+            }
+
             continuation.onTermination = { @Sendable _ in
                 self.lock {
                     self.continuations[key] = nil
                 }
-            }
-
-            lock {
-                continuations[key] = continuation
             }
         }.makeAsyncIterator()
     }
@@ -45,6 +47,21 @@ extension AsyncStream {
         }
     }
 }
+
+public final class CallContextStream<Element>: AsyncSequence {
+    let stream: AsyncStream<WithCallContext<Element>>
+
+    init<S: AsyncSequence>(_ sequence: @autoclosure @escaping @Sendable () -> S) rethrows where S.Element == WithCallContext<Element> {
+        stream = try! .init(sequence())
+    }
+
+    public func makeAsyncIterator() -> AsyncStream<Element>.Iterator {
+        let stream = self.stream
+        return AsyncStream(stream.map(\.value)).makeAsyncIterator()
+    }
+}
+
+extension CallContextStream: @unchecked Sendable where Element: Sendable {}
 
 #if swift(<5.7)
 extension AsyncStream: @unchecked Sendable where Element: Sendable {}

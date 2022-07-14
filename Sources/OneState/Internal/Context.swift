@@ -12,6 +12,11 @@ class Context<State>: ContextBase {
         _read { fatalError() }
     }
 
+    subscript<T> (path path: WritableKeyPath<State, T>, shared shared: AnyObject) -> T {
+        _read { fatalError() }
+        _modify { fatalError() }
+    }
+
     subscript<T> (overridePath path: KeyPath<State, T>) -> T? {
         _read { fatalError() }
     }

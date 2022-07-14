@@ -1,4 +1,5 @@
 import Foundation
+import AsyncAlgorithms
 
 /// Holds a model that drives SwiftUI views
 ///
@@ -90,6 +91,9 @@ public extension Model {
     @discardableResult
     func task(priority: TaskPriority? = nil, _ operation: @escaping @Sendable () async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
         Task(priority: priority) {
+            context.pushTask(for: self)
+            defer { context.popTask(for: self) }
+            
             do {
                 try await inViewModelContext {
                     guard !Task.isCancelled else { return }
@@ -146,11 +150,24 @@ public extension Model {
         }, catch: `catch`)
     }
 
+    @discardableResult
+    func forEach<Element: Sendable>(_ sequence: @autoclosure @escaping @Sendable () -> CallContextStream<Element>, cancelPrevious: Bool = false, priority: TaskPriority? = nil, perform: @escaping @Sendable (Element) async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
+        forEach(sequence().stream.map { ($0.value, $0.callContext) }, cancelPrevious: cancelPrevious, priority: priority, perform: { value, callContext in
+            try await CallContext.$current.withValue(callContext) {
+                try await perform(value)
+            }
+        }, catch: `catch`)
+    }
+
     /// Wait until the predicate based on the models state is fullfilled
     func waitUntil(_ predicate: @autoclosure @escaping @Sendable () -> Bool) async throws {
-        _ = await context.stateUpdates.first { _ in
-            await inViewModelContext { predicate() }
+        let initial = AsyncStream<()> { c in
+            c.yield(())
+            c.finish()
         }
+        let updates = context.stateUpdates.map { _ in () }
+
+        _ = await chain(initial, updates).first(where: predicate)
         try Task.checkCancellation()
     }
 }
@@ -166,35 +183,35 @@ public extension Model {
         context.sendEvent(event, context: context, callContext: .current)
     }
 
-    func events() -> AsyncStream<Event> {
+    func events() -> CallContextStream<Event> {
         let events = context.events
-        return AsyncStream(events.compactMap {
+        return CallContextStream(events.compactMap {
             guard let e = $0.event as? Event else { return nil }
-            return e
+            return .init(value: e, callContext: $0.callContext)
         })
     }
 
-    func events(of event: Event) -> AsyncStream<()> where Event: Equatable&Sendable {
+    func events(of event: Event) -> CallContextStream<()> where Event: Equatable&Sendable {
         let events = context.events
-        return AsyncStream(events.compactMap {
+        return CallContextStream(events.compactMap {
             guard let e = $0.event as? Event, e == event else { return nil }
-            return ()
+            return .init(value: (), callContext: $0.callContext)
         })
     }
 
-    func events<E: Equatable&Sendable>(of event: E) -> AsyncStream<()> {
+    func events<E: Equatable&Sendable>(of event: E) -> CallContextStream<()> {
         let events = context.events
-        return AsyncStream(events.compactMap {
+        return CallContextStream(events.compactMap {
             guard let e = $0.event as? E, e == event else { return nil }
-            return ()
+            return .init(value: (), callContext: $0.callContext)
         })
     }
 
-    func events<M: Model>(fromType modelType: M.Type = M.self) -> AsyncStream<(event: M.Event, model: M)> {
+    func events<M: Model>(fromType modelType: M.Type = M.self) -> CallContextStream<(event: M.Event, model: M)> {
         let events = context.events
-        return AsyncStream(events.compactMap {
+        return CallContextStream(events.compactMap {
             guard let event = $0.event as? M.Event, let context = $0.context as? Context<M.State> else { return nil }
-            return (event, M(context: context))
+            return .init(value: (event, M(context: context)), callContext: $0.callContext)
         })
     }
 }
@@ -292,10 +309,6 @@ extension Model {
         self = ContextBase.$current.withValue(context) {
              Self()
         }
-
-        if context.isForTesting {
-            self.retain()
-        }
     }
     
     var context: Context<State> {
@@ -331,11 +344,22 @@ extension Model {
     func release() {
         context.releaseFromView()
     }
+
+    var typeDescription: String {
+        String(describing: type(of: self))
+    }
 }
 
 @discardableResult nonisolated
 private func inViewModelContext<T: Sendable>(@_inheritActorContext _ operation: @escaping () async throws -> T) async rethrows -> T {
     try await StoreAccess.$isInViewModelContext.withValue(true) {
         try await operation()
+    }
+}
+
+@discardableResult nonisolated
+private func inViewModelContext<T: Sendable>(@_inheritActorContext _ operation: @escaping () throws -> T) rethrows -> T {
+    try StoreAccess.$isInViewModelContext.withValue(true) {
+        try operation()
     }
 }

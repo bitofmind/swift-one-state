@@ -1,13 +1,19 @@
 final class ChildContext<M: Model, State>: Context<State> {
     typealias Root = M.State
 
-    let store: Store<M>
+    let fallbackStore: Store<M>
+    weak var weakStore: Store<M>?
     let path: WritableKeyPath<Root, State>
 
     init(store: Store<M>, path: WritableKeyPath<Root, State>, parent: ContextBase?) {
-        self.store = store
+        weakStore = store
+        fallbackStore = store.fallbackStore
         self.path = path
         super.init(parent: parent)
+    }
+
+    var store: Store<M> {
+        weakStore ?? fallbackStore
     }
 
     override subscript<T> (path path: KeyPath<State, T>) -> T {
@@ -28,6 +34,15 @@ final class ChildContext<M: Model, State>: Context<State> {
     override subscript<T> (path path: KeyPath<State, T>, shared shared: AnyObject) -> T {
         _read {
             yield store[path: self.path.appending(path: path), shared: shared]
+        }
+    }
+
+    override subscript<T> (path path: WritableKeyPath<State, T>, shared shared: AnyObject) -> T {
+        _read {
+            yield store[path: self.path.appending(path: path), shared: shared]
+        }
+        _modify {
+            yield &store[path: self.path.appending(path: path), shared: shared]
         }
     }
 
@@ -74,5 +89,13 @@ final class ChildContext<M: Model, State>: Context<State> {
 
             return context
         }
+    }
+
+    override func pushTask<M: Model>(for model: M) {
+        store.pushTask(for: model)
+    }
+
+    override func popTask<M: Model>(for model: M) {
+        store.popTask(for: model)
     }
 }
