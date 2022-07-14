@@ -4,7 +4,7 @@ import SwiftUI
 @propertyWrapper
 @dynamicMemberLookup
 public struct ObservedModel<M: ModelContainer>: DynamicProperty {
-    @StateObject private var access = ModelAccess()
+    @StateObject private var access = ViewAccess()
 
     public init(wrappedValue: M) {
         self.wrappedValue = wrappedValue

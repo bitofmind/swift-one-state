@@ -1,6 +1,6 @@
 import Foundation
 
-class ModelAccess: StoreAccess, ObservableObject {
+class ViewAccess: StoreAccess, ObservableObject {
     var contexts: [ContextBase] = []
     var observationTasks: [Task<(), Never>] = []
     var lock = Lock()
@@ -30,7 +30,7 @@ class ModelAccess: StoreAccess, ObservableObject {
     override var allowAccessToBeOverridden: Bool { true }
 }
 
-extension ModelAccess {
+extension ViewAccess {
     func startObserving(from contexts: [ContextBase]) {
         stopObserving()
         self.contexts = contexts
@@ -52,7 +52,7 @@ extension ModelAccess {
     }
 }
 
-private extension ModelAccess {
+private extension ViewAccess {
     @MainActor func handle(update: AnyStateChange) async {
         guard update.isStateOverridden == update.isOverrideUpdate else { return }
 
