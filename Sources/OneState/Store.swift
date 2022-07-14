@@ -33,15 +33,27 @@ public final class Store<M: Model>: @unchecked Sendable {
 
     private(set) var context: ChildContext<M, State>!
 
+    private var _activeTasks: [ObjectIdentifier: (description: () -> String, count: Int)] = [:]
+
+    let fallbackStore: Store!
+
     public init(initialState: State, environments: [Any] = []) {
         previousState = Shared(initialState)
         currentState = previousState
         context = nil
+        fallbackStore = Self(fallbackState: initialState)
 
         context = .init(store: self, path: \.self, parent: nil)
         for environment in environments {
             context.environments[ObjectIdentifier(type(of: environment))] = environment
         }
+    }
+
+    private init(fallbackState: State) {
+        previousState = Shared(fallbackState)
+        currentState = previousState
+        context = nil
+        fallbackStore = nil
     }
 }
 
@@ -148,6 +160,7 @@ extension Store {
 
                         self.lock.lock()
                         defer { self.lock.unlock() }
+                        
                         if count == self.modifyCount {
                             self.updateTask = nil
                             break
@@ -172,6 +185,17 @@ extension Store {
         _read {
             let shared = shared as! Shared<State>
             yield shared.value[keyPath: path]
+        }
+    }
+
+    subscript<T> (path path: WritableKeyPath<State, T>, shared shared: AnyObject) -> T {
+        _read {
+            let shared = shared as! Shared<State>
+            yield shared.value[keyPath: path]
+        }
+        _modify {
+            let shared = shared as! Shared<State>
+            yield &shared.value[keyPath: path]
         }
     }
 
@@ -210,6 +234,28 @@ extension Store {
         lock.unlock()
 
         context.notify(update)
+    }
+
+    var isUpdateInProgress: Bool {
+        lock { previousState !== currentState }
+    }
+
+    func pushTask<M: Model>(for model: M) {
+        lock {
+            _activeTasks[ObjectIdentifier(type(of: model)), default: ({ model.typeDescription }, 0)].count += 1
+        }
+    }
+
+    func popTask<M: Model>(for model: M) {
+        lock {
+            _activeTasks[ObjectIdentifier(type(of: model))]!.count -= 1
+        }
+    }
+
+    var activeTasks: [(modelName: String, count: Int)] {
+        lock {
+            _activeTasks.values.filter { $0.count != 0 }.map { ($0.description(), $0.count) }
+        }
     }
 }
 

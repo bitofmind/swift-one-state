@@ -75,11 +75,11 @@ public extension Model {
 }
 
 public extension StoreViewProvider  {
-    func events<Models: ModelContainer>() -> AsyncStream<(event: Models.ModelElement.Event, model: Models.ModelElement)> where State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable {
+    func events<Models: ModelContainer>() -> CallContextStream<(event: Models.ModelElement.Event, model: Models.ModelElement)> where State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable {
         let containerView = storeView(for: \.wrappedValue)
         let events = storeView.context.events
 
-        return AsyncStream(events.compactMap { e -> (Models.ModelElement.Event, Models.ModelElement)? in
+        return CallContextStream(events.compactMap { e -> WithCallContext<(event: Models.ModelElement.Event, model: Models.ModelElement)>? in
             guard let event = e.event as? Models.ModelElement.Event,
                   let containerPath = containerView.context.storePath.appending(path: containerView.path)
             else { return nil }
@@ -89,16 +89,7 @@ public extension StoreViewProvider  {
             for path in container.elementKeyPaths {
                 if let elementPath = containerPath.appending(path: path), elementPath == e.path {
                     let context = e.context as! Context<Models.ModelElement.State>
-
-                    if let callContext = e.callContext {
-                        await callContext {
-                            CallContext.$current.withValue(callContext) {
-                                return (event, Models.ModelElement(context: context))
-                            }
-                        }
-                    } else {
-                        return (event, Models.ModelElement(context: context))
-                    }
+                    return WithCallContext(value: (event, Models.ModelElement(context: context)), callContext: e.callContext)
                 }
             }
 
@@ -106,26 +97,28 @@ public extension StoreViewProvider  {
         })
     }
 
-    func events<Models: ModelContainer>(of event: Models.ModelElement.Event) -> AsyncStream<Models.ModelElement> where State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable&Equatable  {
+    func events<Models: ModelContainer>(of event: Models.ModelElement.Event) -> CallContextStream<Models.ModelElement> where State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable&Equatable  {
         let events = events()
-        return AsyncStream(events.compactMap { $0.event == event ? $0.model : nil })
-    }
-
-    func events<M: Model>() -> AsyncStream<M.Event> where State == StateModel<M> {
-        let events = storeView(for: \.wrappedValue).context.events
-
-        return AsyncStream(events.compactMap {
-            guard let e = $0.event as? M.Event else { return nil }
-            return e
+        return CallContextStream(events.stream.compactMap {
+            $0.value.event == event ? .init(value: $0.value.model, callContext: $0.callContext) : nil
         })
     }
 
-    func events<M: Model>(of event: M.Event) -> AsyncStream<()> where State == StateModel<M>, M.Event: Equatable&Sendable {
+    func events<M: Model>() -> CallContextStream<M.Event> where State == StateModel<M> {
         let events = storeView(for: \.wrappedValue).context.events
 
-        return AsyncStream(events.compactMap {
+        return CallContextStream(events.compactMap {
+            guard let e = $0.event as? M.Event else { return nil }
+            return .init(value: e, callContext: $0.callContext)
+        })
+    }
+
+    func events<M: Model>(of event: M.Event) -> CallContextStream<()> where State == StateModel<M>, M.Event: Equatable&Sendable {
+        let events = storeView(for: \.wrappedValue).context.events
+
+        return CallContextStream(events.compactMap {
             guard let e = $0.event as? M.Event, e == event else { return nil }
-            return ()
+            return .init(value: (), callContext: $0.callContext)
         })
     }
 }

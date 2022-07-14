@@ -15,7 +15,6 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     @Locked var propertyIndex = 0
     @Locked var properties: [Any] = []
     @Locked var cancellables: [Cancellable] = []
-    @Locked var isForTesting = false
     @Locked var hasBeenRemoved = false
     @Locked var refCount = 0
 
@@ -23,9 +22,6 @@ class ContextBase: HoldsLock, @unchecked Sendable {
 
     init(parent: ContextBase?) {
         self.parent = parent
-        if let parent = parent {
-            isForTesting = parent.isForTesting
-        }
     }
 
     deinit {
@@ -118,6 +114,14 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     }
 
     func sendEvent(_ event: Any, path: AnyKeyPath, context: ContextBase, callContext: CallContext?) {
+        fatalError()
+    }
+
+    func pushTask<M: Model>(for model: M) {
+        fatalError()
+    }
+
+    func popTask<M: Model>(for model: M) {
         fatalError()
     }
 }

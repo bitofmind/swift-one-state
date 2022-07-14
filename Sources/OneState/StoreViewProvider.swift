@@ -20,9 +20,12 @@ public protocol StoreViewProvider {
 
 public extension StoreViewProvider where State: Sendable {
     func values(isSame: @escaping @Sendable (State, State) -> Bool) -> AsyncStream<State> {
-        let state = nonObservableState
+        let state = AsyncStream<State> { c in
+            c.yield(nonObservableState)
+            c.finish()
+        }
         let changes = changes(isSame: isSame)
-        return AsyncStream(chain([state].async, changes))
+        return AsyncStream(chain(state, changes))
     }
 
     func changes(isSame: @escaping @Sendable (State, State) -> Bool) -> AsyncStream<State> {

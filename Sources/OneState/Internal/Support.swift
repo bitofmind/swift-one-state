@@ -11,6 +11,31 @@ struct CallContext: Identifiable, Sendable {
     @TaskLocal static var current: CallContext?
 }
 
+struct WithCallContext<Value> {
+    let value: Value
+    let callContext: CallContext?
+}
+
+extension WithCallContext: Sendable where Value: Sendable {}
+
+public func withCallContext<Result>(body: () throws -> Result, perform: @escaping @Sendable (@Sendable () -> Void) async -> Void) rethrows -> Result {
+    try CallContext.$current.withValue(CallContext(perform: perform)) {
+        try body()
+    }
+}
+
+func perform(with callContext: CallContext?, execute: @Sendable () -> Void) async {
+    if let callContext = callContext {
+        await CallContext.$current.withValue(callContext) {
+            await callContext {
+                execute()
+            }
+        }
+    } else {
+        execute()
+    }
+}
+
 final class Shared<Value> {
     var value: Value
 
@@ -28,9 +53,9 @@ struct AnyStateChange: @unchecked Sendable {
 }
 
 class StoreAccess: @unchecked Sendable {
-    func willAccess<Root, State>(path: KeyPath<Root, State>, context: Context<Root>, isSame: @escaping (State, State) -> Bool) { fatalError() }
+    func willAccess<Root, State>(path: KeyPath<Root, State>, context: Context<Root>, isSame: @escaping (State, State) -> Bool) { }
 
-    var allowAccessToBeOverridden: Bool { fatalError() }
+    var allowAccessToBeOverridden: Bool { false }
 
     @TaskLocal static var current: Weak<StoreAccess>?
     @TaskLocal static var isInViewModelContext = false

@@ -39,16 +39,11 @@ public extension Model {
     }
 }
 
-public extension Model {
-    @MainActor func withAnimation<Result>(_ animation: Animation? = .default, _ body: () throws -> Result) rethrows -> Result {
-        let callContext = CallContext { @MainActor action in
-            SwiftUI.withAnimation(animation) {
-                action()
-            }
-        }
-
-        return try CallContext.$current.withValue(callContext) {
-            try body()
+@discardableResult
+public func withAnimation<Result>(_ animation: Animation? = .default, _ body: () throws -> Result) rethrows -> Result {
+   try withCallContext(body: body) { @MainActor action in
+        SwiftUI.withAnimation(animation) {
+            action()
         }
     }
 }
