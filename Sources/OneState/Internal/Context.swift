@@ -25,8 +25,8 @@ class Context<State>: ContextBase {
 
     var storePath: AnyKeyPath { fatalError() }
 
-    func sendEvent(_ event: Any, context: ContextBase, callContext: CallContext?) {
-        sendEvent(event, path: storePath, context: context, callContext: callContext)
+    func sendEvent(_ event: Any, context: ContextBase, callContexts: [CallContext]) {
+        sendEvent(event, path: storePath, context: context, callContexts: callContexts)
     }
 }
 

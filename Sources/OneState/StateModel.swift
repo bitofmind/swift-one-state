@@ -75,11 +75,11 @@ public extension Model {
 }
 
 public extension StoreViewProvider  {
-    func events<Models: ModelContainer>() -> CallContextStream<(event: Models.ModelElement.Event, model: Models.ModelElement)> where State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable {
+    func events<Models: ModelContainer>() -> CallContextsStream<(event: Models.ModelElement.Event, model: Models.ModelElement)> where State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable {
         let containerView = storeView(for: \.wrappedValue)
         let events = storeView.context.events
 
-        return CallContextStream(events.compactMap { e -> WithCallContext<(event: Models.ModelElement.Event, model: Models.ModelElement)>? in
+        return CallContextsStream(events.compactMap { e -> WithCallContexts<(event: Models.ModelElement.Event, model: Models.ModelElement)>? in
             guard let event = e.event as? Models.ModelElement.Event,
                   let containerPath = containerView.context.storePath.appending(path: containerView.path)
             else { return nil }
@@ -89,7 +89,7 @@ public extension StoreViewProvider  {
             for path in container.elementKeyPaths {
                 if let elementPath = containerPath.appending(path: path), elementPath == e.path {
                     let context = e.context as! Context<Models.ModelElement.State>
-                    return WithCallContext(value: (event, Models.ModelElement(context: context)), callContext: e.callContext)
+                    return WithCallContexts(value: (event, Models.ModelElement(context: context)), callContexts: e.callContexts)
                 }
             }
 
@@ -97,28 +97,28 @@ public extension StoreViewProvider  {
         })
     }
 
-    func events<Models: ModelContainer>(of event: Models.ModelElement.Event) -> CallContextStream<Models.ModelElement> where State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable&Equatable  {
+    func events<Models: ModelContainer>(of event: Models.ModelElement.Event) -> CallContextsStream<Models.ModelElement> where State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable&Equatable  {
         let events = events()
-        return CallContextStream(events.stream.compactMap {
-            $0.value.event == event ? .init(value: $0.value.model, callContext: $0.callContext) : nil
+        return CallContextsStream(events.stream.compactMap {
+            $0.value.event == event ? .init(value: $0.value.model, callContexts: $0.callContexts) : nil
         })
     }
 
-    func events<M: Model>() -> CallContextStream<M.Event> where State == StateModel<M> {
+    func events<M: Model>() -> CallContextsStream<M.Event> where State == StateModel<M> {
         let events = storeView(for: \.wrappedValue).context.events
 
-        return CallContextStream(events.compactMap {
+        return CallContextsStream(events.compactMap {
             guard let e = $0.event as? M.Event else { return nil }
-            return .init(value: e, callContext: $0.callContext)
+            return .init(value: e, callContexts: $0.callContexts)
         })
     }
 
-    func events<M: Model>(of event: M.Event) -> CallContextStream<()> where State == StateModel<M>, M.Event: Equatable&Sendable {
+    func events<M: Model>(of event: M.Event) -> CallContextsStream<()> where State == StateModel<M>, M.Event: Equatable&Sendable {
         let events = storeView(for: \.wrappedValue).context.events
 
-        return CallContextStream(events.compactMap {
+        return CallContextsStream(events.compactMap {
             guard let e = $0.event as? M.Event, e == event else { return nil }
-            return .init(value: (), callContext: $0.callContext)
+            return .init(value: (), callContexts: $0.callContexts)
         })
     }
 }

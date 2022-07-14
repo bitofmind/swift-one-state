@@ -48,10 +48,10 @@ extension AsyncStream {
     }
 }
 
-public final class CallContextStream<Element>: AsyncSequence {
-    let stream: AsyncStream<WithCallContext<Element>>
+public final class CallContextsStream<Element>: AsyncSequence {
+    let stream: AsyncStream<WithCallContexts<Element>>
 
-    init<S: AsyncSequence>(_ sequence: @autoclosure @escaping @Sendable () -> S) rethrows where S.Element == WithCallContext<Element> {
+    init<S: AsyncSequence>(_ sequence: @autoclosure @escaping @Sendable () -> S) rethrows where S.Element == WithCallContexts<Element> {
         stream = try! .init(sequence())
     }
 
@@ -61,7 +61,7 @@ public final class CallContextStream<Element>: AsyncSequence {
     }
 }
 
-extension CallContextStream: @unchecked Sendable where Element: Sendable {}
+extension CallContextsStream: @unchecked Sendable where Element: Sendable {}
 
 #if swift(<5.7)
 extension AsyncStream: @unchecked Sendable where Element: Sendable {}
