@@ -18,13 +18,15 @@ public final class TestModel<M: Model> {
     }
 }
 
-public extension TestModel {
-    var storeView: StoreView<M.State, M.State, Write> { wrappedValue.storeView }
+extension TestModel: StoreViewProvider {
+    public var storeView: StoreView<M.State, M.State, Write> {
+        wrappedValue.storeView
+    }
 }
 
 extension TestModel: TestViewProvider {
     public var testView: TestView<M.State, M.State> {
-        TestView(storeView: wrappedValue.storeView)
+        TestView(storeView: storeView)
     }
 }
 
@@ -35,5 +37,7 @@ public extension TestModel {
 }
 
 extension TestModel {
-    var access: TestAccessBase { wrappedValue.storeView.access as! TestAccessBase }
+    var access: TestAccessBase {
+        wrappedValue.storeView.access as! TestAccessBase
+    }
 }
