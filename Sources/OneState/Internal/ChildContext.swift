@@ -56,9 +56,9 @@ final class ChildContext<M: Model, State>: Context<State> {
         store.stateOverride != nil
     }
 
-    override func sendEvent(_ event: Any, path: AnyKeyPath, context: ContextBase, callContext: CallContext?) {
-        events.yield((event: event, path: path, context: context, callContext: callContext))
-        parent?.sendEvent(event, path: path, context: context, callContext: callContext)
+    override func sendEvent(_ event: Any, path: AnyKeyPath, context: ContextBase, callContexts: [CallContext]) {
+        events.yield((event: event, path: path, context: context, callContexts: callContexts))
+        parent?.sendEvent(event, path: path, context: context, callContexts: callContexts)
     }
 
     override var storePath: AnyKeyPath { path }

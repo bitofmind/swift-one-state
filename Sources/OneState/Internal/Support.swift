@@ -2,37 +2,37 @@ import Foundation
 
 struct CallContext: Identifiable, Sendable {
     let id = UUID()
-    let perform: @Sendable (@Sendable () -> Void) async -> Void
+    let perform: @MainActor @Sendable (@MainActor @Sendable () -> Void) -> Void
 
-    func callAsFunction(_ action: @Sendable () -> Void) async {
-        await perform(action)
+    @MainActor
+    func callAsFunction(_ action: @MainActor @Sendable () -> Void) {
+        perform(action)
     }
 
-    @TaskLocal static var current: CallContext?
+    @TaskLocal static var currentContexts: [CallContext] = []
 }
 
-struct WithCallContext<Value> {
+struct WithCallContexts<Value> {
     let value: Value
-    let callContext: CallContext?
+    let callContexts: [CallContext]
 }
 
-extension WithCallContext: Sendable where Value: Sendable {}
+extension WithCallContexts: Sendable where Value: Sendable {}
 
-public func withCallContext<Result>(body: () throws -> Result, perform: @escaping @Sendable (@Sendable () -> Void) async -> Void) rethrows -> Result {
-    try CallContext.$current.withValue(CallContext(perform: perform)) {
+public func withCallContext<Result>(body: () throws -> Result, perform: @escaping @MainActor @Sendable (@MainActor @Sendable () -> Void) -> Void) rethrows -> Result {
+    try CallContext.$currentContexts.withValue(CallContext.currentContexts + [CallContext(perform: perform)]) {
         try body()
     }
 }
 
-func perform(with callContext: CallContext?, execute: @Sendable () -> Void) async {
-    if let callContext = callContext {
-        await CallContext.$current.withValue(callContext) {
-            await callContext {
-                execute()
-            }
-        }
-    } else {
+@MainActor
+func apply<C: Collection&Sendable>(callContexts: C, execute: @Sendable () -> Void) where C.Element == CallContext, C.SubSequence: Sendable {
+    if callContexts.isEmpty {
         execute()
+    } else {
+        (callContexts.first!) {
+            apply(callContexts: callContexts.dropFirst(), execute: execute)
+        }
     }
 }
 
@@ -49,7 +49,7 @@ struct AnyStateChange: @unchecked Sendable {
     var current: AnyObject
     var isStateOverridden: Bool
     var isOverrideUpdate: Bool
-    var callContext: CallContext?
+    var callContexts: [CallContext] = []
 }
 
 class StoreAccess: @unchecked Sendable {

@@ -151,9 +151,9 @@ public extension Model {
     }
 
     @discardableResult
-    func forEach<Element: Sendable>(_ sequence: @autoclosure @escaping @Sendable () -> CallContextStream<Element>, cancelPrevious: Bool = false, priority: TaskPriority? = nil, perform: @escaping @Sendable (Element) async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
-        forEach(sequence().stream.map { ($0.value, $0.callContext) }, cancelPrevious: cancelPrevious, priority: priority, perform: { value, callContext in
-            try await CallContext.$current.withValue(callContext) {
+    func forEach<Element: Sendable>(_ sequence: @autoclosure @escaping @Sendable () -> CallContextsStream<Element>, cancelPrevious: Bool = false, priority: TaskPriority? = nil, perform: @escaping @Sendable (Element) async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
+        forEach(sequence().stream.map { ($0.value, $0.callContexts) }, cancelPrevious: cancelPrevious, priority: priority, perform: { value, callContexts in
+            try await CallContext.$currentContexts.withValue(callContexts) {
                 try await perform(value)
             }
         }, catch: `catch`)
@@ -175,43 +175,43 @@ public extension Model {
 public extension Model {
     /// Sends an event to self and ancestors
     func send(_ event: Event) {
-        context.sendEvent(event, context: context, callContext: .current)
+        context.sendEvent(event, context: context, callContexts: CallContext.currentContexts)
     }
 
     /// Sends an event to self and ancestors
     func send<E>(_ event: E) {
-        context.sendEvent(event, context: context, callContext: .current)
+        context.sendEvent(event, context: context, callContexts: CallContext.currentContexts)
     }
 
-    func events() -> CallContextStream<Event> {
+    func events() -> CallContextsStream<Event> {
         let events = context.events
-        return CallContextStream(events.compactMap {
+        return CallContextsStream(events.compactMap {
             guard let e = $0.event as? Event else { return nil }
-            return .init(value: e, callContext: $0.callContext)
+            return .init(value: e, callContexts: $0.callContexts)
         })
     }
 
-    func events(of event: Event) -> CallContextStream<()> where Event: Equatable&Sendable {
+    func events(of event: Event) -> CallContextsStream<()> where Event: Equatable&Sendable {
         let events = context.events
-        return CallContextStream(events.compactMap {
+        return CallContextsStream(events.compactMap {
             guard let e = $0.event as? Event, e == event else { return nil }
-            return .init(value: (), callContext: $0.callContext)
+            return .init(value: (), callContexts: $0.callContexts)
         })
     }
 
-    func events<E: Equatable&Sendable>(of event: E) -> CallContextStream<()> {
+    func events<E: Equatable&Sendable>(of event: E) -> CallContextsStream<()> {
         let events = context.events
-        return CallContextStream(events.compactMap {
+        return CallContextsStream(events.compactMap {
             guard let e = $0.event as? E, e == event else { return nil }
-            return .init(value: (), callContext: $0.callContext)
+            return .init(value: (), callContexts: $0.callContexts)
         })
     }
 
-    func events<M: Model>(fromType modelType: M.Type = M.self) -> CallContextStream<(event: M.Event, model: M)> {
+    func events<M: Model>(fromType modelType: M.Type = M.self) -> CallContextsStream<(event: M.Event, model: M)> {
         let events = context.events
-        return CallContextStream(events.compactMap {
+        return CallContextsStream(events.compactMap {
             guard let event = $0.event as? M.Event, let context = $0.context as? Context<M.State> else { return nil }
-            return .init(value: (event, M(context: context)), callContext: $0.callContext)
+            return .init(value: (event, M(context: context)), callContexts: $0.callContexts)
         })
     }
 }

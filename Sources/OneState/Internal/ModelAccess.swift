@@ -73,11 +73,7 @@ private extension ModelAccess {
 
         guard wasUpdated else { return }
 
-        if let callContext = update.callContext {
-            await callContext { @Sendable in
-                objectWillChange.send()
-            }
-        } else {
+        apply(callContexts: update.callContexts) {
             objectWillChange.send()
         }
     }

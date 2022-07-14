@@ -28,7 +28,6 @@ public extension Model {
         }
     }
 
-
     subscript<Models>(dynamicMember path: WritableKeyPath<State, Writable<StateModel<Models>>>) -> Binding<Models> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
         .init {
             self[dynamicMember: path.appending(path: \.wrappedValue)]
@@ -39,13 +38,20 @@ public extension Model {
     }
 }
 
-@discardableResult
 public func withAnimation<Result>(_ animation: Animation? = .default, _ body: () throws -> Result) rethrows -> Result {
-   try withCallContext(body: body) { @MainActor action in
+   try withCallContext(body: body) { action in
         SwiftUI.withAnimation(animation) {
             action()
         }
     }
+}
+
+public func withTransaction<Result>(_ transaction: Transaction, _ body: () throws -> Result) rethrows -> Result {
+    try withCallContext(body: body) { action in
+         SwiftUI.withTransaction(transaction) {
+             action()
+         }
+     }
 }
 
 public extension StoreViewProvider where Access == Write {

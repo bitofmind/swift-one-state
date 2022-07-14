@@ -29,7 +29,7 @@ public final class Store<M: Model>: @unchecked Sendable {
 
     private var updateTask: Task<(), Never>?
     private var lastFromContext: ContextBase?
-    private var lastCallContext: CallContext?
+    private var lastCallContextIds: [CallContext.ID] = []
 
     private(set) var context: ChildContext<M, State>!
 
@@ -135,7 +135,8 @@ extension Store {
                 return
             }
 
-            if let last = lastFromContext, (last !== fromContext || lastCallContext?.id != CallContext.current?.id) {
+            let currentCallContextIds = CallContext.currentContexts.map(\.id)
+            if let last = lastFromContext, (last !== fromContext || lastCallContextIds != currentCallContextIds) {
                 lock.unlock()
                 notify(context: last)
                 lock.lock()
@@ -147,7 +148,7 @@ extension Store {
 
             yield &currentState.value[keyPath: path]
             lastFromContext = fromContext
-            lastCallContext = CallContext.current
+            lastCallContextIds = currentCallContextIds
             modifyCount += 1
 
             if updateTask == nil {
@@ -167,13 +168,7 @@ extension Store {
                         }
                     }
 
-                    if let callContext = CallContext.current {
-                        await callContext {
-                            self.notify(context: fromContext)
-                        }
-                    } else {
-                        self.notify(context: fromContext)
-                    }
+                    self.notify(context: fromContext)
                 }
             }
             
@@ -227,7 +222,7 @@ extension Store {
             current: state,
             isStateOverridden: currentOverride != nil,
             isOverrideUpdate: false,
-            callContext: .current
+            callContexts: CallContext.currentContexts
         )
 
         previousState = state
