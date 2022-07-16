@@ -19,9 +19,15 @@ struct WithCallContexts<Value> {
 
 extension WithCallContexts: Sendable where Value: Sendable {}
 
-public func withCallContext<Result>(body: () throws -> Result, perform: @escaping @MainActor @Sendable (@MainActor @Sendable () -> Void) -> Void) rethrows -> Result {
+func withCallContext<Result>(body: () throws -> Result, perform: @escaping @MainActor @Sendable (@MainActor @Sendable () -> Void) -> Void) rethrows -> Result {
     try CallContext.$currentContexts.withValue(CallContext.currentContexts + [CallContext(perform: perform)]) {
         try body()
+    }
+}
+
+func transaction<Result>(body: () throws -> Result) rethrows -> Result {
+    try withCallContext(body: body) { action in
+        action()
     }
 }
 

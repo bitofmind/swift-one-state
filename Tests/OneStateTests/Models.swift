@@ -15,6 +15,7 @@ struct CounterModel: Model {
 struct EventModel: Model {
     struct State: Equatable {
         var count = 0
+        var receivedEvents: [EventModel.Event] = []
     }
 
     enum Event: Equatable {
@@ -23,6 +24,14 @@ struct EventModel: Model {
     }
 
     @ModelState var state: State
+
+    func onActivate() {
+        forEach(events()) {
+            state.receivedEvents.append($0)
+        }
+
+        state.count += 1
+    }
 
     func increment() {
         state.count += 1

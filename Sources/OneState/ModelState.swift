@@ -58,7 +58,7 @@ extension ModelState: StoreViewProvider {
 public extension ModelState {
     func view<Value: Sendable&Equatable>(for path: WritableKeyPath<State, Value>) -> StateView<Value> {
         let view = self[dynamicMember: path]
-        return .init(didUpdate: view.changes) {
+        return .init(didUpdate: .init(view.changes)) {
             view.nonObservableState
         } set: {
             view.context[path: view.path] = $0

@@ -19,35 +19,36 @@ public protocol StoreViewProvider {
 }
 
 public extension StoreViewProvider where State: Sendable {
-    func values(isSame: @escaping @Sendable (State, State) -> Bool) -> AsyncStream<State> {
-        let state = AsyncStream<State> { c in
-            c.yield(nonObservableState)
-            c.finish()
-        }
-        let changes = changes(isSame: isSame)
-        return AsyncStream(chain(state, changes))
-    }
-
-    func changes(isSame: @escaping @Sendable (State, State) -> Bool) -> AsyncStream<State> {
+    func changes(isSame: @escaping @Sendable (State, State) -> Bool) -> CallContextsStream<State> {
         let view = self.storeView
-        return AsyncStream(view.context.stateUpdates.compactMap { stateChange -> State? in
+        return CallContextsStream(view.context.stateUpdates.compactMap { stateChange -> WithCallContexts<State>? in
             let stateUpdate = StateUpdate(stateChange: stateChange, provider: view)
 
             let current = stateUpdate.current
             let previous = stateUpdate.previous
 
-            return !isSame(previous, current) ? current : nil
+            let result = WithCallContexts(value: current, callContexts: stateUpdate.stateChange.callContexts)
+            return !isSame(previous, current) ? result : nil
         })
+    }
+
+    func values(isSame: @escaping @Sendable (State, State) -> Bool) -> CallContextsStream<State> {
+        let state = AsyncStream<WithCallContexts<State>> { c in
+            c.yield(.init(value: nonObservableState, callContexts: []))
+            c.finish()
+        }
+        let changes = changes(isSame: isSame)
+        return CallContextsStream(chain(state, changes.stream))
     }
 }
 
 public extension StoreViewProvider where State: Equatable&Sendable {
-    var values: AsyncStream<State> {
-        values(isSame: { $0 == $1 })
+    var changes: CallContextsStream<State> {
+        changes(isSame: { $0 == $1 })
     }
 
-    var changes: AsyncStream<State> {
-        changes(isSame: { $0 == $1 })
+    var values: CallContextsStream<State> {
+        values(isSame: { $0 == $1 })
     }
 }
 
