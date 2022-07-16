@@ -12,8 +12,9 @@ struct CounterModel: Model {
     }
 }
 
-struct EventModel: Model {
-    struct State: Equatable {
+struct EventModel: Model, Identifiable {
+    struct State: Equatable, Identifiable {
+        var id = 0
         var count = 0
         var receivedEvents: [EventModel.Event] = []
     }
@@ -38,3 +39,5 @@ struct EventModel: Model {
         send(.count(state.count))
     }
 }
+
+

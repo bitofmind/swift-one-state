@@ -12,8 +12,8 @@ extension TestViewProvider {
 }
 
 public extension TestViewProvider {
-    func assert(_ value: State, file: StaticString = #file, line: UInt = #line) async {
-        await assert(file: file, line: line) {
+    func assert(_ value: State, timeoutNanoseconds timeout: UInt64 = NSEC_PER_SEC, file: StaticString = #file, line: UInt = #line) async {
+        await assert(timeoutNanoseconds: timeout, file: file, line: line) {
             $0 = value
         }
     }
@@ -26,12 +26,8 @@ public extension TestViewProvider {
         .init(storeView: testView.storeView.storeView(for: path))
     }
 
-    func unwrap<T>(file: StaticString = #file, line: UInt = #line) -> TestView<Root, T> where State == T? {
-        guard let view: StoreView = self.testView.storeView.storeView(for: \.self) else {
-            fatalError("")
-        }
-
-        return TestView(storeView: view)
+    func unwrap<T>(timeoutNanoseconds timeout: UInt64 = NSEC_PER_SEC, file: StaticString = #file, line: UInt = #line) async throws -> TestView<Root, T> where State == T? {
+        try await access.unwrap(view: testView.storeView, timeout: timeout, file: file, line: line)
     }
 }
 

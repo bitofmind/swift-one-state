@@ -25,9 +25,7 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
         var tasks = [Task<(), Never>] ()
         tasks.append(Task { [weak access, store] in
             var first = true
-            access?.stateUpdate.receiveSkipDuplicates(initialState)
-
-            for await state in store.changes {
+            for await state in store.values {
                 access?.stateUpdate.receiveSkipDuplicates(state)
 
                 guard first else { continue }

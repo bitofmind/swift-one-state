@@ -104,8 +104,8 @@ public extension StoreViewProvider  {
         })
     }
 
-    func events<M: Model>() -> CallContextsStream<M.Event> where State == StateModel<M> {
-        let events = storeView(for: \.wrappedValue).context.events
+    func events<M: Model>() -> CallContextsStream<M.Event> where State == StateModel<M>, M.StateContainer == M.State, Access == Write {
+        let events = M(storeView(for: \.wrappedValue)).context.events
 
         return CallContextsStream(events.compactMap {
             guard let e = $0.event as? M.Event else { return nil }
@@ -113,8 +113,8 @@ public extension StoreViewProvider  {
         })
     }
 
-    func events<M: Model>(of event: M.Event) -> CallContextsStream<()> where State == StateModel<M>, M.Event: Equatable&Sendable {
-        let events = storeView(for: \.wrappedValue).context.events
+    func events<M: Model>(of event: M.Event) -> CallContextsStream<()> where State == StateModel<M>, M.StateContainer == M.State, Access == Write, M.Event: Equatable&Sendable {
+        let events = M(storeView(for: \.wrappedValue)).context.events
 
         return CallContextsStream(events.compactMap {
             guard let e = $0.event as? M.Event, e == event else { return nil }
