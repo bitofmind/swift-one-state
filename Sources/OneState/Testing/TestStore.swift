@@ -4,7 +4,7 @@ import AsyncAlgorithms
 public final class TestStore<M: Model> where M.State: Equatable&Sendable {
     let store: Store<M>
     let access: TestAccess<M.State>
-    var tasks: [Task<(), Never>] = []
+    let tasks: [Task<(), Never>]
 
     public typealias State = M.State
 
@@ -22,6 +22,7 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
             onTestFailure: onTestFailure
         )
 
+        var tasks = [Task<(), Never>] ()
         tasks.append(Task { [weak access, store] in
             var first = true
             access?.stateUpdate.receiveSkipDuplicates(initialState)
@@ -43,6 +44,8 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
                 access?.eventUpdate.receive(event)
             }
         })
+
+        self.tasks = tasks
     }
 
     deinit {
@@ -51,6 +54,8 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
         }
     }
 }
+
+extension TestStore: Sendable where State: Sendable {}
 
 extension TestStore: StoreViewProvider {
     public var storeView: StoreView<State, State, Write> {

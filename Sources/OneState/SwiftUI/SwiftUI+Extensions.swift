@@ -39,7 +39,7 @@ public extension Model {
 }
 
 public func withAnimation<Result>(_ animation: Animation? = .default, _ body: () throws -> Result) rethrows -> Result {
-   try withCallContext(body: body) { action in
+    try withCallContext(body: body) { action in
         SwiftUI.withAnimation(animation) {
             action()
         }
