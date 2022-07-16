@@ -20,15 +20,8 @@ public protocol StoreViewProvider {
 
 public extension StoreViewProvider where State: Sendable {
     func changes(isSame: @escaping @Sendable (State, State) -> Bool) -> CallContextsStream<State> {
-        let view = self.storeView
-        return CallContextsStream(view.context.stateUpdates.compactMap { stateChange -> WithCallContexts<State>? in
-            let stateUpdate = StateUpdate(stateChange: stateChange, provider: view)
-
-            let current = stateUpdate.current
-            let previous = stateUpdate.previous
-
-            let result = WithCallContexts(value: current, callContexts: stateUpdate.stateChange.callContexts)
-            return !isSame(previous, current) ? result : nil
+        CallContextsStream(allChanges().stream.removeDuplicates {
+            isSame($0.value, $1.value)
         })
     }
 
@@ -38,7 +31,9 @@ public extension StoreViewProvider where State: Sendable {
             c.finish()
         }
         let changes = changes(isSame: isSame)
-        return CallContextsStream(chain(state, changes.stream))
+        return CallContextsStream(chain(state, changes.stream).removeDuplicates {
+            isSame($0.value, $1.value)
+        })
     }
 }
 
@@ -110,5 +105,15 @@ extension StoreViewProvider {
     var nonObservableState: State {
         let view = self.storeView
         return view.context[path: view.path, access: view.access]
+    }
+
+    func allChanges() -> CallContextsStream<State> {
+        let view = self.storeView
+        return CallContextsStream(view.context.stateUpdates.map { stateChange -> WithCallContexts<State> in
+            let stateUpdate = StateUpdate(stateChange: stateChange, provider: view)
+            let current = stateUpdate.current
+
+            return WithCallContexts(value: current, callContexts: stateChange.callContexts)
+        })
     }
 }
