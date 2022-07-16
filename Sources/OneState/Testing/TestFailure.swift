@@ -8,6 +8,7 @@ public struct TestFailure<State> {
     public enum Kind {
         case assertStateMismatch(expected: State, actual: State)
         case receiveEventTimeout(event: Any)
+        case unwrapFailed
 
         case stateNotExhausted(lastAsserted: State, actual: State)
         case eventNotExhausted(event: Any)
@@ -31,6 +32,9 @@ public extension TestFailure {
 
         case let .receiveEventTimeout(event: event):
             return "Timeout while waiting to receive event: \(String(describing: event))"
+
+        case .unwrapFailed:
+            return "Failed to unwrap value"
 
         case let .stateNotExhausted(lastAsserted: lastAsserted, actual: actual):
             return

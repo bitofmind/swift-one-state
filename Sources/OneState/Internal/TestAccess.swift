@@ -8,6 +8,10 @@ class TestAccessBase: StoreAccess {
     func receive<Event: Equatable>(_ event: Event, context: ContextBase, timeout: UInt64, file: StaticString, line: UInt) async {
         fatalError()
     }
+
+    func unwrap<Root, T>(view: StoreView<Root, T?, Write>, timeout: UInt64, file: StaticString, line: UInt) async throws -> TestView<Root, T> {
+        fatalError()
+    }
 }
 
 class TestAccess<State: Equatable>: TestAccessBase {
@@ -77,7 +81,37 @@ class TestAccess<State: Equatable>: TestAccessBase {
             await onTestFailure(.receiveEventTimeout(event: event), file: file, line: line)
         }
     }
+
+    override func unwrap<Root, T>(view: StoreView<Root, T?, Write>, timeout: UInt64, file: StaticString, line: UInt) async throws -> TestView<Root, T> {
+        guard let unwrappedView: StoreView = view.storeView(for: \.self) else {
+            throw UnwrapError()
+        }
+
+        lock {
+            let shared = Shared(_expectedState)
+            view.context[path: view.path, shared: shared] = unwrappedView.nonObservableState
+            _expectedState = shared.value
+        }
+
+        @Sendable func predicate(_ value: State) -> Bool {
+            let shared = Shared(value)
+            return view.context[path: view.path, shared: shared] != nil
+        }
+
+        if predicate(lastAssertedState) {
+            return TestView(storeView: unwrappedView)
+        }
+
+        if await stateUpdate.consume(upUntil: predicate, keepLast: true, timeout: timeout) {
+            return TestView(storeView: unwrappedView)
+        }
+
+        await onTestFailure(.unwrapFailed, file: file, line: line)
+        throw UnwrapError()
+    }
 }
+
+struct UnwrapError: Error {}
 
 extension TestAccess.Update {
     func receiveSkipDuplicates(_ value: T) where T: Equatable {

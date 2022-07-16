@@ -313,7 +313,7 @@ extension Model {
     
     var context: Context<State> {
         guard let context = modelState?.context else {
-            fatalError("Model \(type(of: self)) is used before fully initialized")
+            fatalError("Model \(type(of: self)) is missing a mandatory @ModelState member")
         }
 
         return context
