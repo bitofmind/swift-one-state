@@ -138,6 +138,8 @@ extension Store {
             let currentCallContextIds = CallContext.currentContexts.map(\.id)
             if let last = lastFromContext, (last !== fromContext || lastCallContextIds != currentCallContextIds) {
                 lock.unlock()
+                updateTask?.cancel()
+                updateTask = nil
                 notify(context: last)
                 lock.lock()
             }
@@ -168,7 +170,9 @@ extension Store {
                         }
                     }
 
-                    self.notify(context: fromContext)
+                    if !Task.isCancelled {
+                        self.notify(context: fromContext)
+                    }
                 }
             }
             
