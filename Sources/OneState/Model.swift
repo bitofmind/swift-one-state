@@ -348,6 +348,10 @@ extension Model {
     var typeDescription: String {
         String(describing: type(of: self))
     }
+
+    var isActive: Bool {
+        context.refCount != 0
+    }
 }
 
 @discardableResult nonisolated

@@ -27,13 +27,23 @@ final class EventTests: XCTestCase {
         @TestModel var parent = store.model
         @TestModel var child = parent.$child
 
-        await $child.count.assert(0)
+        await $child.id.assert(1)
         child.send(.count(3))
 
         await $parent.assert {
             $0.receivedEvents.append(.count(3))
-            $0.receivedIds.append(child.id)
+            $0.receivedIds.append(10 + child.id)
         }
+
+
+        @TestModel var childAlt = parent.$childAlt
+        childAlt.send(.count(9))
+
+        await $parent.assert {
+            $0.receivedEvents.append(.count(9))
+            $0.receivedIds.append(30 + childAlt.id)
+        }
+
 
         parent.setOptChild(id: 5)
         try await $parent.optChild.unwrap().assert(.init(id: 5))
@@ -43,7 +53,29 @@ final class EventTests: XCTestCase {
 
         await $parent.assert {
             $0.receivedEvents.append(.count(7))
-            $0.receivedIds.append(optChild.id)
+            $0.receivedIds.append(20 + optChild.id)
+        }
+
+        parent.addChild(id: 8)
+        parent.addChild(id: 3)
+
+        await $parent.children.assert([.init(id: 8), .init(id: 3)])
+        @TestModel var child1 = parent.$children[0]
+        @TestModel var child2 = parent.$children[1]
+
+        child2.send(.count(1))
+
+        await $parent.assert {
+            $0.receivedEvents.append(.count(1))
+            $0.receivedIds.append(40 + child2.id)
+        }
+
+        child1.send(.empty)
+        child2.send(.count(2))
+
+        await $parent.assert {
+            $0.receivedEvents += [.empty, .count(2)]
+            $0.receivedIds +=  [40 + child1.id, 40 + child2.id]
         }
 
         await store.assertExhausted(.state)
@@ -53,7 +85,6 @@ final class EventTests: XCTestCase {
 private struct ChildModel: Model, Identifiable {
     struct State: Equatable, Identifiable {
         var id = 0
-        var count = 0
     }
 
     enum Event: Equatable {
@@ -67,6 +98,7 @@ private struct ChildModel: Model, Identifiable {
 private struct ParentModel: Model {
     struct State: Equatable {
         @StateModel<ChildModel> var child = .init(id: 1)
+        @StateModel<ChildModel> var childAlt = .init(id: 9)
         @StateModel<ChildModel?> var optChild = nil
         @StateModel<[ChildModel]> var children = []
 
@@ -78,19 +110,31 @@ private struct ParentModel: Model {
 
     func onActivate() {
         forEach($state.$child.events()) { event in
-            print("child", event, state.child.id)
             state.receivedEvents.append(event)
-            state.receivedIds.append(state.child.id)
+            state.receivedIds.append(10 + state.child.id)
+        }
+
+        forEach(self.$childAlt.events()) { event in
+            state.receivedEvents.append(event)
+            state.receivedIds.append(30 + state.childAlt.id)
         }
 
         forEach($state.$optChild.events()) { event, child in
-            print("opt child", event, child.id)
             state.receivedEvents.append(event)
-            state.receivedIds.append(child.id)
+            state.receivedIds.append(20 + child.id)
+        }
+
+        forEach($state.$children.events()) { event, child in
+            state.receivedEvents.append(event)
+            state.receivedIds.append(40 + child.id)
         }
     }
 
     func setOptChild(id: Int) {
         state.optChild = .init(id: id)
+    }
+
+    func addChild(id: Int) {
+        state.children.append(.init(id: id))
     }
 }

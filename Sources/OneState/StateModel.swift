@@ -125,6 +125,11 @@ public extension StoreViewProvider  {
 
 public extension Model {
     @discardableResult
+    func activate<P: StoreViewProvider, M: Model>(_ view: P) -> Cancellable where P.State == StateModel<M>, M.StateContainer == M.State, P.Access == Write {
+        M(view.storeView(for: \.wrappedValue)).activate().store(in: self)
+    }
+
+    @discardableResult
     func activate<P: StoreViewProvider, Models>(_ view: P) -> Cancellable where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.StateContainer: Equatable, P.Access == Write {
         let containerView = view.storeView(for: \.wrappedValue)
 
