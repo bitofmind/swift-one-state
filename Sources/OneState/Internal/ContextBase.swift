@@ -2,8 +2,8 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     var lock = Lock()
     private(set) weak var parent: ContextBase?
 
-    private var _children: [AnyKeyPath: ContextBase] = [:]
-    private var _overrideChildren: [AnyKeyPath: ContextBase] = [:]
+    var _children: [AnyKeyPath: ContextBase] = [:]
+    var _overrideChildren: [AnyKeyPath: ContextBase] = [:]
 
     let stateUpdates = AsyncPassthroughSubject<AnyStateChange>()
 
@@ -37,10 +37,13 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         }
     }
 
+    var _allChildren: [AnyKeyPath: ContextBase] {
+        isStateOverridden ? _overrideChildren : _children
+    }
+
     var allChildren: [AnyKeyPath: ContextBase] {
         get {
-            let isStateOverridden = isStateOverridden
-            return lock { isStateOverridden ? _overrideChildren : _children }
+            lock { _allChildren }
         }
         set {
             let isStateOverridden = isStateOverridden

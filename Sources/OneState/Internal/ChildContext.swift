@@ -64,30 +64,32 @@ final class ChildContext<M: Model, State>: Context<State> {
     override var storePath: AnyKeyPath { path }
 
     override func context<T>(at path: WritableKeyPath<State, T>) -> Context<T> {
-        let isInViewModelContext = StoreAccess.isInViewModelContext
+        lock {
+            let isInViewModelContext = StoreAccess.isInViewModelContext
 
-        if isInViewModelContext, let context = regularChildren[path] {
-            return context as! Context<T>
-        } else if !isInViewModelContext, let context = allChildren[path] {
-            return context as! Context<T>
-        } else if parent == nil && path == (\State.self as AnyKeyPath) {
-            let context = self as! Context<T>
-            return context
-        } else {
-            let contextValue = self[path: \.self, access: nil]
-            ThreadState.current.stateModelCount = 0
-            _ = contextValue[keyPath: path]
-            assert(ThreadState.current.stateModelCount <= 1, "Don't skip middle models when accessing sub model")
-
-            let context = ChildContext<M, T>(store: store, path: self.path.appending(path: path), parent: self)
-
-            if isInViewModelContext {
-                regularChildren[path] = context
+            if isInViewModelContext, let context = _children[path] {
+                return context as! Context<T>
+            } else if !isInViewModelContext, let context = _allChildren[path] {
+                return context as! Context<T>
+            } else if parent == nil && path == (\State.self as AnyKeyPath) {
+                let context = self as! Context<T>
+                return context
             } else {
-                allChildren[path] = context
-            }
+                let contextValue = self[path: \.self, access: nil]
+                ThreadState.current.stateModelCount = 0
+                _ = contextValue[keyPath: path]
+                assert(ThreadState.current.stateModelCount <= 1, "Don't skip middle models when accessing sub model")
 
-            return context
+                let context = ChildContext<M, T>(store: store, path: self.path.appending(path: path), parent: self)
+
+                if isInViewModelContext || !isStateOverridden {
+                    _children[path] = context
+                } else {
+                    _overrideChildren[path] = context
+                }
+
+                return context
+            }
         }
     }
 
