@@ -98,6 +98,10 @@ final class ChildContext<M: Model, State>: Context<State> {
     }
 
     override func popTask<M: Model>(for model: M, isInActivationContext: Bool) {
-        store.popTask(for: model, isInActivationContext: isInActivationContext)
+        weakStore?.popTask(for: model, isInActivationContext: isInActivationContext)
+    }
+
+    override func didModify(for access: StoreAccess) {
+        access.didModify(state: store.sharedState)
     }
 }

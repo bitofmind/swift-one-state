@@ -104,6 +104,12 @@ public extension Store {
 }
 
 extension Store {
+    var sharedState: Shared<State> {
+        lock {
+            currentState
+        }
+    }
+
     var state: State {
         _read {
             lock.lock()

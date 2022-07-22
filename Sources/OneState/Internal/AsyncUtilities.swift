@@ -32,32 +32,44 @@ final class AsyncPassthroughSubject<Element>: AsyncSequence, @unchecked Sendable
     }
 }
 
-extension AsyncStream {
-    init<S: AsyncSequence>(_ sequence: @autoclosure @escaping @Sendable () -> S) rethrows where S.Element == Element {
-        self.init { c in
-            let task = Task {
-                for try await element in sequence() {
-                    c.yield(element)
-                }
+public struct AnyAsyncIterator<Element>: AsyncIteratorProtocol {
+    let nextClosure: () async -> Element?
 
-                c.finish()
-            }
+    init<T: AsyncIteratorProtocol>(_ iterator: T) where T.Element == Element {
+        var iterator = iterator
+        nextClosure = { try? await iterator.next() }
+    }
 
-            c.onTermination = { @Sendable _ in task.cancel() }
-        }
+    public func next() async -> Element? {
+        await nextClosure()
     }
 }
 
-public final class CallContextsStream<Element>: AsyncSequence {
-    let stream: AsyncStream<WithCallContexts<Element>>
+public struct AnyAsyncSequence<Element>: AsyncSequence {
+    let makeAsyncIteratorClosure: () -> AsyncIterator
 
-    init<S: AsyncSequence>(_ sequence: @autoclosure @escaping @Sendable () -> S) rethrows where S.Element == WithCallContexts<Element> {
-        stream = try! .init(sequence())
+    init<T: AsyncSequence>(_ sequence: T) where T.Element == Element {
+        makeAsyncIteratorClosure = { AnyAsyncIterator(sequence.makeAsyncIterator()) }
     }
 
-    public func makeAsyncIterator() -> AsyncStream<Element>.Iterator {
-        let stream = self.stream
-        return AsyncStream(stream.map(\.value)).makeAsyncIterator()
+    public func makeAsyncIterator() -> AnyAsyncIterator<Element> {
+        AnyAsyncIterator(makeAsyncIteratorClosure())
+    }
+}
+
+extension AnyAsyncSequence: @unchecked Sendable where Element: Sendable {}
+
+public struct CallContextsStream<Element>: AsyncSequence {
+    let stream: AnyAsyncSequence<WithCallContexts<Element>>
+    let makeAsyncIteratorClosure: () -> AnyAsyncIterator<Element>
+
+    init<S: AsyncSequence>(_ sequence: S) where S.Element == WithCallContexts<Element> {
+        stream = AnyAsyncSequence(sequence)
+        makeAsyncIteratorClosure = { AnyAsyncIterator(sequence.map(\.value).makeAsyncIterator()) }
+    }
+
+    public func makeAsyncIterator() -> AnyAsyncIterator<Element> {
+        AnyAsyncIterator(makeAsyncIteratorClosure())
     }
 }
 

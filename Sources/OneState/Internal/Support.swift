@@ -60,6 +60,8 @@ struct AnyStateChange: @unchecked Sendable {
 
 class StoreAccess: @unchecked Sendable {
     func willAccess<Root, State>(path: KeyPath<Root, State>, context: Context<Root>, isSame: @escaping (State, State) -> Bool) { }
+    func didModify<State>(state: Shared<State>) { }
+    func didSend(event: ContextBase.EventInfo) {}
 
     var allowAccessToBeOverridden: Bool { false }
 

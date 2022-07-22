@@ -25,9 +25,13 @@ class Context<State>: ContextBase {
 
     var storePath: AnyKeyPath { fatalError() }
 
-    func sendEvent(_ event: Any, context: ContextBase, callContexts: [CallContext]) {
-        sendEvent(event, path: storePath, context: context, callContexts: callContexts)
+    func sendEvent(_ event: Any, context: ContextBase, callContexts: [CallContext], storeAccess: StoreAccess?) {
+        let eventInfo = EventInfo(event: event, path: storePath, context: context, callContexts: callContexts)
+        sendEvent(eventInfo)
+        storeAccess?.didSend(event: eventInfo)
     }
+
+    func didModify(for access: StoreAccess) { }
 }
 
 extension Context {
@@ -41,6 +45,9 @@ extension Context {
         }
         _modify {
             yield &self[path: path]
+            if let access = access {
+                didModify(for: access)
+            }
         }
     }
 

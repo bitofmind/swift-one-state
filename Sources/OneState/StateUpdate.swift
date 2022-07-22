@@ -25,7 +25,7 @@ extension StateUpdate: Equatable where State: Equatable {
 }
 
 public extension StoreViewProvider {
-    var stateUpdates: AsyncStream<StateUpdate<State>> {
+    var stateUpdates: AnyAsyncSequence<StateUpdate<State>> {
         let view = self.storeView
         return .init(view.context.stateUpdates.filter { update in
             !update.isOverrideUpdate

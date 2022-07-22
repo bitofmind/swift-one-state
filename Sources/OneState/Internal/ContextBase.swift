@@ -7,8 +7,13 @@ class ContextBase: HoldsLock, @unchecked Sendable {
 
     let stateUpdates = AsyncPassthroughSubject<AnyStateChange>()
 
-    typealias Event = (event: Any, path: AnyKeyPath, context: ContextBase, callContexts: [CallContext])
-    let events = AsyncPassthroughSubject<Event>()
+    struct EventInfo: @unchecked Sendable {
+        var  event: Any
+        var  path: AnyKeyPath
+        var context: ContextBase
+        var callContexts: [CallContext]
+    }
+    let events = AsyncPassthroughSubject<EventInfo>()
 
     @Locked var environments: Environments = [:]
 
@@ -114,7 +119,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         fatalError()
     }
 
-    func sendEvent(_ event: Any, path: AnyKeyPath, context: ContextBase, callContexts: [CallContext]) {
+    func sendEvent(_ eventInfo: EventInfo) {
         fatalError()
     }
 
