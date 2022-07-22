@@ -4,52 +4,16 @@ import AsyncAlgorithms
 public final class TestStore<M: Model> where M.State: Equatable&Sendable {
     let store: Store<M>
     let access: TestAccess<M.State>
-    let tasks: [Task<(), Never>]
 
     public typealias State = M.State
 
     public init(initialState: State, environments: [Any] = [], onTestFailure: @escaping @Sendable (TestFailure<State>) async -> Void) {
         store = .init(initialState: initialState, environments: environments)
 
-        let channel = AsyncChannel<()>()
-        let initTask = Task {
-            let _ = await channel.first { _ in true }
-        }
-
         access = TestAccess(
             state: initialState,
-            initTask: initTask,
             onTestFailure: onTestFailure
         )
-
-        var tasks = [Task<(), Never>] ()
-        tasks.append(Task { [weak access, store] in
-            var first = true
-            for await state in store.values {
-                access?.stateUpdate.receiveSkipDuplicates(state)
-
-                guard first else { continue }
-                first = false
-
-                Task {
-                    await channel.send(())
-                }
-            }
-        })
-
-        tasks.append(Task { [weak access, store] in
-            for await event in store.context.events {
-                access?.eventUpdate.receive(event)
-            }
-        })
-
-        self.tasks = tasks
-    }
-
-    deinit {
-        for task in tasks {
-            task.cancel()
-        }
     }
 }
 

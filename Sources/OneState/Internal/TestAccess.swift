@@ -19,22 +19,20 @@ class TestAccess<State: Equatable>: TestAccessBase {
     private var _expectedState: State
     let onTestFailure: @Sendable (TestFailure<State>) async -> Void
     var expectedState: State { lock { _expectedState } }
-    let initTask: Task<(), Never>
 
     final class Update<T> {
         private var lock = Lock()
         private var _values: [T] = []
-        private let didUpdate = AsyncPassthroughSubject<T>()
         var values: [T] { lock { _values } }
     }
 
     let stateUpdate = Update<State>()
-    let eventUpdate = Update<ContextBase.Event>()
+    let eventUpdate = Update<ContextBase.EventInfo>()
 
-    init(state: State, initTask: Task<(), Never>, onTestFailure: @escaping @Sendable (TestFailure<State>) async -> Void) {
+    init(state: State, onTestFailure: @escaping @Sendable (TestFailure<State>) async -> Void) {
         self._expectedState = state
-        self.initTask = initTask
         self.onTestFailure = onTestFailure
+        stateUpdate.receive(state)
     }
 
     var lastAssertedState: State { stateUpdate.values.first! }
@@ -45,7 +43,6 @@ class TestAccess<State: Equatable>: TestAccessBase {
     }
 
     override func assert<Root, S>(view: StoreView<Root, S, Write>, modify: @escaping (inout S) -> Void, timeout: UInt64, file: StaticString, line: UInt) async {
-        await initTask.value
         lock {
             let shared = Shared(_expectedState)
             modify(&view.context[path: view.path, shared: shared])
@@ -69,14 +66,13 @@ class TestAccess<State: Equatable>: TestAccessBase {
     }
 
     override func receive<Event: Equatable>(_ event: Event, context: ContextBase, timeout: UInt64, file: StaticString, line: UInt) async {
-        @Sendable func predicate(value: ContextBase.Event) -> Bool {
+        @Sendable func predicate(value: ContextBase.EventInfo) -> Bool {
             guard let e = value.event as? Event, e == event, value.context === context else {
                 return false
             }
             return true
         }
 
-        await initTask.value
         if await !eventUpdate.consume(upUntil: predicate, timeout: timeout) {
             await onTestFailure(.receiveEventTimeout(event: event), file: file, line: line)
         }
@@ -109,6 +105,15 @@ class TestAccess<State: Equatable>: TestAccessBase {
         await onTestFailure(.unwrapFailed, file: file, line: line)
         throw UnwrapError()
     }
+
+    override func didModify<S>(state: Shared<S>) {
+        Swift.assert(State.self == S.self)
+        stateUpdate.receiveSkipDuplicates(state.value as! State)
+    }
+
+    override func didSend(event: ContextBase.EventInfo) {
+        eventUpdate.receive(event)
+    }
 }
 
 struct UnwrapError: Error {}
@@ -120,14 +125,12 @@ extension TestAccess.Update {
                 return
             }
             _values.append(value)
-            didUpdate.yield(value)
         }
     }
 
     func receive(_ value: T) {
         lock {
             _values.append(value)
-            didUpdate.yield(value)
         }
     }
 

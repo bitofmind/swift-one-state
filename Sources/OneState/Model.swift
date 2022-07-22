@@ -176,12 +176,14 @@ public extension Model {
 public extension Model {
     /// Sends an event to self and ancestors
     func send(_ event: Event) {
-        context.sendEvent(event, context: context, callContexts: CallContext.currentContexts)
+        let view = storeView
+        context.sendEvent(event, context: view.context, callContexts: CallContext.currentContexts, storeAccess: view.access)
     }
 
     /// Sends an event to self and ancestors
     func send<E>(_ event: E) {
-        context.sendEvent(event, context: context, callContexts: CallContext.currentContexts)
+        let view = storeView
+        context.sendEvent(event, context: view.context, callContexts: CallContext.currentContexts, storeAccess: view.access)
     }
 
     func events() -> CallContextsStream<Event> {
