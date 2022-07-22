@@ -239,14 +239,16 @@ extension Store {
         lock { previousState !== currentState }
     }
 
-    func pushTask<M: Model>(for model: M) {
+    func pushTask<M: Model>(for model: M, isInActivationContext: Bool) {
         lock {
+            guard !isInActivationContext else { return }
             _activeTasks[ObjectIdentifier(type(of: model)), default: ({ model.typeDescription }, 0)].count += 1
         }
     }
 
-    func popTask<M: Model>(for model: M) {
+    func popTask<M: Model>(for model: M, isInActivationContext: Bool) {
         lock {
+            guard !isInActivationContext else { return }
             _activeTasks[ObjectIdentifier(type(of: model))]!.count -= 1
         }
     }

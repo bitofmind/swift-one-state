@@ -7,7 +7,11 @@ public extension Cancellable {
     /// same underlying state is non longer being displayed
     @discardableResult
     func store<M: Model>(in viewModel: M) -> Cancellable {
-        viewModel.context.cancellables.append(self)
+        if ContextBase.isInActivationContext {
+            viewModel.context.activationCancellables.append(self)
+        } else {
+            viewModel.context.cancellables.append(self)
+        }
         return self
     }
 }

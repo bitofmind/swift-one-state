@@ -31,7 +31,7 @@ public struct ObservedModel<M: ModelContainer>: DynamicProperty {
 
         guard !contexts.elementsEqual(prevContexts, by: ===) else { return }
 
-        prevContexts.forEach { $0.releaseFromView() }
+        prevContexts.forEach { $0.activationRelease() }
         wrappedValue.models.forEach { $0.retain() }
         access.startObserving(from: contexts)
         access.objectWillChange.send()

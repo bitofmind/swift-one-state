@@ -91,8 +91,9 @@ public extension Model {
     @discardableResult
     func task(priority: TaskPriority? = nil, _ operation: @escaping @Sendable () async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
         Task(priority: priority) {
-            context.pushTask(for: self)
-            defer { context.popTask(for: self) }
+            let isInActivationContext = ContextBase.isInActivationContext
+            context.pushTask(for: self, isInActivationContext: isInActivationContext)
+            defer { context.popTask(for: self, isInActivationContext: isInActivationContext) }
             
             do {
                 try await inViewModelContext {
@@ -221,7 +222,7 @@ public extension Model {
     func activate() -> Cancellable {
         retain()
         return AnyCancellable {
-            context.releaseFromView()
+            context.activationRelease()
         }
     }
 
@@ -333,16 +334,18 @@ extension Model {
 
 extension Model {
     func retain() {
-        context.retainFromView()
-        guard !context.isOverrideStore, context.refCount == 1 else { return }
-                
-        ContextBase.$current.withValue(nil) {
-            onActivate()
+        context.activateRetain()
+        guard !context.isOverrideStore, context.activationRefCount == 1 else { return }
+
+        ContextBase.$isInActivationContext.withValue(true) {
+            ContextBase.$current.withValue(nil) {
+                onActivate()
+            }
         }
     }
     
     func release() {
-        context.releaseFromView()
+        context.activationRelease()
     }
 
     var typeDescription: String {
@@ -350,7 +353,7 @@ extension Model {
     }
 
     var isActive: Bool {
-        context.refCount != 0
+        context.activationRefCount != 0
     }
 }
 

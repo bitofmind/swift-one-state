@@ -8,7 +8,7 @@ class ViewAccess: StoreAccess, ObservableObject {
     var wasStateOverriden = false
 
     deinit {
-        contexts.forEach { $0.releaseFromView() }
+        contexts.forEach { $0.activationRelease() }
         observationTasks.forEach { $0.cancel() }
     }
 

@@ -93,11 +93,11 @@ final class ChildContext<M: Model, State>: Context<State> {
         }
     }
 
-    override func pushTask<M: Model>(for model: M) {
-        store.pushTask(for: model)
+    override func pushTask<M: Model>(for model: M, isInActivationContext: Bool) {
+        store.pushTask(for: model, isInActivationContext: isInActivationContext)
     }
 
-    override func popTask<M: Model>(for model: M) {
-        store.popTask(for: model)
+    override func popTask<M: Model>(for model: M, isInActivationContext: Bool) {
+        store.popTask(for: model, isInActivationContext: isInActivationContext)
     }
 }
