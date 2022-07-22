@@ -39,8 +39,6 @@ public struct ModelEnvironment<Value> {
 
     public var wrappedValue: Value {
         get {
-            precondition(!context.hasBeenRemoved, "The context holding the environment has been removed and is no longer active")
-
             guard let value = context.environmentValue(fallbackValue: fallbackValue) else {
                 fatalError("No environment has been set for `\(Value.self)`")
             }

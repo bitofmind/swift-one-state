@@ -163,13 +163,13 @@ public extension Model {
                 for oldKey in previousKeys.subtracting(currentKeys) {
                     let model = activatedModels[oldKey]
                     assert(model != nil)
-                    model?.context.releaseFromView()
+                    model?.context.activationRelease()
                     activatedModels[oldKey] = nil
                 }
             }
 
             for model in activatedModels.values {
-                model.context.releaseFromView()
+                model.context.activationRelease()
             }
         }
     }

@@ -15,17 +15,25 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     @Locked var propertyIndex = 0
     @Locked var properties: [Any] = []
     @Locked var cancellables: [Cancellable] = []
-    @Locked var hasBeenRemoved = false
-    @Locked var refCount = 0
+    @Locked var activationCancellables: [Cancellable] = []
+    @Locked var activationRefCount = 0
 
     @TaskLocal static var current: ContextBase?
+    @TaskLocal static var isInActivationContext = false
 
     init(parent: ContextBase?) {
         self.parent = parent
     }
 
     deinit {
-        onRemoval()
+        let cancellables = self.cancellables + self.activationCancellables
+        for cancellable in cancellables {
+            cancellable.cancel()
+        }
+
+        if let parent = parent {
+            parent.removeChildStore(self)
+        }
     }
 
     var regularChildren: [AnyKeyPath: ContextBase] {
@@ -73,16 +81,6 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         }
     }
 
-    func removeChildren() {
-        let children: [ContextBase] = lock {
-            Array(_overrideChildren.values) + _children.values
-        }
-
-        for child in children {
-            child.onRemovalFromView()
-        }
-    }
-
     func notifyAncestors(_ update: AnyStateChange) {
         parent?.notifyAncestors(update)
         parent?.stateUpdates.yield(update)
@@ -120,11 +118,11 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         fatalError()
     }
 
-    func pushTask<M: Model>(for model: M) {
+    func pushTask<M: Model>(for model: M, isInActivationContext: Bool) {
         fatalError()
     }
 
-    func popTask<M: Model>(for model: M) {
+    func popTask<M: Model>(for model: M, isInActivationContext: Bool) {
         fatalError()
     }
 }
@@ -136,49 +134,22 @@ extension ContextBase {
         }
     }
 
-    func retainFromView() {
+    func activateRetain() {
         if isStateOverridden && !isOverrideStore { return }
 
-        refCount += 1
+        activationRefCount += 1
     }
 
-    func releaseFromView() {
+    func activationRelease() {
         if isStateOverridden && !isOverrideStore { return }
 
-        refCount -= 1
-        if refCount == 0 {
-            onRemovalFromView()
-        }
-    }
-}
-
-private extension ContextBase {
-    func onRemovalFromView() {
-        onRemoval()
-    }
-
-    func onRemoval() {
-        guard !hasBeenRemoved else {
-            return
-        }
-
-        let cancellables = self.cancellables
-        guard cancellables.isEmpty else {
-            self.cancellables.removeAll()
+        activationRefCount -= 1
+        if activationRefCount == 0 {
+            let cancellables = self.activationCancellables
+            self.activationCancellables.removeAll()
             for cancellable in cancellables {
                 cancellable.cancel()
             }
-
-            return onRemoval() // Call recursively in case more actions has been added while cancelling
-        }
-
-        if parent != nil {
-            hasBeenRemoved = true
-        }
-
-        removeChildren()
-        if let parent = parent {
-            parent.removeChildStore(self)
         }
     }
 }
