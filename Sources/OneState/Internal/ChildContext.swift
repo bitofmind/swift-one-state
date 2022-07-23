@@ -56,9 +56,12 @@ final class ChildContext<M: Model, State>: Context<State> {
         store.stateOverride != nil
     }
 
-    override func sendEvent(_ event: Any, path: AnyKeyPath, context: ContextBase, callContexts: [CallContext]) {
-        events.yield((event: event, path: path, context: context, callContexts: callContexts))
-        parent?.sendEvent(event, path: path, context: context, callContexts: callContexts)
+    override func sendEvent(_ eventInfo: EventInfo) {
+        Task {
+            events.yield(eventInfo)
+        }
+
+        parent?.sendEvent(eventInfo)
     }
 
     override var storePath: AnyKeyPath { path }
@@ -94,7 +97,7 @@ final class ChildContext<M: Model, State>: Context<State> {
     }
 
     override func pushTask<M: Model>(for model: M, isInActivationContext: Bool) {
-        store.pushTask(for: model, isInActivationContext: isInActivationContext)
+        weakStore?.pushTask(for: model, isInActivationContext: isInActivationContext)
     }
 
     override func popTask<M: Model>(for model: M, isInActivationContext: Bool) {

@@ -85,8 +85,6 @@ final class CallContextTests: XCTestCase {
             $0.receivedEvents += [.empty]
         }
 
-        await store.assertExhausted([.state, .events])
-
         let finalCounts = await counts
         let finalCurrentA = await currentA
         let finalCurrentB = await currentB
