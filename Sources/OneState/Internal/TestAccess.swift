@@ -14,10 +14,10 @@ class TestAccessBase: StoreAccess {
     }
 }
 
-class TestAccess<State: Equatable>: TestAccessBase {
+final class TestAccess<State: Equatable>: TestAccessBase {
     var lock = Lock()
     private var _expectedState: State
-    let onTestFailure: @Sendable (TestFailure<State>) async -> Void
+    let onTestFailure: @Sendable (TestFailure<State>) -> Void
     var expectedState: State { lock { _expectedState } }
 
     final class Update<T> {
@@ -29,7 +29,7 @@ class TestAccess<State: Equatable>: TestAccessBase {
     let stateUpdate = Update<State>()
     let eventUpdate = Update<ContextBase.EventInfo>()
 
-    init(state: State, onTestFailure: @escaping @Sendable (TestFailure<State>) async -> Void) {
+    init(state: State, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void) {
         self._expectedState = state
         self.onTestFailure = onTestFailure
         stateUpdate.receive(state)
@@ -38,8 +38,8 @@ class TestAccess<State: Equatable>: TestAccessBase {
     var lastAssertedState: State { stateUpdate.values.first! }
     var lastReceivedState: State { stateUpdate.values.last! }
 
-    func onTestFailure(_ kind: TestFailure<State>.Kind, file: StaticString, line: UInt) async {
-        await onTestFailure(.init(kind: kind, file: file, line: line))
+    func onTestFailure(_ kind: TestFailure<State>.Kind, file: StaticString, line: UInt) {
+        onTestFailure(.init(kind: kind, file: file, line: line))
     }
 
     override func assert<Root, S>(view: StoreView<Root, S, Write>, modify: @escaping (inout S) -> Void, timeout: UInt64, file: StaticString, line: UInt) async {
@@ -55,14 +55,14 @@ class TestAccess<State: Equatable>: TestAccessBase {
         }
 
         if predicate(lastAssertedState) {
-            return
+            return await Task.yield()
         }
 
         if await stateUpdate.consume(upUntil: predicate, keepLast: true, timeout: timeout) {
-            return
+            return await Task.yield()
         }
 
-        await onTestFailure(.assertStateMismatch(expected: expected, actual: lastReceivedState), file: file, line: line)
+        onTestFailure(.assertStateMismatch(expected: expected, actual: lastReceivedState), file: file, line: line)
     }
 
     override func receive<Event: Equatable>(_ event: Event, context: ContextBase, timeout: UInt64, file: StaticString, line: UInt) async {
@@ -74,8 +74,10 @@ class TestAccess<State: Equatable>: TestAccessBase {
         }
 
         if await !eventUpdate.consume(upUntil: predicate, timeout: timeout) {
-            await onTestFailure(.receiveEventTimeout(event: event), file: file, line: line)
+            onTestFailure(.receiveEventTimeout(event: event), file: file, line: line)
         }
+
+        await Task.yield()
     }
 
     override func unwrap<Root, T>(view: StoreView<Root, T?, Write>, timeout: UInt64, file: StaticString, line: UInt) async throws -> TestView<Root, T> {
@@ -102,7 +104,7 @@ class TestAccess<State: Equatable>: TestAccessBase {
             return TestView(storeView: unwrappedView)
         }
 
-        await onTestFailure(.unwrapFailed, file: file, line: line)
+        onTestFailure(.unwrapFailed, file: file, line: line)
         throw UnwrapError()
     }
 
@@ -131,6 +133,12 @@ extension TestAccess.Update {
     func receive(_ value: T) {
         lock {
             _values.append(value)
+        }
+    }
+
+    func consumeAll() {
+        lock {
+            _values.removeAll()
         }
     }
 

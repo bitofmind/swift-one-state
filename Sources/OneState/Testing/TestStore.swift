@@ -4,16 +4,35 @@ import AsyncAlgorithms
 public final class TestStore<M: Model> where M.State: Equatable&Sendable {
     let store: Store<M>
     let access: TestAccess<M.State>
+    let file: StaticString
+    let line: UInt
 
     public typealias State = M.State
 
-    public init(initialState: State, environments: [Any] = [], onTestFailure: @escaping @Sendable (TestFailure<State>) async -> Void) {
+    public init(initialState: State, environments: [Any] = [], file: StaticString = #file, line: UInt = #line, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void) {
         store = .init(initialState: initialState, environments: environments)
 
         access = TestAccess(
             state: initialState,
             onTestFailure: onTestFailure
         )
+
+        self.file = file
+        self.line = line
+    }
+
+    deinit {
+        for info in store.activeTasks {
+            access.onTestFailure(.tasksAreStillRunning(modelName: info.modelName, taskCount: info.count), file: file, line: line)
+        }
+
+        for event in access.eventUpdate.values {
+            access.onTestFailure(.eventNotExhausted(event: event.event), file: file, line: line)
+        }
+
+        if access.stateUpdate.values.count > 1 {
+            access.onTestFailure(.stateNotExhausted(lastAsserted: access.lastAssertedState, actual: store.state), file: file, line: line)
+        }
     }
 }
 
@@ -32,8 +51,8 @@ public extension TestStore {
 }
 
 public extension TestStore {
-    convenience init<T>(initialState: T, environments: [Any] = [], onTestFailure: @escaping @Sendable (TestFailure<State>) async -> Void) where M == EmptyModel<T> {
-        self.init(initialState: initialState, environments: environments, onTestFailure: onTestFailure)
+    convenience init<T>(initialState: T, environments: [Any] = [], file: StaticString = #file, line: UInt = #line, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void) where M == EmptyModel<T> {
+        self.init(initialState: initialState, environments: environments, file: file, line: line, onTestFailure: onTestFailure)
     }
 
     var model: M {
@@ -43,26 +62,18 @@ public extension TestStore {
     }
 }
 
-public struct ExhaustedFlags: OptionSet {
-    public let rawValue: Int
-    public init(rawValue: Int) {
-        self.rawValue = rawValue
+public extension TestStore {
+    func exhaustEvents() {
+        access.eventUpdate.consumeAll()
     }
 
-    public static let state = Self(rawValue: 1 << 0)
-    public static let events = Self(rawValue: 1 << 1)
-    public static let tasks = Self(rawValue: 1 << 2)
-    public static let all: Self = [state, events, tasks]
-}
-
-public extension TestStore {
-    func assertExhausted(_ flags: ExhaustedFlags = .all, timeoutNanoseconds timeout: UInt64 = NSEC_PER_SEC, file: StaticString = #file, line: UInt = #line) async {
+    func exhaustTasks(timeoutNanoseconds timeout: UInt64 = NSEC_PER_SEC, file: StaticString = #file, line: UInt = #line) async {
         let start = DispatchTime.now().uptimeNanoseconds
         var hasTimedout: Bool {
             start.distance(to: DispatchTime.now().uptimeNanoseconds) >= timeout
         }
 
-        while flags.contains(.tasks) {
+        while true {
             let activeTasks = store.activeTasks
 
             if activeTasks.isEmpty {
@@ -71,39 +82,8 @@ public extension TestStore {
 
             if hasTimedout  {
                 for info in activeTasks {
-                    await access.onTestFailure(.tasksAreStillRunning(modelName: info.modelName, taskCount: info.count), file: file, line: line)
+                    access.onTestFailure(.tasksAreStillRunning(modelName: info.modelName, taskCount: info.count), file: file, line: line)
                 }
-                break
-            }
-
-            await Task.yield()
-        }
-
-        while flags.contains(.events) {
-            let events = access.eventUpdate.values
-            if events.isEmpty { break }
-
-            if hasTimedout {
-                for event in events {
-                    await access.onTestFailure(.eventNotExhausted(event: event.event), file: file, line: line)
-                }
-                break
-            }
-
-            await Task.yield()
-        }
-
-        while flags.contains(.state) {
-            await Task { [store] in
-                while store.isUpdateInProgress {
-                    await Task.yield()
-                }
-            }.value
-
-            if access.stateUpdate.values.count == 1 { break }
-
-            if hasTimedout {
-                await access.onTestFailure(.stateNotExhausted(lastAsserted: access.lastAssertedState, actual: store.state), file: file, line: line)
                 break
             }
 

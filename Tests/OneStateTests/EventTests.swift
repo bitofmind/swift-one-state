@@ -19,7 +19,7 @@ final class EventTests: XCTestCase {
             $0.receivedEvents = [.empty, .count(2) , .count(3), .empty]
         }
 
-        await store.assertExhausted([.state, .tasks])
+        store.exhaustEvents()
     }
 
     func testChildEvents() async throws {
@@ -34,7 +34,6 @@ final class EventTests: XCTestCase {
             $0.receivedEvents.append(.count(3))
             $0.receivedIds.append(10 + child.id)
         }
-
 
         @TestModel var childAlt = parent.$childAlt
         childAlt.send(.count(9))
@@ -78,7 +77,7 @@ final class EventTests: XCTestCase {
             $0.receivedIds +=  [40 + child1.id, 40 + child2.id]
         }
 
-        await store.assertExhausted([.state, .tasks])
+        store.exhaustEvents()
     }
 }
 

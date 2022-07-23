@@ -90,13 +90,13 @@ public extension Model {
     /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
     func task(priority: TaskPriority? = nil, _ operation: @escaping @Sendable () async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
-        Task(priority: priority) {
-            let isInActivationContext = ContextBase.isInActivationContext
-            context.pushTask(for: self, isInActivationContext: isInActivationContext)
-            defer { context.popTask(for: self, isInActivationContext: isInActivationContext) }
-            
+        let isInActivationContext = ContextBase.isInActivationContext
+        context.pushTask(for: self, isInActivationContext: isInActivationContext)
+        return Task(priority: priority) {
             do {
                 try await inViewModelContext {
+                    defer { context.popTask(for: self, isInActivationContext: isInActivationContext) }
+
                     guard !Task.isCancelled else { return }
                     try await operation()
                 }

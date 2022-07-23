@@ -3,7 +3,7 @@ import AsyncAlgorithms
 @testable import OneState
 
 class ActivateTests: XCTestCase {
-    func testActivation() throws {
+    func testActivation() async throws {
         let store = TestStore<EventModel>(initialState: .init(), onTestFailure: assertNoFailure)
 
         XCTAssertFalse(store.model.isActive)
@@ -18,6 +18,8 @@ class ActivateTests: XCTestCase {
             @TestModel var outer = store.model
 
             XCTAssertTrue(outer.isActive)
+
+            await $outer.count.assert(2)
 
             do {
                 @TestModel var inner = store.model
@@ -83,7 +85,7 @@ class ActivateTests: XCTestCase {
             await $parent.children.assert([])
         }
 
-        await store.assertExhausted([.state, .tasks])
+        store.exhaustEvents()
     }
 }
 
