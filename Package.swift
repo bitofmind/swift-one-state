@@ -29,6 +29,11 @@ let package = Package(
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms")
             ],
             swiftSettings: swiftSettings
+        ),
+        .testTarget(
+            name: "OneStateTests",
+            dependencies: ["OneState"],
+            swiftSettings: swiftSettings
         )
     ]
 )

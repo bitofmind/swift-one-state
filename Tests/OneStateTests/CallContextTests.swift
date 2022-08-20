@@ -3,7 +3,7 @@ import AsyncAlgorithms
 @testable import OneState
 
 final class CallContextTests: XCTestCase {
-    func testModelEventWithContext() async throws {
+    func _testModelEventWithContext() async throws {
         let store = TestStore<EventModel>(initialState: .init(), onTestFailure: assertNoFailure)
 
         let countsChannel = AsyncChannel<Int>()

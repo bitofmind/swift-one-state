@@ -45,6 +45,8 @@ public struct AnyAsyncIterator<Element>: AsyncIteratorProtocol {
     }
 }
 
+extension AnyAsyncIterator: @unchecked Sendable where Element: Sendable {}
+
 public struct AnyAsyncSequence<Element>: AsyncSequence {
     let makeAsyncIteratorClosure: () -> AsyncIterator
 
