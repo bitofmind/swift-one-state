@@ -96,12 +96,12 @@ final class ChildContext<M: Model, State>: Context<State> {
         }
     }
 
-    override func pushTask<M: Model>(for model: M, isInActivationContext: Bool) {
-        weakStore?.pushTask(for: model, isInActivationContext: isInActivationContext)
+    override func pushTask(_ info: TaskInfo) {
+        weakStore?.pushTask(info)
     }
 
-    override func popTask<M: Model>(for model: M, isInActivationContext: Bool) {
-        weakStore?.popTask(for: model, isInActivationContext: isInActivationContext)
+    override func popTask(_ info: TaskInfo) {
+        weakStore?.popTask(info)
     }
 
     override func didModify(for access: StoreAccess) {

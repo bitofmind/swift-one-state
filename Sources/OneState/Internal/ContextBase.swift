@@ -123,11 +123,11 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         fatalError()
     }
 
-    func pushTask<M: Model>(for model: M, isInActivationContext: Bool) {
+    func pushTask(_ info: TaskInfo) {
         fatalError()
     }
 
-    func popTask<M: Model>(for model: M, isInActivationContext: Bool) {
+    func popTask(_ info: TaskInfo) {
         fatalError()
     }
 }

@@ -69,6 +69,18 @@ class StoreAccess: @unchecked Sendable {
     @TaskLocal static var isInViewModelContext = false
 }
 
+struct TaskInfo: Identifiable, Sendable {
+    var id: ObjectIdentifier
+    var modelDescription: String
+    var isInActivationContext: Bool
+
+    init<M: Model>(for model: M) {
+        id = ObjectIdentifier(type(of: model))
+        modelDescription = model.typeDescription
+        isInActivationContext = ContextBase.isInActivationContext
+    }
+}
+
 struct Weak<T: AnyObject>: @unchecked Sendable {
     weak var value: T?
 }

@@ -245,17 +245,17 @@ extension Store {
         lock { previousState !== currentState }
     }
 
-    func pushTask<M: Model>(for model: M, isInActivationContext: Bool) {
+    func pushTask(_ info: TaskInfo) {
         lock {
-            guard !isInActivationContext else { return }
-            _activeTasks[ObjectIdentifier(type(of: model)), default: ({ model.typeDescription }, 0)].count += 1
+            guard !info.isInActivationContext else { return }
+            _activeTasks[info.id, default: ({ info.modelDescription }, 0)].count += 1
         }
     }
 
-    func popTask<M: Model>(for model: M, isInActivationContext: Bool) {
+    func popTask(_ info: TaskInfo) {
         lock {
-            guard !isInActivationContext else { return }
-            _activeTasks[ObjectIdentifier(type(of: model))]!.count -= 1
+            guard !info.isInActivationContext else { return }
+            _activeTasks[info.id]!.count -= 1
         }
     }
 
