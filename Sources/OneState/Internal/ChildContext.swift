@@ -13,7 +13,8 @@ final class ChildContext<M: Model, State>: Context<State> {
     }
 
     var store: Store<M> {
-        weakStore ?? fallbackStore
+        assert(weakStore != nil, "Attempt to access a store that has been released")
+        return weakStore ?? fallbackStore
     }
 
     override subscript<T> (path path: KeyPath<State, T>) -> T {

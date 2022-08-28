@@ -143,9 +143,9 @@ extension Store {
 
             let currentCallContextIds = CallContext.currentContexts.map(\.id)
             if let last = lastFromContext, (last !== fromContext || lastCallContextIds != currentCallContextIds) {
-                lock.unlock()
                 updateTask?.cancel()
                 updateTask = nil
+                lock.unlock()
                 notify(context: last)
                 lock.lock()
             }

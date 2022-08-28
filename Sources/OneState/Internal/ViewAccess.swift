@@ -4,7 +4,7 @@ class ViewAccess: StoreAccess, ObservableObject {
     var contexts: [ContextBase] = []
     var observationTasks: [Task<(), Never>] = []
     var lock = Lock()
-    var observedStates: [AnyKeyPath: (AnyStateChange) -> Bool] = [:]
+    var observedStates: [AnyKeyPath: (AnyStateChange, ContextBase) -> Bool] = [:]
     var wasStateOverriden = false
 
     deinit {
@@ -16,8 +16,8 @@ class ViewAccess: StoreAccess, ObservableObject {
         lock {
             guard observedStates.index(forKey: path) == nil else { return }
 
-            observedStates[path] = { [weak context] update in
-                guard let context = context else { return false }
+            observedStates[path] = { [weak context] update, fromContext in
+                guard let context = context, context === fromContext else { return false }
 
                 return isSame(
                     context[path: path, shared: update.current],
@@ -37,7 +37,7 @@ extension ViewAccess {
         observationTasks = contexts.map { context in
             Task { @MainActor [weak self] in
                 for await update in context.stateUpdates where !Task.isCancelled {
-                    await self?.handle(update: update)
+                    await self?.handle(update: update, for: context)
                 }
             }
         }
@@ -53,7 +53,7 @@ extension ViewAccess {
 }
 
 private extension ViewAccess {
-    @MainActor func handle(update: AnyStateChange) async {
+    @MainActor func handle(update: AnyStateChange, for context: ContextBase) async {
         guard update.isStateOverridden == update.isOverrideUpdate else { return }
 
         let wasUpdated: Bool = lock {
@@ -63,7 +63,7 @@ private extension ViewAccess {
             }
 
             for equal in observedStates.values {
-                guard equal(update) else {
+                guard equal(update, context) else {
                     return true
                 }
             }
