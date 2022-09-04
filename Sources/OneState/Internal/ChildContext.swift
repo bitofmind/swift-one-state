@@ -1,20 +1,11 @@
 final class ChildContext<M: Model, State>: Context<State> {
-    typealias Root = M.State
+    let store: Store<M>
+    let path: WritableKeyPath<M.State, State>
 
-    let fallbackStore: Store<M>
-    weak var weakStore: Store<M>?
-    let path: WritableKeyPath<Root, State>
-
-    init(store: Store<M>, path: WritableKeyPath<Root, State>, parent: ContextBase?) {
-        weakStore = store
-        fallbackStore = store.fallbackStore
+    init(store: Store<M>, path: WritableKeyPath<M.State, State>, parent: ContextBase?) {
+        self.store = store
         self.path = path
         super.init(parent: parent)
-    }
-
-    var store: Store<M> {
-        assert(weakStore != nil, "Attempt to access a store that has been released")
-        return weakStore ?? fallbackStore
     }
 
     override subscript<T> (path path: KeyPath<State, T>) -> T {
@@ -97,15 +88,11 @@ final class ChildContext<M: Model, State>: Context<State> {
         }
     }
 
-    override func pushTask(_ info: TaskInfo) {
-        weakStore?.pushTask(info)
-    }
-
-    override func popTask(_ info: TaskInfo) {
-        weakStore?.popTask(info)
-    }
-
     override func didModify(for access: StoreAccess) {
         access.didModify(state: store.sharedState)
+    }
+
+    override var cancellations: Cancellations {
+        store.cancellations
     }
 }

@@ -22,7 +22,7 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
     }
 
     deinit {
-        for info in store.activeTasks {
+        for info in store.cancellations.activeTasks {
             access.onTestFailure(.tasksAreStillRunning(modelName: info.modelName, taskCount: info.count), file: file, line: line)
         }
 
@@ -74,7 +74,7 @@ public extension TestStore {
         }
 
         while true {
-            let activeTasks = store.activeTasks
+            let activeTasks = store.cancellations.activeTasks
 
             if activeTasks.isEmpty {
                 break

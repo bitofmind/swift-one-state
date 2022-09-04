@@ -1,3 +1,5 @@
+import Foundation
+
 class ContextBase: HoldsLock, @unchecked Sendable {
     var lock = Lock()
     private(set) weak var parent: ContextBase?
@@ -19,22 +21,20 @@ class ContextBase: HoldsLock, @unchecked Sendable {
 
     @Locked var propertyIndex = 0
     @Locked var properties: [Any] = []
-    @Locked var cancellables: [Cancellable] = []
-    @Locked var activationCancellables: [Cancellable] = []
     @Locked var activationRefCount = 0
 
     @TaskLocal static var current: ContextBase?
-    @TaskLocal static var isInActivationContext = false
+
+    let cancellableKey = UUID()
+    let activationCancellableKey = UUID()
 
     init(parent: ContextBase?) {
         self.parent = parent
     }
 
     deinit {
-        let cancellables = self.cancellables + self.activationCancellables
-        for cancellable in cancellables {
-            cancellable.cancel()
-        }
+        cancellations.cancelAll(for: cancellableKey)
+        cancellations.cancelAll(for: activationCancellableKey)
 
         if let parent = parent {
             parent.removeChildStore(self)
@@ -123,13 +123,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         fatalError()
     }
 
-    func pushTask(_ info: TaskInfo) {
-        fatalError()
-    }
-
-    func popTask(_ info: TaskInfo) {
-        fatalError()
-    }
+    var cancellations: Cancellations { fatalError() }
 }
 
 extension ContextBase {
@@ -150,11 +144,7 @@ extension ContextBase {
 
         activationRefCount -= 1
         if activationRefCount == 0 {
-            let cancellables = self.activationCancellables
-            self.activationCancellables.removeAll()
-            for cancellable in cancellables {
-                cancellable.cancel()
-            }
+            cancellations.cancelAll(for: activationCancellableKey)
         }
     }
 }

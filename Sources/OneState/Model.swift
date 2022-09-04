@@ -79,33 +79,49 @@ public extension Model where State: Identifiable {
 }
 
 public extension Model {
+    @discardableResult
+    func onCancel(_ perform: @escaping () -> Void) -> Cancellable {
+        AnyCancellable(cancellations: context.cancellations) {
+            perform()
+        }.cancel(for: context.cancellableKey)
+    }
+
+    func cancelAll(for key: AnyHashable) {
+        context.cancellations.cancelAll(for: key)
+    }
+
+    func cancelAll(for id: Any.Type) {
+        context.cancellations.cancelAll(for: ObjectIdentifier(id))
+    }
+}
+
+public extension Model {
     /// Add an action to be called once the model is deactivated
     /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
     func onDeactivate(_ perform: @escaping () -> Void) -> Cancellable {
-        AnyCancellable(onCancel: perform).store(in: self)
+        onCancel(perform)
+            .cancel(for: context.activationCancellableKey)
     }
 
     /// Perform a task for the life time of the model
     /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
     func task(priority: TaskPriority? = nil, _ operation: @escaping @Sendable () async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
-        let taskInfo = TaskInfo(for: self)
-        let context = context
-        context.pushTask(taskInfo)
-        
-        return Task(priority: priority) {
-            do {
-                try await inViewModelContext {
-                    defer { context.popTask(taskInfo) }
+        TaskCancellable(model: self) { onDone in
+            Task(priority: priority) {
+                do {
+                    try await inViewModelContext {
+                        defer { onDone() }
 
-                    guard !Task.isCancelled else { return }
-                    try await operation()
+                        guard !Task.isCancelled else { return }
+                        try await operation()
+                    }
+                } catch {
+                    `catch`?(error)
                 }
-            } catch {
-                `catch`?(error)
             }
-        }.store(in: self)
+        }
     }
 
     /// Iterate an async sequence for the life time of the model
@@ -225,14 +241,15 @@ public extension Model {
     @discardableResult
     func activate() -> Cancellable {
         retain()
-        return AnyCancellable {
+        return onCancel {
             context.activationRelease()
         }
     }
 
     @discardableResult
     func activate<M: Model>(_ viewModel: M) -> Cancellable {
-        viewModel.activate().store(in: self)
+        viewModel.activate()
+            .cancel(for: context.cancellableKey)
     }
 }
 
@@ -341,7 +358,7 @@ extension Model {
         context.activateRetain()
         guard !context.isOverrideStore, context.activationRefCount == 1 else { return }
 
-        ContextBase.$isInActivationContext.withValue(true) {
+        withCancellationContext(context.activationCancellableKey) {
             ContextBase.$current.withValue(nil) {
                 onActivate()
             }

@@ -12,6 +12,15 @@ struct CounterModel: Model {
     }
 }
 
+struct TwoCountersModel: Model {
+    struct State: Equatable {
+        @StateModel<CounterModel> var counter1 = .init(count: 1)
+        @StateModel<CounterModel> var counter2 = .init(count: 2)
+    }
+
+    @ModelState var state: State
+}
+
 struct EventModel: Model, Identifiable {
     struct State: Equatable, Identifiable {
         var id = 0

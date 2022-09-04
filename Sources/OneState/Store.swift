@@ -29,31 +29,19 @@ public final class Store<M: Model>: @unchecked Sendable {
 
     private var updateTask: Task<(), Never>?
     private var lastFromContext: ContextBase?
-    private var lastCallContextIds: [CallContext.ID] = []
+    private var lastCallContexts: [CallContext] = []
 
-    private(set) var context: ChildContext<M, State>!
+    private(set) weak var weakContext: ChildContext<M, State>?
+    private var environments: Environments = [:]
 
-    private var _activeTasks: [ObjectIdentifier: (description: () -> String, count: Int)] = [:]
-
-    let fallbackStore: Store!
+    let cancellations = Cancellations()
 
     public init(initialState: State, environments: [Any] = []) {
         previousState = Shared(initialState)
         currentState = previousState
-        context = nil
-        fallbackStore = Self(fallbackState: initialState)
-
-        context = .init(store: self, path: \.self, parent: nil)
         for environment in environments {
-            context.environments[ObjectIdentifier(type(of: environment))] = environment
+            self.environments[ObjectIdentifier(type(of: environment))] = environment
         }
-    }
-
-    private init(fallbackState: State) {
-        previousState = Shared(fallbackState)
-        currentState = previousState
-        context = nil
-        fallbackStore = nil
     }
 }
 
@@ -67,7 +55,10 @@ public extension Store {
     }
 
     func updateEnvironment<Value>(_ value: Value) {
-        context.environments[ObjectIdentifier(Value.self)] = value
+        lock {
+            environments[ObjectIdentifier(Value.self)] = value
+        }
+        weakContext?.environments[ObjectIdentifier(Value.self)] = value
     }
 
     /// Access the the lastest update useful for debugging or initial state for state recording
@@ -98,7 +89,7 @@ public extension Store {
             let update = AnyStateChange(previous: previous, current: current, isStateOverridden: true, isOverrideUpdate: true)
             lock.unlock()
 
-            context.notify(update)
+            weakContext?.notify(update)
         }
     }
 }
@@ -141,13 +132,12 @@ extension Store {
                 return
             }
 
-            let currentCallContextIds = CallContext.currentContexts.map(\.id)
-            if let last = lastFromContext, (last !== fromContext || lastCallContextIds != currentCallContextIds) {
+            let callContexts = CallContext.currentContexts
+
+            if let last = lastFromContext, (last !== fromContext || lastCallContexts != callContexts) {
                 updateTask?.cancel()
                 updateTask = nil
-                lock.unlock()
-                notify(context: last)
-                lock.lock()
+                notify(context: last, callContexts: lastCallContexts)
             }
 
             if previousState === currentState {
@@ -156,7 +146,7 @@ extension Store {
 
             yield &currentState.value[keyPath: path]
             lastFromContext = fromContext
-            lastCallContextIds = currentCallContextIds
+            lastCallContexts = callContexts
             modifyCount += 1
 
             if updateTask == nil {
@@ -169,15 +159,16 @@ extension Store {
 
                         self.lock.lock()
                         defer { self.lock.unlock() }
+
+                        guard !Task.isCancelled else {
+                            return
+                        }
                         
                         if count == self.modifyCount {
                             self.updateTask = nil
+                            self.notify(context: fromContext, callContexts: callContexts)
                             break
                         }
-                    }
-
-                    if !Task.isCancelled {
-                        self.notify(context: fromContext)
                     }
                 }
             }
@@ -216,12 +207,9 @@ extension Store {
         }
     }
 
-    func notify(context: ContextBase) {
-        lock.lock()
-
+    func notify(context: ContextBase, callContexts: [CallContext]) {
         let state = currentState
         guard previousState !== state, lastFromContext === context else {
-            lock.unlock()
             return
         }
 
@@ -232,37 +220,32 @@ extension Store {
             current: state,
             isStateOverridden: currentOverride != nil,
             isOverrideUpdate: false,
-            callContexts: CallContext.currentContexts
+            callContexts: callContexts
         )
 
         previousState = state
-        lock.unlock()
 
+        lock.unlock()
         context.notify(update)
+        lock.lock()
     }
 
     var isUpdateInProgress: Bool {
         lock { previousState !== currentState }
     }
 
-    func pushTask(_ info: TaskInfo) {
-        lock {
-            guard !info.isInActivationContext else { return }
-            _activeTasks[info.id, default: ({ info.modelDescription }, 0)].count += 1
+    var context: ChildContext<M, State> {
+        if let context = weakContext {
+            return context
         }
-    }
 
-    func popTask(_ info: TaskInfo) {
-        lock {
-            guard !info.isInActivationContext else { return }
-            _activeTasks[info.id]!.count -= 1
+        let context = ChildContext(store: self, path: \.self, parent: nil)
+        for (key, value) in environments {
+            context.environments[key] = value
         }
-    }
 
-    var activeTasks: [(modelName: String, count: Int)] {
-        lock {
-            _activeTasks.values.filter { $0.count != 0 }.map { ($0.description(), $0.count) }
-        }
+        weakContext = context
+        return context
     }
 }
 

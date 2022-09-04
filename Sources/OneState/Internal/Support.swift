@@ -1,7 +1,7 @@
 import Foundation
 
-struct CallContext: Identifiable, Sendable {
-    let id = UUID()
+struct CallContext: Identifiable, Sendable, Equatable {
+    let id = Self.nextId
     let perform: @MainActor @Sendable (@MainActor @Sendable () -> Void) -> Void
 
     @MainActor
@@ -9,7 +9,20 @@ struct CallContext: Identifiable, Sendable {
         perform(action)
     }
 
+    static func == (lhs: CallContext, rhs: CallContext) -> Bool {
+        lhs.id == rhs.id
+    }
+
     @TaskLocal static var currentContexts: [CallContext] = []
+
+    static var lock = Lock()
+    static var _nextId = 0
+    static var nextId: Int {
+        lock {
+            _nextId += 1
+            return _nextId
+        }
+    }
 }
 
 struct WithCallContexts<Value> {
@@ -69,26 +82,8 @@ class StoreAccess: @unchecked Sendable {
     @TaskLocal static var isInViewModelContext = false
 }
 
-struct TaskInfo: Identifiable, Sendable {
-    var id: ObjectIdentifier
-    var modelDescription: String
-    var isInActivationContext: Bool
-
-    init<M: Model>(for model: M) {
-        id = ObjectIdentifier(type(of: model))
-        modelDescription = model.typeDescription
-        isInActivationContext = ContextBase.isInActivationContext
-    }
-}
-
 struct Weak<T: AnyObject>: @unchecked Sendable {
     weak var value: T?
-}
-
-struct AnyCancellable: Cancellable {
-    var onCancel: () -> Void
-
-    func cancel() { onCancel() }
 }
 
 final class ThreadState: @unchecked Sendable {

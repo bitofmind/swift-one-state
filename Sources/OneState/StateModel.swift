@@ -126,7 +126,8 @@ public extension StoreViewProvider  {
 public extension Model {
     @discardableResult
     func activate<P: StoreViewProvider, M: Model>(_ view: P) -> Cancellable where P.State == StateModel<M>, M.StateContainer == M.State, P.Access == Write {
-        M(view.storeView(for: \.wrappedValue)).activate().store(in: self)
+        M(view.storeView(for: \.wrappedValue)).activate()
+            .cancel(for: context.activationCancellableKey)
     }
 
     @discardableResult
@@ -172,5 +173,6 @@ public extension Model {
                 model.context.activationRelease()
             }
         }
+        .cancel(for: context.activationCancellableKey)
     }
 }

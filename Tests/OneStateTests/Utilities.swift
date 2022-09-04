@@ -5,6 +5,7 @@ import XCTest
     XCTFail(failure.message, file: failure.file, line: failure.line)
 }
 
+@propertyWrapper
 final class Locked<Value> {
     private let lock = NSLock()
     private var _value: Value
@@ -13,9 +14,22 @@ final class Locked<Value> {
         _value = value
     }
 
+    init(wrappedValue: Value) {
+        _value = wrappedValue
+    }
+
     var value: Value {
         get { lock { _value } }
         set { lock { _value = newValue } }
+    }
+
+    var wrappedValue: Value {
+        get { value }
+        set { value = newValue }
+    }
+    
+    var projectedValue: Locked {
+        self
     }
 
     func callAsFunction<T>(_ operation: (inout Value) -> T) -> T {

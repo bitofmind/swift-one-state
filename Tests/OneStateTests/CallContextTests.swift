@@ -3,7 +3,7 @@ import AsyncAlgorithms
 @testable import OneState
 
 final class CallContextTests: XCTestCase {
-    func _testModelEventWithContext() async throws {
+    func testModelEventWithContext() async throws {
         let store = TestStore<EventModel>(initialState: .init(), onTestFailure: assertNoFailure)
 
         let countsChannel = AsyncChannel<Int>()
@@ -28,6 +28,7 @@ final class CallContextTests: XCTestCase {
                     currentA.value = .currentA
                     currentB.value = .currentB
                 }
+
                 await currentAChannel.send(currentA.value)
                 await currentBChannel.send(currentB.value)
                 await countsChannel.send(count)
@@ -89,8 +90,8 @@ final class CallContextTests: XCTestCase {
         let finalCurrentA = await currentA
         let finalCurrentB = await currentB
         XCTAssertEqual(finalCounts, [1, 2, 4, 5])
-        XCTAssertEqual(finalCurrentA, [5, 4, 0, 0])
-        XCTAssertEqual(finalCurrentB, [2, 6, 9, 9])
+        XCTAssertEqual(finalCurrentA, [0, 5, 4, 0])
+        XCTAssertEqual(finalCurrentB, [0, 2, 6, 9])
     }
 }
 

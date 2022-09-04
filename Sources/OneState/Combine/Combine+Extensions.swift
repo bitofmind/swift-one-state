@@ -18,8 +18,9 @@ public extension Model {
             perform(value)
         })
 
-        cancellable.store(in: self)
-        return cancellable
+        return onCancel {
+            cancellable.cancel()
+        }
     }
 }
 
@@ -72,8 +73,6 @@ extension PassthroughSubject where Failure == Never, Output: Sendable {
         }
     }
 }
-
-extension Combine.AnyCancellable: Cancellable {}
 
 extension Store: ObservableObject {}
 

@@ -25,11 +25,12 @@ class StoreTests: XCTestCase {
             let context = store.context
             optContext = context
         }
-        XCTAssertNil(weakStore)
+        XCTAssertNotNil(weakStore)
         XCTAssertNotNil(optContext)
         weak var weakContext = optContext
         XCTAssertNotNil(weakContext)
         optContext = nil
         XCTAssertNil(weakContext)
+        XCTAssertNil(weakStore)
     }
 }
