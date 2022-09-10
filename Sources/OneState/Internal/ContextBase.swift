@@ -25,16 +25,16 @@ class ContextBase: HoldsLock, @unchecked Sendable {
 
     @TaskLocal static var current: ContextBase?
 
-    let cancellableKey = UUID()
-    let activationCancellableKey = UUID()
+    let contextCancellationKey = UUID()
+    let activationCancellationKey = UUID()
 
     init(parent: ContextBase?) {
         self.parent = parent
     }
 
     deinit {
-        cancellations.cancelAll(for: cancellableKey)
-        cancellations.cancelAll(for: activationCancellableKey)
+        cancellations.cancelAll(for: contextCancellationKey)
+        cancellations.cancelAll(for: activationCancellationKey)
 
         if let parent = parent {
             parent.removeChildStore(self)
@@ -144,7 +144,7 @@ extension ContextBase {
 
         activationRefCount -= 1
         if activationRefCount == 0 {
-            cancellations.cancelAll(for: activationCancellableKey)
+            cancellations.cancelAll(for: activationCancellationKey)
         }
     }
 }

@@ -83,7 +83,7 @@ public extension Model {
     func onCancel(_ perform: @escaping () -> Void) -> Cancellable {
         AnyCancellable(cancellations: context.cancellations) {
             perform()
-        }.cancel(for: context.cancellableKey)
+        }.cancel(for: context.contextCancellationKey)
     }
 
     func cancelAll(for key: AnyHashable) {
@@ -101,7 +101,7 @@ public extension Model {
     @discardableResult
     func onDeactivate(_ perform: @escaping () -> Void) -> Cancellable {
         onCancel(perform)
-            .cancel(for: context.activationCancellableKey)
+            .cancel(for: context.activationCancellationKey)
     }
 
     /// Perform a task for the life time of the model
@@ -139,32 +139,27 @@ public extension Model {
                 return
             }
 
-            var task: Task<(), Error>?
-            var caughtError: Error? = nil
-            for try await value in sequence() {
-                guard caughtError == nil, !Task.isCancelled else { return }
+            let cancelID = UUID()
+            try await withTaskCancellationHandler {
+                for try await value in sequence() {
+                    cancelAll(for: cancelID)
 
-                if let task = task {
-                    task.cancel()
-                    do {
-                        try await task.value
-                    } catch {
-                        caughtError = error
-                    }
-                }
-
-                task = Task {
-                    guard !Task.isCancelled else { return }
-                    do {
-                        try await inViewModelContext {
-                            try await perform(value)
+                    task {
+                        guard !Task.isCancelled else { return }
+                        do {
+                            try await inViewModelContext {
+                                try await perform(value)
+                            }
+                        } catch is CancellationError {
+                            print()
+                        } catch {
+                            `catch`?(error)
+                            throw error
                         }
-                    } catch is CancellationError {
-                    } catch {
-                        `catch`?(error)
-                        throw error
-                    }
+                    }.cancel(for: cancelID)
                 }
+            } onCancel: {
+                cancelAll(for: cancelID)
             }
         }, catch: `catch`)
     }
@@ -249,7 +244,7 @@ public extension Model {
     @discardableResult
     func activate<M: Model>(_ viewModel: M) -> Cancellable {
         viewModel.activate()
-            .cancel(for: context.cancellableKey)
+            .cancel(for: context.contextCancellationKey)
     }
 }
 
@@ -358,7 +353,7 @@ extension Model {
         context.activateRetain()
         guard !context.isOverrideStore, context.activationRefCount == 1 else { return }
 
-        withCancellationContext(context.activationCancellableKey) {
+        withCancellationContext(context.activationCancellationKey) {
             ContextBase.$current.withValue(nil) {
                 onActivate()
             }
