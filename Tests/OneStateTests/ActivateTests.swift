@@ -70,7 +70,6 @@ class ActivateTests: XCTestCase {
             parent.clearOptChild()
             await $parent.optChild.assert(nil) // deactivate will never be recieved as reciever does no longer exists
 
-
             parent.addChild(id: 7)
 
             let child = try XCTUnwrap(parent.$children.first)
@@ -122,7 +121,7 @@ private struct ParentModel: Model {
     @ModelState var state: State
 
     func onActivate() {
-        forEach($state.$child.events()) { event in
+        forEach(self.$child.events()) { event in
             state.events.append(event)
         }
 
