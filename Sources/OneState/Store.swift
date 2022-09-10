@@ -19,7 +19,7 @@ import Foundation
 public final class Store<M: Model>: @unchecked Sendable {
     public typealias State = M.State
     
-    private var lock = Lock()
+    private let lock = NSRecursiveLock()
 
     private var previousState: Shared<State>
     private var currentState: Shared<State>
@@ -119,7 +119,9 @@ extension Store {
 
     subscript<T> (path path: WritableKeyPath<State, T>, fromContext fromContext: ContextBase) -> T {
         _read {
+            lock.lock()
             yield currentState.value[keyPath: path]
+            lock.unlock()
         }
         _modify {
             lock.lock()
@@ -154,21 +156,15 @@ extension Store {
                 updateTask = Task { @MainActor in
                     while true {
                         let count = self.lock { self.modifyCount }
-
                         await Task.yield()
 
-                        self.lock.lock()
-                        defer { self.lock.unlock() }
-
-                        guard !Task.isCancelled else {
-                            return
-                        }
-                        
-                        if count == self.modifyCount {
+                        let shouldBreak = self.lock {
+                            guard count == self.modifyCount else { return false }
                             self.updateTask = nil
                             self.notify(context: fromContext, callContexts: callContexts)
-                            break
+                            return true
                         }
+                        if shouldBreak { break }
                     }
                 }
             }
@@ -226,7 +222,9 @@ extension Store {
         previousState = state
 
         lock.unlock()
-        context.notify(update)
+        if !Task.isCancelled {
+            context.notify(update)
+        }
         lock.lock()
     }
 

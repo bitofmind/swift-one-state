@@ -1,5 +1,11 @@
 import Foundation
 
+extension NSLocking {
+    func callAsFunction<T>(_ operation: () throws -> T) rethrows -> T {
+        try withLock(operation)
+    }
+}
+
 struct Lock {
     private var _lock = os_unfair_lock_s()
     
