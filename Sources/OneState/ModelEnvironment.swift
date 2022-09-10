@@ -14,7 +14,7 @@
 ///             await myServer.hello()
 ///         }
 ///     }
-@propertyWrapper
+@propertyWrapper @dynamicMemberLookup
 public struct ModelEnvironment<Value> {
     let context: ContextBase
     let fallbackValue: (@Sendable () -> Value)?
@@ -60,6 +60,12 @@ public struct ModelEnvironment<Value> {
 }
 
 extension ModelEnvironment: Sendable where Value: Sendable {}
+
+extension ModelEnvironment: StoreViewProvider where Value: Model {
+    public var storeView: StoreView<Value.State, Value.State, Write> {
+        wrappedValue.storeView
+    }
+}
 
 private extension ModelEnvironment {
     var key: ObjectIdentifier { .init(Value.self) }
