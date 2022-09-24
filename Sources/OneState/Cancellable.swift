@@ -66,24 +66,27 @@ struct AnyCancellable: Cancellable, InternalCancellable {
 
 struct TaskCancellable: Cancellable, InternalCancellable {
     var id: Int
-    let cancellations: Cancellations
-    let task: Task<Void, Error>
-    let name: String
+    var cancellations: Cancellations
+    var task: Task<Void, Error>!
+    var name: String
 
     init<M: Model>(model: M, task: @escaping @Sendable (@escaping @Sendable () -> Void) -> Task<Void, Error>) {
         let cs = model.context.cancellations
         self.cancellations = cs
         let id = cancellations.nextId
         self.id = id
+        name = model.typeDescription
+        self.task = nil
+
+        cs.register(self)
+
         self.task = task {
             _ = cs.unregister(id)
         }
-        name = model.typeDescription
-        cs.register(self)
     }
 
     func onCancel() {
-        task.cancel()
+        task?.cancel()
     }
 
     public func cancel() {
