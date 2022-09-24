@@ -12,20 +12,15 @@ class ViewAccess: StoreAccess, ObservableObject {
         observationTasks.forEach { $0.cancel() }
     }
 
-    override func willAccess<Root, State>(path: KeyPath<Root, State>, context: Context<Root>, isSame: @escaping (State, State) -> Bool) {
-        lock {
-            guard observedStates.index(forKey: path) == nil else { return }
+    override func willAccess(path: AnyKeyPath, didUpdate: @escaping (AnyStateChange) -> Bool) {
+       lock {
+           guard observedStates.index(forKey: path) == nil else { return }
 
-            observedStates[path] = { [weak context] update, fromContext in
-                guard let context = context, context === fromContext else { return false }
-
-                return isSame(
-                    context[path: path, shared: update.current],
-                    context[path: path, shared: update.previous]
-                )
-            }
-        }
-    }
+           observedStates[path] = { update, fromContext in
+               didUpdate(update)
+           }
+       }
+   }
 
     override var allowAccessToBeOverridden: Bool { true }
 }

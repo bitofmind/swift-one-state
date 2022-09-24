@@ -109,4 +109,20 @@ final class ChildContext<M: Model, State>: Context<State> {
     override var cancellations: Cancellations {
         store.cancellations
     }
+
+    override func value<T>(for path: KeyPath<State, T>, access: StoreAccess?, isSame: @escaping (T, T) -> Bool) -> T {
+        if !StoreAccess.isInViewModelContext, let access = access {
+            let fullPath = self.path.appending(path: path)
+            access.willAccess(path: fullPath) { [weak store] update in
+                guard let store = store, update.current is Shared<M.State> else { return true }
+                
+                return isSame(
+                    store[path: fullPath, shared: update.current],
+                    store[path: fullPath, shared: update.previous]
+                )
+            }
+        }
+
+        return self[path: path, access: access]
+    }
 }

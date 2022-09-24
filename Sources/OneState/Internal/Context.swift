@@ -21,6 +21,10 @@ class Context<State>: ContextBase {
         _read { fatalError() }
     }
 
+    func value<T>(for path: KeyPath<State, T>, access: StoreAccess?, isSame: @escaping (T, T) -> Bool) -> T {
+        fatalError()
+    }
+
     func context<T>(at path: WritableKeyPath<State, T>) -> Context<T> { fatalError() }
 
     var storePath: AnyKeyPath { fatalError() }
@@ -63,13 +67,6 @@ extension Context {
 }
 
 extension Context {
-    func value<T>(for path: KeyPath<State, T>, access: StoreAccess?, isSame: @escaping (T, T) -> Bool) -> T {
-        if !StoreAccess.isInViewModelContext, let access = access {
-            access.willAccess(path: path, context: self, isSame: isSame)
-        }
-        return self[path: path, access: access]
-    }
-
     func value<T: Equatable>(for path: KeyPath<State, T>, access: StoreAccess?) -> T {
         value(for: path, access: access, isSame: ==)
     }
