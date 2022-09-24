@@ -93,6 +93,10 @@ public extension Model {
     func cancelAll(for id: Any.Type) {
         context.cancellations.cancelAll(for: ObjectIdentifier(id))
     }
+
+    var activationCancellationKey: AnyHashable {
+        context.activationCancellationKey
+    }
 }
 
 public extension Model {
@@ -249,21 +253,23 @@ public extension Model {
 }
 
 public extension Model {
+    @_disfavoredOverload
     subscript<T: Equatable>(dynamicMember path: KeyPath<State, T>) -> T {
         value(for: path)
     }
 
+    @_disfavoredOverload
     subscript<T: Equatable>(dynamicMember path: WritableKeyPath<State, T>) -> T {
         value(for: path)
     }
 
-    subscript<S, T: Equatable>(dynamicMember path: WritableKeyPath<S, T>) -> T?  where State == S? {
+    subscript<S, T: Equatable>(dynamicMember path: WritableKeyPath<S, T>) -> T? where State == S? {
         _ = value(for: \.self, isSame: State.hasSameStructure) // To trigger update once optional toggles
         guard let path  = nonObservableState.elementKeyPaths.first?.appending(path: path) else { return nil }
         return value(for: path)
     }
 
-    subscript<S, T: Equatable>(dynamicMember path: WritableKeyPath<S, T?>) -> T?  where State == S? {
+    subscript<S, T: Equatable>(dynamicMember path: WritableKeyPath<S, T?>) -> T? where State == S? {
         _ = value(for: \.self, isSame: State.hasSameStructure) // To trigger update once optional toggles
         guard let path = nonObservableState.elementKeyPaths.first?.appending(path: path) else { return nil }
         return value(for: path)
@@ -282,13 +288,15 @@ public extension Model where State: Equatable {
 }
 
 public extension Model {
-    func value<T>(for keyPath: KeyPath<State, T>, isSame: @escaping (T, T) -> Bool) -> T {
+    func value<T>(for path: KeyPath<State, T>, isSame: @escaping (T, T) -> Bool) -> T {
         let view = self.storeView
-        return view.context.value(for: view.path.appending(path: keyPath), access: view.access, isSame: isSame)
+        return view.context.value(for: view.path.appending(path: path), access: view.access, isSame: isSame)
     }
 
-    func value<T: Equatable>(for keyPath: KeyPath<State, T>) -> T {
-        value(for: keyPath, isSame: ==)
+    func value<T: Equatable>(for path: KeyPath<State, T>) -> T {
+        value(for: path, isSame: {
+            $0 == $1
+        })
     }
 }
 
