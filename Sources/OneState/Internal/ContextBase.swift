@@ -10,8 +10,8 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     let stateUpdates = AsyncPassthroughSubject<AnyStateChange>()
 
     struct EventInfo: @unchecked Sendable {
-        var  event: Any
-        var  path: AnyKeyPath
+        var event: Any
+        var path: AnyKeyPath
         var context: ContextBase
         var callContexts: [CallContext]
     }
@@ -37,7 +37,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         cancellations.cancelAll(for: activationCancellationKey)
 
         if let parent = parent {
-            parent.removeChildStore(self)
+            parent.removeContext(self)
         }
     }
 
@@ -70,19 +70,28 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         }
     }
 
-    func removeChildStore(_ storeToRemove: ContextBase) {
+    func removeContext(_ contextToRemove: ContextBase) {
         lock {
-            for (path, context) in _overrideChildren where context === storeToRemove {
+            for (path, context) in _overrideChildren where context === contextToRemove {
                 _overrideChildren[path] = nil
                 return
             }
 
-            for (path, context) in _children where context === storeToRemove {
+            for (path, context) in _children where context === contextToRemove {
                 _children[path] = nil
                 return
             }
 
             fatalError("Failed to remove context")
+        }
+    }
+
+    func removeRecusively() {
+        parent?.removeContext(self)
+        parent = nil
+
+        for child in allChildren.values {
+            child.removeRecusively()
         }
     }
 
