@@ -123,6 +123,37 @@ class CancelletionTests: XCTestCase {
 
         XCTAssertEqual(count, 4)
     }
+
+    func testForEachCancelPrevious() async throws {
+        @Locked var count = 0
+        let channel = AsyncChannel<Int>()
+        let sync = AsyncChannel<()>()
+
+        let store = TestStore<CounterModel>(initialState: .init(), onTestFailure: assertNoFailure)
+        @TestModel var model = store.model
+
+        model.forEach(channel, cancelPrevious: true) {
+            $count.wrappedValue += $0
+            await sync.send(())
+        }
+        .cancel(for: CancelKey.self)
+
+        var it = sync.makeAsyncIterator()
+        XCTAssertEqual(count, 0)
+        await channel.send(1)
+        await it.next()
+        XCTAssertEqual(count, 1)
+
+        await channel.send(10)
+        await it.next()
+        XCTAssertEqual(count, 11)
+
+        await channel.send(100)
+        await it.next()
+        XCTAssertEqual(count, 111)
+
+        model.cancelAll(for: CancelKey.self)
+    }
 }
 
 enum CancelKey {}

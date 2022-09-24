@@ -121,7 +121,7 @@ private struct ParentModel: Model {
     @ModelState var state: State
 
     func onActivate() {
-        forEach(self.$child.events()) { event in
+        forEach($state.$child.events()) { event in
             state.events.append(event)
         }
 

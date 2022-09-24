@@ -113,7 +113,7 @@ private struct ParentModel: Model {
             state.receivedIds.append(10 + state.child.id)
         }
 
-        forEach(self.$childAlt.events()) { event in
+        forEach($state.$childAlt.events()) { event in
             state.receivedEvents.append(event)
             state.receivedIds.append(30 + state.childAlt.id)
         }
