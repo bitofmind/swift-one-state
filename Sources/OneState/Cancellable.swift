@@ -1,3 +1,5 @@
+import Foundation
+
 /// A protocol indicating that an activity or action supports cancellation.
 public protocol Cancellable {
     /// Cancel the activity.
@@ -64,11 +66,13 @@ struct AnyCancellable: Cancellable, InternalCancellable {
     @TaskLocal static var contexts: [AnyHashable] = []
 }
 
-struct TaskCancellable: Cancellable, InternalCancellable {
+final class TaskCancellable: Cancellable, InternalCancellable {
     var id: Int
     var cancellations: Cancellations
     var task: Task<Void, Error>!
     var name: String
+    var lock = Lock()
+    var hasBeenCancelled = false
 
     init<M: Model>(model: M, task: @escaping @Sendable (@escaping @Sendable () -> Void) -> Task<Void, Error>) {
         let cs = model.context.cancellations
@@ -80,13 +84,19 @@ struct TaskCancellable: Cancellable, InternalCancellable {
 
         cs.register(self)
 
-        self.task = task {
-            _ = cs.unregister(id)
+        lock {
+            guard !self.hasBeenCancelled else { return }
+            self.task = task {
+                _ = cs.unregister(id)
+            }
         }
     }
 
     func onCancel() {
-        task?.cancel()
+        lock {
+            self.task?.cancel()
+            self.hasBeenCancelled = true
+        }
     }
 
     public func cancel() {
