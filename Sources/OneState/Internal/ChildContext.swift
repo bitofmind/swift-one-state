@@ -92,6 +92,20 @@ final class ChildContext<M: Model, State>: Context<State> {
         access.didModify(state: store.sharedState)
     }
 
+    override func notify(_ update: AnyStateChange) {
+        super.notify(update)
+
+        let contextValue = self[path: \.self, access: nil]
+
+        for (path, context) in allChildren {
+            ThreadState.current.pathFallbackCount = 0
+            _ = contextValue[keyPath: path]
+            if ThreadState.current.pathFallbackCount > 0 {
+                context.removeRecusively()
+            }
+        }
+    }
+
     override var cancellations: Cancellations {
         store.cancellations
     }

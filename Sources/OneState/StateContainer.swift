@@ -119,6 +119,7 @@ private extension Optional {
     subscript (unwrapFallback fallback: UnwrapFallback<Wrapped>) -> Wrapped {
         get {
             guard let self = self else {
+                reportPathDidFallback()
                 return fallback.value
             }
             return self
@@ -141,8 +142,12 @@ private extension MutableCollection {
                     return element
                 }
             }
-               
-            return first { $0[keyPath: cursor.idPath] == cursor.id } ?? cursor.fallback
+
+            guard let value = first(where: { $0[keyPath: cursor.idPath] == cursor.id }) else {
+                reportPathDidFallback()
+                return cursor.fallback
+            }
+            return value
         }
         set {
             if cursor.index >= startIndex && cursor.index < endIndex {

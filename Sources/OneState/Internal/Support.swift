@@ -88,6 +88,7 @@ struct Weak<T: AnyObject>: @unchecked Sendable {
 
 final class ThreadState: @unchecked Sendable {
     var stateModelCount = 0
+    var pathFallbackCount = 0
     init() {}
 
     static var current: ThreadState {
@@ -108,3 +109,7 @@ private let threadStateKey: pthread_key_t = {
     pthread_key_create(&key, cleanup)
     return key
  }()
+
+public func reportPathDidFallback() {
+    ThreadState.current.pathFallbackCount += 1
+}
