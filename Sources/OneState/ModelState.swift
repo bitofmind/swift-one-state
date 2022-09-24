@@ -26,7 +26,7 @@ public struct ModelState<State> {
 
     public init() {
         guard let context = ContextBase.current as? Context<State> else {
-            fatalError("ModelState can only be used from a Model with an injected view.")
+            fatalError("ModelState can only be used from a Model with an injected store view.")
         }
         self.context = context
         storeAccess = StoreAccess.current?.value

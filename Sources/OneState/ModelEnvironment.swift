@@ -21,7 +21,7 @@ public struct ModelEnvironment<Value> {
 
     public init() {
         guard let context = ContextBase.current else {
-            fatalError("ModelEnvironment can only be used from a Model with an injected view.")
+            fatalError("ModelEnvironment can only be used from a Model with an injected store view.")
         }
 
         self.context = context
@@ -30,7 +30,7 @@ public struct ModelEnvironment<Value> {
     
     public init(wrappedValue: @escaping @Sendable @autoclosure () -> Value) {
         guard let context = ContextBase.current else {
-            fatalError("ModelEnvironment can only be used from a Model with an injected view.")
+            fatalError("ModelEnvironment can only be used from a Model with an injected store view.")
         }
 
         self.context = context

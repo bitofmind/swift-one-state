@@ -61,6 +61,11 @@ public extension Store {
         weakContext?.environments[ObjectIdentifier(Value.self)] = value
     }
 
+    func dependency<Value>(_ path: WritableKeyPath<ModelDependencyValues, Value>, _ value: Value) -> Self {
+        updateDependency(path, value)
+        return self
+    }
+
     /// Access the the lastest update useful for debugging or initial state for state recording
     var latestUpdate: StateUpdate<State> {
         .init(
@@ -245,10 +250,32 @@ extension Store {
         weakContext = context
         return context
     }
+
+    func updateDependency<Value>(_ path: WritableKeyPath<ModelDependencyValues, Value>, _ value: Value) {
+        var d = ModelDependencyValues { _ in
+            nil
+        } set: { key, value in
+            self.lock {
+                self.environments[key] = value
+            }
+            self.weakContext?.environments[key] = value
+        }
+        d[keyPath: path] = value
+    }
 }
 
 extension Store: StoreViewProvider {
     public var storeView: StoreView<State, State, Write> {
         .init(context: context, path: \.self, access: nil)
+    }
+}
+
+public extension Store {
+    func environment<Value>(_ value: Value) -> Self {
+        lock {
+            environments[ObjectIdentifier(Value.self)] = value
+        }
+        weakContext?.environments[ObjectIdentifier(Value.self)] = value
+        return self
     }
 }

@@ -48,6 +48,11 @@ public extension TestStore {
     func updateEnvironment<Value>(_ value: Value) {
         store.updateEnvironment(value)
     }
+
+    func dependency<Value>(_ path: WritableKeyPath<ModelDependencyValues, Value>, _ value: Value) -> Self {
+        store.updateDependency(path, value)
+        return self
+    }
 }
 
 public extension TestStore {
