@@ -65,6 +65,14 @@ public struct ModelDependency<Value> {
             d[keyPath: path] = newValue
         }
     }
+
+    public var projectedValue: Self {
+        return self
+    }
+
+    public func reset() {
+        dependencies.set(ObjectIdentifier(path), nil)
+    }
 }
 
 extension ModelDependency: Sendable where Value: Sendable {}
