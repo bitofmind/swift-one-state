@@ -1,8 +1,8 @@
 import Foundation
 
 public protocol ModelDependencyKey {
-  associatedtype Value
-  static var defaultValue: Value { get }
+    associatedtype Value: Sendable
+    static var defaultValue: Value { get }
 }
 
 public struct ModelDependencyValues: Sendable {

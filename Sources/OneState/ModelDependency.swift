@@ -48,7 +48,7 @@ public struct ModelDependency<Value> {
         dependencies = ModelDependencyValues {
             context.dependencyValue(key: $0)
         } set: {
-            context.environments[$0] = $1
+            context.dependencies[$0] = $1
         }
         self.path = path
     }
@@ -85,11 +85,11 @@ extension ModelDependency: StoreViewProvider where Value: Model {
 
 extension ContextBase {
     func dependencyValue(key: ObjectIdentifier) -> Any? {
-        var value = environments[key]
+        var value = dependencies[key]
 
         var parent = self.parent
         while value == nil, let p = parent {
-            value = p.environments[key]
+            value = p.dependencies[key]
             parent = p.parent
         }
 

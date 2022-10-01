@@ -17,7 +17,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     }
     let events = AsyncPassthroughSubject<EventInfo>()
 
-    @Locked var environments: Environments = [:]
+    @Locked var dependencies: [ObjectIdentifier: Any] = [:]
 
     @Locked var propertyIndex = 0
     @Locked var properties: [Any] = []

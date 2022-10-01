@@ -32,33 +32,23 @@ public final class Store<M: Model>: @unchecked Sendable {
     private var lastCallContexts: [CallContext] = []
 
     private(set) weak var weakContext: ChildContext<M, State>?
-    private var environments: Environments = [:]
+    private var dependencies: [ObjectIdentifier: Any] = [:]
 
     let cancellations = Cancellations()
 
-    public init(initialState: State, environments: [Any] = []) {
+    public init(initialState: State) {
         previousState = Shared(initialState)
         currentState = previousState
-        for environment in environments {
-            self.environments[ObjectIdentifier(type(of: environment))] = environment
-        }
     }
 }
 
 public extension Store {
-    convenience init<T>(initialState: T, environments: [Any] = []) where M == EmptyModel<T> {
-        self.init(initialState: initialState, environments: environments)
+    convenience init<T>(initialState: T) where M == EmptyModel<T> {
+        self.init(initialState: initialState)
     }
 
     var model: M {
         M(self)
-    }
-
-    func updateEnvironment<Value>(_ value: Value) {
-        lock {
-            environments[ObjectIdentifier(Value.self)] = value
-        }
-        weakContext?.environments[ObjectIdentifier(Value.self)] = value
     }
 
     func dependency<Value>(_ path: WritableKeyPath<ModelDependencyValues, Value>, _ value: Value) -> Self {
@@ -243,8 +233,8 @@ extension Store {
         }
 
         let context = ChildContext(store: self, path: \.self, parent: nil)
-        for (key, value) in environments {
-            context.environments[key] = value
+        for (key, value) in dependencies {
+            context.dependencies[key] = value
         }
 
         weakContext = context
@@ -256,9 +246,9 @@ extension Store {
             nil
         } set: { key, value in
             self.lock {
-                self.environments[key] = value
+                self.dependencies[key] = value
             }
-            self.weakContext?.environments[key] = value
+            self.weakContext?.dependencies[key] = value
         }
         d[keyPath: path] = value
     }
@@ -270,12 +260,3 @@ extension Store: StoreViewProvider {
     }
 }
 
-public extension Store {
-    func environment<Value>(_ value: Value) -> Self {
-        lock {
-            environments[ObjectIdentifier(Value.self)] = value
-        }
-        weakContext?.environments[ObjectIdentifier(Value.self)] = value
-        return self
-    }
-}
