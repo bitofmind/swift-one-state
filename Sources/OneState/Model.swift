@@ -80,13 +80,13 @@ public extension Model where State: Identifiable {
 
 public extension Model {
     @discardableResult
-    func onCancel(_ perform: @escaping () -> Void) -> Cancellable {
+    func onCancel(_ perform: @Sendable @escaping () -> Void) -> Cancellable {
         AnyCancellable(cancellations: context.cancellations) {
             perform()
         }.cancel(for: context.contextCancellationKey)
     }
 
-    func cancelAll(for key: AnyHashable) {
+    func cancelAll(for key: some Hashable&Sendable) {
         context.cancellations.cancelAll(for: key)
     }
 
@@ -134,10 +134,12 @@ public extension Model {
     /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
     /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
-    func forEach<S: AsyncSequence>(_ sequence: @autoclosure @escaping @Sendable () -> S, cancelPrevious: Bool = false, priority: TaskPriority? = nil, perform: @escaping @Sendable (S.Element) async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable where S.Element: Sendable {
-        task(priority: priority, {
+    func forEach<S: AsyncSequence&Sendable>(_ sequence: S, cancelPrevious: Bool = false, priority: TaskPriority? = nil, perform: @escaping @Sendable (S.Element) async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable where S.Element: Sendable {
+        let cancellations = context.cancellations
+        let typeDescription = typeDescription
+        return task(priority: priority, {
             guard cancelPrevious else {
-                for try await value in sequence() {
+                for try await value in sequence {
                     try await perform(value)
                 }
                 return
@@ -145,32 +147,36 @@ public extension Model {
 
             let cancelID = UUID()
             try await withTaskCancellationHandler {
-                for try await value in sequence() {
-                    cancelAll(for: cancelID)
-
-                    task {
-                        guard !Task.isCancelled else { return }
-                        do {
-                            try await inViewModelContext {
-                                try await perform(value)
+                for try await value in sequence {
+                    cancellations.cancelAll(for: cancelID)
+                    TaskCancellable(
+                        name: typeDescription,
+                        cancellations: cancellations,
+                        priority: priority,
+                        operation: {
+                            guard !Task.isCancelled else { return }
+                            do {
+                                try await inViewModelContext {
+                                    try await perform(value)
+                                }
+                            } catch is CancellationError {
+                                print()
+                            } catch {
+                                `catch`?(error)
+                                throw error
                             }
-                        } catch is CancellationError {
-                            print()
-                        } catch {
-                            `catch`?(error)
-                            throw error
                         }
-                    }.cancel(for: cancelID)
+                    ).cancel(for: cancelID)
                 }
             } onCancel: {
-                cancelAll(for: cancelID)
+                cancellations.cancelAll(for: cancelID)
             }
         }, catch: `catch`)
     }
 
     @discardableResult
-    func forEach<Element: Sendable>(_ sequence: @autoclosure @escaping @Sendable () -> CallContextsStream<Element>, cancelPrevious: Bool = false, priority: TaskPriority? = nil, perform: @escaping @Sendable (Element) async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
-        forEach(sequence().stream.map { ($0.value, $0.callContexts) }, cancelPrevious: cancelPrevious, priority: priority, perform: { value, callContexts in
+    func forEach<Element: Sendable>(_ sequence: CallContextsStream<Element>, cancelPrevious: Bool = false, priority: TaskPriority? = nil, perform: @escaping @Sendable (Element) async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
+        forEach(sequence.stream.map { ($0.value, $0.callContexts) }, cancelPrevious: cancelPrevious, priority: priority, perform: { value, callContexts in
             try await CallContext.$currentContexts.withValue(callContexts) {
                 try await perform(value)
             }
@@ -240,6 +246,7 @@ public extension Model {
     @discardableResult
     func activate() -> Cancellable {
         retain()
+        let context = context
         return onCancel {
             context.activationRelease()
         }
@@ -382,14 +389,14 @@ extension Model {
 }
 
 @discardableResult nonisolated
-private func inViewModelContext<T: Sendable>(@_inheritActorContext _ operation: @escaping () async throws -> T) async rethrows -> T {
+func inViewModelContext<T: Sendable>(@_inheritActorContext _ operation: @escaping () async throws -> T) async rethrows -> T {
     try await StoreAccess.$isInViewModelContext.withValue(true) {
         try await operation()
     }
 }
 
 @discardableResult nonisolated
-private func inViewModelContext<T: Sendable>(@_inheritActorContext _ operation: @escaping () throws -> T) rethrows -> T {
+func inViewModelContext<T: Sendable>(@_inheritActorContext _ operation: @escaping () throws -> T) rethrows -> T {
     try StoreAccess.$isInViewModelContext.withValue(true) {
         try operation()
     }
