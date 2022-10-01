@@ -104,6 +104,7 @@ public extension StoreViewProvider where Access == Write {
 
 public extension StoreViewProvider {
     func printStateUpdates(name: String = "") where State: Sendable {
+        let stateUpdates = stateUpdates
         Task {
             for await update in stateUpdates {
                 update.printDiff(name: name)
