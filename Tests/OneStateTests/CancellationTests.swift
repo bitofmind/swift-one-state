@@ -7,7 +7,7 @@ class CancelletionTests: XCTestCase {
         @Locked var count = 0
 
         do {
-            let store = TestStore<CounterModel>(initialState: .init(), onTestFailure: assertNoFailure)
+            let store = TestStore<CounterModel>(initialState: .init())
 
             store.model.onCancel {
                 $count.wrappedValue += 5
@@ -21,7 +21,7 @@ class CancelletionTests: XCTestCase {
         @Locked var count = 0
 
         do {
-            let store = TestStore<CounterModel>(initialState: .init(), onTestFailure: assertNoFailure)
+            let store = TestStore<CounterModel>(initialState: .init())
             @TestModel var model = store.model
 
             model.onCancel {
@@ -40,7 +40,7 @@ class CancelletionTests: XCTestCase {
         @Locked var count = 0
 
         do {
-            let store = TestStore<TwoCountersModel>(initialState: .init(), onTestFailure: assertNoFailure)
+            let store = TestStore<TwoCountersModel>(initialState: .init())
 
             @TestModel var model = store.model
             @TestModel var counter1 = model.$counter1
@@ -68,7 +68,7 @@ class CancelletionTests: XCTestCase {
         @Locked var count = 0
 
         do {
-            let store = TestStore<CounterModel>(initialState: .init(), onTestFailure: assertNoFailure)
+            let store = TestStore<CounterModel>(initialState: .init())
             @TestModel var model = store.model
 
             withCancellationContext(CancelKey.self) {
@@ -91,7 +91,7 @@ class CancelletionTests: XCTestCase {
         let channel = AsyncChannel<(Int)>()
 
         do {
-            let store = TestStore<CounterModel>(initialState: .init(), onTestFailure: assertNoFailure)
+            let store = TestStore<CounterModel>(initialState: .init())
             @TestModel var model = store.model
 
             async let v = Array(channel.prefix(1))
@@ -129,7 +129,7 @@ class CancelletionTests: XCTestCase {
         let channel = AsyncChannel<Int>()
         let sync = AsyncChannel<()>()
 
-        let store = TestStore<CounterModel>(initialState: .init(), onTestFailure: assertNoFailure)
+        let store = TestStore<CounterModel>(initialState: .init())
         @TestModel var model = store.model
 
         model.forEach(channel, cancelPrevious: true) {

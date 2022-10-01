@@ -29,7 +29,7 @@ final class TestAccess<State: Equatable>: TestAccessBase {
     let stateUpdate = Update<State>()
     let eventUpdate = Update<ContextBase.EventInfo>()
 
-    init(state: State, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void) {
+    init(state: State, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void = assertNoFailure) {
         self._expectedState = state
         self.onTestFailure = onTestFailure
         stateUpdate.receive(state)

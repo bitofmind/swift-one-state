@@ -4,7 +4,7 @@ import AsyncAlgorithms
 
 final class EventTests: XCTestCase {
     func testModelEvents() async throws {
-        let store = TestStore<EventModel>(initialState: .init(), onTestFailure: assertNoFailure)
+        let store = TestStore<EventModel>(initialState: .init())
         @TestModel var model = store.model
 
         await $model.count.assert(1)
@@ -23,7 +23,7 @@ final class EventTests: XCTestCase {
     }
 
     func testChildEvents() async throws {
-        let store = TestStore<ParentModel>(initialState: .init(), onTestFailure: assertNoFailure)
+        let store = TestStore<ParentModel>(initialState: .init())
         @TestModel var parent = store.model
         @TestModel var child = parent.$child
 

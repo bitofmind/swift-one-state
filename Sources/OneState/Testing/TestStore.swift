@@ -9,8 +9,8 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
 
     public typealias State = M.State
 
-    public init(initialState: State, environments: [Any] = [], file: StaticString = #file, line: UInt = #line, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void) {
-        store = .init(initialState: initialState, environments: environments)
+    public init(initialState: State, file: StaticString = #file, line: UInt = #line, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void = assertNoFailure) {
+        store = .init(initialState: initialState)
 
         access = TestAccess(
             state: initialState,
@@ -45,10 +45,6 @@ extension TestStore: StoreViewProvider {
 }
 
 public extension TestStore {
-    func updateEnvironment<Value>(_ value: Value) {
-        store.updateEnvironment(value)
-    }
-
     func dependency<Value>(_ path: WritableKeyPath<ModelDependencyValues, Value>, _ value: Value) -> Self {
         store.updateDependency(path, value)
         return self
@@ -56,8 +52,8 @@ public extension TestStore {
 }
 
 public extension TestStore {
-    convenience init<T>(initialState: T, environments: [Any] = [], file: StaticString = #file, line: UInt = #line, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void) where M == EmptyModel<T> {
-        self.init(initialState: initialState, environments: environments, file: file, line: line, onTestFailure: onTestFailure)
+    convenience init<T>(initialState: T, file: StaticString = #file, line: UInt = #line, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void = assertNoFailure) where M == EmptyModel<T> {
+        self.init(initialState: initialState, file: file, line: line, onTestFailure: onTestFailure)
     }
 
     var model: M {

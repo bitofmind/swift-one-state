@@ -1,4 +1,5 @@
 import Foundation
+import CustomDump
 
 public struct StateUpdate<State>: Identifiable {
     var stateChange: AnyStateChange
@@ -13,6 +14,17 @@ public struct StateUpdate<State>: Identifiable {
 
     public var current: State {
         getCurrent(stateChange)
+    }
+}
+
+public extension StateUpdate {
+    var stateDiff: String? {
+        diff(previous, current)
+    }
+
+    func printDiff(name: String = "") {
+        guard let diff = stateDiff else { return }
+        Swift.print("State did update\(name.isEmpty ? "" : " for \(name)"):\n" + diff)
     }
 }
 

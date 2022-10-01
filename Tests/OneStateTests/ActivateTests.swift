@@ -4,7 +4,7 @@ import AsyncAlgorithms
 
 class ActivateTests: XCTestCase {
     func testActivation() async throws {
-        let store = TestStore<EventModel>(initialState: .init(), onTestFailure: assertNoFailure)
+        let store = TestStore<EventModel>(initialState: .init())
 
         XCTAssertFalse(store.model.isActive)
 
@@ -34,7 +34,7 @@ class ActivateTests: XCTestCase {
     }
 
     func testChildActivation() async throws {
-        let store = TestStore<ParentModel>(initialState: .init(), onTestFailure: assertNoFailure)
+        let store = TestStore<ParentModel>(initialState: .init())
         XCTAssertFalse(store.model.isActive)
 
         do {

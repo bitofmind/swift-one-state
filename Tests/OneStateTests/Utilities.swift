@@ -1,10 +1,6 @@
 import XCTest
 @testable import OneState
 
-@Sendable func assertNoFailure<State>(failure: TestFailure<State>) {
-    XCTFail(failure.message, file: failure.file, line: failure.line)
-}
-
 @propertyWrapper
 final class Locked<Value> {
     private let lock = NSLock()
