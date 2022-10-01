@@ -2,7 +2,7 @@
 
 import PackageDescription
 
-let swiftSettings: [SwiftSetting] = [SwiftSetting.unsafeFlags(["-Xfrontend", "-warn-concurrency"])]
+let swiftSettings: [SwiftSetting] = []//SwiftSetting.unsafeFlags(["-Xfrontend", "-warn-concurrency"])]
 
 let package = Package(
     name: "swift-one-state",
