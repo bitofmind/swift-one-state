@@ -1,4 +1,5 @@
 import AsyncAlgorithms
+import CustomDump
 
 /// Conforming types exposes a view into the store holding its state
 ///
@@ -98,6 +99,16 @@ public extension StoreViewProvider {
 public extension StoreViewProvider where Access == Write {
     subscript<T>(dynamicMember path: WritableKeyPath<State, T>) -> StoreView<Root, T, Write> {
         storeView(for: path)
+    }
+}
+
+public extension StoreViewProvider {
+    func printStateUpdates(name: String = "") where State: Sendable {
+        Task {
+            for await update in stateUpdates {
+                update.printDiff(name: name)
+            }
+        }
     }
 }
 

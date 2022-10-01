@@ -27,8 +27,6 @@ class Context<State>: ContextBase {
 
     func context<T>(at path: WritableKeyPath<State, T>) -> Context<T> { fatalError() }
 
-    var storePath: AnyKeyPath { fatalError() }
-
     func sendEvent(_ event: Any, context: ContextBase, callContexts: [CallContext], storeAccess: StoreAccess?) {
         let eventInfo = EventInfo(event: event, path: storePath, context: context, callContexts: callContexts)
         sendEvent(eventInfo)

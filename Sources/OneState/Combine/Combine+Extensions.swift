@@ -1,7 +1,7 @@
 import Foundation
 
 #if canImport(Combine)
-import Combine
+@preconcurrency import Combine
 
 public extension Model {
     /// Receive updates from a publisher for the life time of the model
@@ -61,11 +61,11 @@ extension StateView: Publisher where Value: Equatable {
 }
 
 extension PassthroughSubject where Failure == Never, Output: Sendable {
-    convenience init<S: AsyncSequence>(_ sequence: @autoclosure @escaping @Sendable () -> S) where S.Element == Output {
+    convenience init<S: AsyncSequence&Sendable>(_ sequence: S) where S.Element == Output {
         self.init()
 
         Task {
-            for try await value in sequence() {
+            for try await value in sequence {
                 self.send(value)
             }
 

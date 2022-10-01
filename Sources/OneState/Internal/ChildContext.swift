@@ -1,3 +1,5 @@
+import CustomDump
+
 final class ChildContext<M: Model, State>: Context<State> {
     let store: Store<M>
     let path: WritableKeyPath<M.State, State>
@@ -124,5 +126,18 @@ final class ChildContext<M: Model, State>: Context<State> {
         }
 
         return self[path: path, access: access]
+    }
+
+    override func diff(for change: AnyStateChange, at path: AnyKeyPath) -> String? {
+        guard let current = change.current as? Shared<M.State>,
+              let previous = change.previous as? Shared<M.State> else {
+            return nil
+        }
+
+        guard let c = current.value[keyPath: path], let p = previous.value[keyPath: path] else {
+            return nil
+        }
+
+        return CustomDump.diff(p, c)
     }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import CustomDump
 
 @propertyWrapper
 @dynamicMemberLookup
@@ -41,4 +42,11 @@ extension Writable: CustomStringConvertible {
         String(describing: wrappedValue)
     }
 }
+
+extension Writable: CustomDumpRepresentable {
+    public var customDumpValue: Any {
+        wrappedValue
+    }
+}
+
 

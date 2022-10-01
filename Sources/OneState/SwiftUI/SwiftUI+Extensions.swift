@@ -67,4 +67,22 @@ public extension StoreViewProvider where Access == Write {
     }
 }
 
+#if canImport(Combine)
+import Combine
+
+public extension View {
+    func printStateUpdates<P: StoreViewProvider>(for provider: P, name: String = "") -> some View where P.State: Sendable {
+        onReceive(provider.stateUpdatesPublisher.flatMap { update -> AnyPublisher<StateUpdate<P.State>, Never> in
+            if Thread.isMainThread {
+                return Just(update).eraseToAnyPublisher()
+            } else {
+                return Just(update).receive(on: DispatchQueue.main).eraseToAnyPublisher()
+            }
+        }) { update in
+            update.printDiff(name: name)
+        }
+    }
+}
+
+#endif
 #endif

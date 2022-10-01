@@ -103,7 +103,7 @@ public extension Model {
     /// Add an action to be called once the model is deactivated
     /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
-    func onDeactivate(_ perform: @escaping () -> Void) -> Cancellable {
+    func onDeactivate(_ perform: @Sendable @escaping () -> Void) -> Cancellable {
         onCancel(perform)
             .cancel(for: context.activationCancellationKey)
     }
@@ -112,20 +112,13 @@ public extension Model {
     /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
     func task(priority: TaskPriority? = nil, _ operation: @escaping @Sendable () async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
-        TaskCancellable(model: self) { onDone in
-            Task(priority: priority) {
-                do {
-                    try await inViewModelContext {
-                        defer { onDone() }
-
-                        guard !Task.isCancelled else { return }
-                        try await operation()
-                    }
-                } catch {
-                    `catch`?(error)
-                }
-            }
-        }
+        TaskCancellable(
+            name: typeDescription,
+            cancellations: context.cancellations,
+            priority: priority,
+            operation: operation,
+            catch: `catch`
+        )
     }
 
     /// Iterate an async sequence for the life time of the model

@@ -1,4 +1,5 @@
 import Foundation
+import CustomDump
 
 /// Declare what model to used to represent a models states variable
 ///
@@ -120,6 +121,12 @@ public extension StoreViewProvider  {
             guard let e = $0.event as? M.Event, e == event else { return nil }
             return .init(value: (), callContexts: $0.callContexts)
         })
+    }
+}
+
+extension StateModel: CustomDumpRepresentable {
+    public var customDumpValue: Any {
+        wrappedValue
     }
 }
 

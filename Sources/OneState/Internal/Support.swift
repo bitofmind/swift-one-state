@@ -15,12 +15,11 @@ struct CallContext: Identifiable, Sendable, Equatable {
 
     @TaskLocal static var currentContexts: [CallContext] = []
 
-    static var lock = Lock()
-    static var _nextId = 0
+    static let _nextId = Protected(0)
     static var nextId: Int {
-        lock {
-            _nextId += 1
-            return _nextId
+        _nextId.modify {
+            $0 += 1
+            return $0
         }
     }
 }
