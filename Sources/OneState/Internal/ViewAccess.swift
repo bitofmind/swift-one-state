@@ -6,6 +6,7 @@ class ViewAccess: StoreAccess, ObservableObject {
     var lock = Lock()
     var observedStates: [AnyKeyPath: (AnyStateChange, ContextBase) -> Bool] = [:]
     var wasStateOverriden = false
+    var lastStateChange: AnyStateChange?
 
     deinit {
         contexts.forEach { $0.activationRelease() }
@@ -59,6 +60,7 @@ private extension ViewAccess {
 
             for equal in observedStates.values {
                 guard equal(update, context) else {
+                    self.lastStateChange = update
                     return true
                 }
             }

@@ -133,6 +133,10 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     }
 
     var cancellations: Cancellations { fatalError() }
+
+    func diff(for change: AnyStateChange, at path: AnyKeyPath) -> String? { fatalError() }
+
+    var storePath: AnyKeyPath { fatalError() }
 }
 
 extension ContextBase {

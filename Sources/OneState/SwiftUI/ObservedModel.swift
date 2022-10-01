@@ -1,10 +1,11 @@
 #if canImport(SwiftUI)
 import SwiftUI
+import CustomDump
 
 @propertyWrapper
 @dynamicMemberLookup
 public struct ObservedModel<M: ModelContainer>: DynamicProperty {
-    @StateObject private var access = ViewAccess()
+    @StateObject fileprivate var access = ViewAccess()
 
     public init(wrappedValue: M) {
         self.wrappedValue = wrappedValue
@@ -29,6 +30,7 @@ public struct ObservedModel<M: ModelContainer>: DynamicProperty {
             }
         })
 
+
         guard !contexts.elementsEqual(prevContexts, by: ===) else { return }
 
         prevContexts.forEach { $0.activationRelease() }
@@ -41,6 +43,28 @@ public struct ObservedModel<M: ModelContainer>: DynamicProperty {
 extension ObservedModel: StoreViewProvider where M: Model {
     public var storeView: StoreView<M.State, M.State, Write> {
         wrappedValue.storeView
+    }
+}
+
+public extension View {
+    @MainActor
+    func printObservedUpdates<M: Model>(for observedModel: ObservedModel<M>) -> some View {
+        let access = observedModel.access
+        let lastChange = access.lock {
+            defer { access.lastStateChange = nil }
+            return access.lastStateChange
+        }
+
+
+        if let update = lastChange {
+            for context in access.contexts {
+                if let diff = context.diff(for: update, at: context.storePath) {
+                    print("Observed update for \(type(of: observedModel.wrappedValue)):\n", diff)
+                }
+            }
+         }
+
+        return self
     }
 }
 
