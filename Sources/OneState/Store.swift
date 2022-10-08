@@ -31,8 +31,9 @@ public final class Store<M: Model>: @unchecked Sendable {
     private var lastFromContext: ContextBase?
     private var lastCallContexts: [CallContext] = []
 
-    private(set) weak var weakContext: ChildContext<M, State>?
+    private(set) weak var weakContext: ChildContext<M, M>?
     private var dependencies: [ObjectIdentifier: Any] = [:]
+    private var hasBeenActivated = false
 
     let cancellations = Cancellations()
 
@@ -43,10 +44,6 @@ public final class Store<M: Model>: @unchecked Sendable {
 }
 
 public extension Store {
-    convenience init<T>(initialState: T) where M == EmptyModel<T> {
-        self.init(initialState: initialState)
-    }
-
     var model: M {
         M(self)
     }
@@ -119,9 +116,10 @@ extension Store {
             lock.unlock()
         }
         _modify {
+            let isOverrideContext = fromContext.isOverrideContext
             lock.lock()
 
-            if currentOverride != nil, fromContext.isOverrideStore {
+            if currentOverride != nil, isOverrideContext {
                 // Upgrade to runtime error?
                 assertionFailure("Not allowed to modify state from a overridden store")
                 yield &currentState.value[keyPath: path]
@@ -133,8 +131,8 @@ extension Store {
 
             if let last = lastFromContext, (last !== fromContext || lastCallContexts != callContexts) {
                 updateTask?.cancel()
-                updateTask = nil
                 notify(context: last, callContexts: lastCallContexts)
+                updateTask = nil
             }
 
             if previousState === currentState {
@@ -148,17 +146,19 @@ extension Store {
 
             if updateTask == nil {
                 // Try to coalesce updates
-                updateTask = Task { @MainActor in
+                updateTask = Task {
                     while true {
                         let count = self.lock { self.modifyCount }
                         await Task.yield()
 
                         let shouldBreak = self.lock {
                             guard count == self.modifyCount else { return false }
+                            guard !Task.isCancelled else { return true }
                             self.updateTask = nil
                             self.notify(context: fromContext, callContexts: callContexts)
                             return true
                         }
+                        
                         if shouldBreak { break }
                     }
                 }
@@ -227,19 +227,32 @@ extension Store {
         lock { previousState !== currentState }
     }
 
-    var context: ChildContext<M, State> {
+    var context: ChildContext<M, M> {
+        lock.lock()
         if let context = weakContext {
+            lock.unlock()
             return context
         }
 
-        let context = ChildContext(store: self, path: \.self, parent: nil)
+        let context = ChildContext<M, M>(store: self, path: \.self, parent: nil)
         for (key, value) in dependencies {
             context.dependencies[key] = value
         }
 
         weakContext = context
+
+        guard !hasBeenActivated else {
+            lock.unlock()
+            return context
+        }
+
+        hasBeenActivated = true
+        lock.unlock()
+        ContextBase.$current.withValue(nil) {
+            context.model.onActivate()
+        }
         return context
-    }
+     }
 
     func updateDependency<Value>(_ path: WritableKeyPath<ModelDependencyValues, Value>, _ value: Value) {
         var d = ModelDependencyValues { _ in

@@ -83,6 +83,18 @@ public extension StoreViewProvider {
         storeView(for: path)
     }
 
+    subscript<S, T>(dynamicMember path: KeyPath<S, T>) -> StoreView<Root, T?, Read> where State == S? {
+        let view = storeView
+        let unwrapPath = view.path.appending(path: \.[unwrap: path])
+        return StoreView(context: view.context, path: unwrapPath, access: view.access)
+    }
+
+    subscript<S, T>(dynamicMember path: KeyPath<S, T?>) -> StoreView<Root, T?, Read> where State == S? {
+        let view = storeView
+        let unwrapPath = view.path.appending(path: \.[unwrap: path])
+        return StoreView(context: view.context, path: unwrapPath, access: view.access)
+    }
+
     subscript<T>(dynamicMember path: KeyPath<State, T?>) -> StoreView<Root, T, Read>? {
         storeView(for: path)
     }
@@ -99,6 +111,35 @@ public extension StoreViewProvider {
 public extension StoreViewProvider where Access == Write {
     subscript<T>(dynamicMember path: WritableKeyPath<State, T>) -> StoreView<Root, T, Write> {
         storeView(for: path)
+    }
+
+    subscript<Models>(dynamicMember path: WritableKeyPath<State, StateModel<Models>>) -> StoreView<Root, StateModel<Models>, Write> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
+        observeContainer(atPath: path)
+        return storeView(for: path)
+    }
+
+    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T>) -> StoreView<Root, T?, Write> where State == S? {
+        let view = storeView
+        let unwrapPath = view.path.appending(path: \.[unwrap: path])
+        return StoreView(context: view.context, path: unwrapPath, access: view.access)
+    }
+
+    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T?>) -> StoreView<Root, T?, Write> where State == S? {
+        let view = storeView
+        let unwrapPath = view.path.appending(path: \.[unwrap: path])
+        return StoreView(context: view.context, path: unwrapPath, access: view.access)
+    }
+
+    subscript<T>(dynamicMember path: WritableKeyPath<State, T?>) -> StoreView<Root, T, Read>? {
+        storeView(for: path)
+    }
+
+    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T>) -> StoreView<Root, T, Read>? where State == S? {
+        storeView(for: \.self)?.storeView(for: path)
+    }
+
+    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T?>) -> StoreView<Root, T, Read>? where State == S? {
+        storeView(for: \.self)?.storeView(for: path)
     }
 }
 
@@ -127,5 +168,73 @@ extension StoreViewProvider {
 
             return WithCallContexts(value: current, callContexts: stateChange.callContexts)
         })
+    }
+}
+
+extension StoreViewProvider where Access == Write {
+    func observeContainer<Models>(atPath path: WritableKeyPath<State, StateModel<Models>>) where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
+        let view = storeView
+        let containerPath = view.path.appending(path: path).appending(path: \.wrappedValue)
+        let context = view.context
+        if context.containers[containerPath] == nil {
+            context.containers[containerPath] = { update in
+                let prevContainer = view.context[path: containerPath, shared: update.previous]
+                let currentContainer = view.context[path: containerPath, shared: update.current]
+
+                guard !Models.StateContainer.hasSameStructure(lhs: prevContainer, rhs: currentContainer) else {
+                    return
+                }
+
+                let prevElementPaths = Set(prevContainer.elementKeyPaths)
+                let currentElementPaths = Set(currentContainer.elementKeyPaths)
+
+                let addedPaths = currentElementPaths.subtracting(prevElementPaths)
+                let removedPaths = prevElementPaths.subtracting(currentElementPaths)
+
+                for addedPath in addedPaths {
+                    let childPath = containerPath.appending(path: addedPath)
+                    if context.allChildren[childPath] == nil {
+                        let containerView = StoreView(context: view.context, path: childPath, access: nil)
+                        _ = Models.ModelElement(containerView)
+                    }
+                }
+
+                for removedPath in removedPaths {
+                    if let childContext = context.allChildren[containerPath.appending(path: removedPath)] {
+                        childContext.removeRecusively()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private extension Optional {
+    subscript<T> (unwrap path: KeyPath<Wrapped, T>) -> T? {
+        self?[keyPath: path]
+    }
+
+    subscript<T> (unwrap path: KeyPath<Wrapped, T?>) -> T? {
+        self?[keyPath: path]
+    }
+
+    subscript<T> (unwrap path: WritableKeyPath<Wrapped, T>) -> T? {
+        get {
+            self?[keyPath: path]
+        }
+        set {
+            if let value = newValue {
+                self?[keyPath: path] = value
+            }
+        }
+    }
+
+    subscript<T> (unwrap path: WritableKeyPath<Wrapped, T?>) -> T? {
+        get {
+            self?[keyPath: path]
+        }
+        set {
+            self?[keyPath: path] = newValue
+        }
     }
 }

@@ -22,6 +22,8 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
     }
 
     deinit {
+        store.context.removeRecusively()
+        
         for info in store.cancellations.activeTasks {
             access.onTestFailure(.tasksAreStillRunning(modelName: info.modelName, taskCount: info.count), file: file, line: line)
         }
@@ -52,10 +54,6 @@ public extension TestStore {
 }
 
 public extension TestStore {
-    convenience init<T>(initialState: T, file: StaticString = #file, line: UInt = #line, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void = assertNoFailure) where M == EmptyModel<T> {
-        self.init(initialState: initialState, file: file, line: line, onTestFailure: onTestFailure)
-    }
-
     var model: M {
         StoreAccess.$current.withValue(Weak(value: access)) {
             M(self)

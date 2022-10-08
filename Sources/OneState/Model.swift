@@ -65,7 +65,7 @@ public extension Model {
     /// set up correclty.
     init<Provider: StoreViewProvider>(_ viewStore: Provider) where Provider.State == State, Provider.Access == Write {
         let view = viewStore.storeView
-        self.init(context: view.context.context(at: view.path))
+        self = view.context.model(at: view.path)
     }
 }
 
@@ -93,10 +93,6 @@ public extension Model {
     func cancelAll(for id: Any.Type) {
         context.cancellations.cancelAll(for: ObjectIdentifier(id))
     }
-
-    var activationCancellationKey: AnyHashable {
-        context.activationCancellationKey
-    }
 }
 
 public extension Model {
@@ -105,7 +101,6 @@ public extension Model {
     @discardableResult
     func onDeactivate(_ perform: @Sendable @escaping () -> Void) -> Cancellable {
         onCancel(perform)
-            .cancel(for: context.activationCancellationKey)
     }
 
     /// Perform a task for the life time of the model
@@ -119,6 +114,7 @@ public extension Model {
             operation: operation,
             catch: `catch`
         )
+        .cancel(for: context.contextCancellationKey)
     }
 
     /// Iterate an async sequence for the life time of the model
@@ -236,23 +232,6 @@ public extension Model {
 }
 
 public extension Model {
-    @discardableResult
-    func activate() -> Cancellable {
-        retain()
-        let context = context
-        return onCancel {
-            context.activationRelease()
-        }
-    }
-
-    @discardableResult
-    func activate<M: Model>(_ viewModel: M) -> Cancellable {
-        viewModel.activate()
-            .cancel(for: context.contextCancellationKey)
-    }
-}
-
-public extension Model {
     @_disfavoredOverload
     subscript<T: Equatable>(dynamicMember path: KeyPath<State, T>) -> T {
         value(for: path)
@@ -300,14 +279,6 @@ public extension Model {
     }
 }
 
-public struct EmptyModel<State: Sendable>: Model {
-    public typealias State = State
-    @ModelState var state: State
-    public init() {}
-}
-
-extension EmptyModel: Sendable where State: Sendable {}
-
 extension Model {
     var storeView: StoreView<State, State, Write> {
         let modelState = self.modelState
@@ -330,10 +301,7 @@ extension Model {
 
 extension Model {
     init(context: Context<State>) {
-        context.propertyIndex = 0
-        self = ContextBase.$current.withValue(context) {
-             Self()
-        }
+        self = context.getModel()
     }
     
     var context: Context<State> {
@@ -354,30 +322,9 @@ extension Model {
 
         return nil
     }
-}
-
-extension Model {
-    func retain() {
-        context.activateRetain()
-        guard !context.isOverrideStore, context.activationRefCount == 1 else { return }
-
-        withCancellationContext(context.activationCancellationKey) {
-            ContextBase.$current.withValue(nil) {
-                onActivate()
-            }
-        }
-    }
-    
-    func release() {
-        context.activationRelease()
-    }
 
     var typeDescription: String {
         String(describing: type(of: self))
-    }
-
-    var isActive: Bool {
-        context.activationRefCount != 0
     }
 }
 

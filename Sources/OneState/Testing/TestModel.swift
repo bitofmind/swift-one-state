@@ -4,13 +4,8 @@ import Foundation
 public final class TestModel<M: Model> {
     public let wrappedValue: M
 
-    deinit {
-        wrappedValue.release()
-    }
-
     public init(wrappedValue model: M) {
         wrappedValue = model
-        model.retain()
     }
 
     public var projectedValue: TestModel<M> {

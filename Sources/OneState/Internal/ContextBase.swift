@@ -6,6 +6,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
 
     var _children: [AnyKeyPath: ContextBase] = [:]
     var _overrideChildren: [AnyKeyPath: ContextBase] = [:]
+    @Locked var isOverrideContext: Bool = false
 
     let stateUpdates = AsyncPassthroughSubject<AnyStateChange>()
 
@@ -18,27 +19,27 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     let events = AsyncPassthroughSubject<EventInfo>()
 
     @Locked var dependencies: [ObjectIdentifier: Any] = [:]
-
-    @Locked var propertyIndex = 0
     @Locked var properties: [Any] = []
-    @Locked var activationRefCount = 0
 
     @TaskLocal static var current: ContextBase?
 
     let contextCancellationKey = UUID()
-    let activationCancellationKey = UUID()
+
+    @Locked var containers: [AnyKeyPath: (AnyStateChange) -> ()] = [:]
 
     init(parent: ContextBase?) {
         self.parent = parent
     }
 
     deinit {
-        cancellations.cancelAll(for: contextCancellationKey)
-        cancellations.cancelAll(for: activationCancellationKey)
+        onRemoval()
+    }
 
-        if let parent = parent {
-            parent.removeContext(self)
-        }
+    func onRemoval() {
+        cancellations.cancelAll(for: contextCancellationKey)
+
+        parent?.removeContext(self)
+        parent = nil
     }
 
     var regularChildren: [AnyKeyPath: ContextBase] {
@@ -81,14 +82,11 @@ class ContextBase: HoldsLock, @unchecked Sendable {
                 _children[path] = nil
                 return
             }
-
-            fatalError("Failed to remove context")
         }
     }
 
     func removeRecusively() {
-        parent?.removeContext(self)
-        parent = nil
+        onRemoval()
 
         for child in allChildren.values {
             child.removeRecusively()
@@ -122,6 +120,10 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         notifyAncestors(update)
         stateUpdates.yield(update)
         notifyDescendants(update)
+
+        for container in containers.values {
+            container(update)
+        }
     }
 
     var isStateOverridden: Bool {
@@ -139,25 +141,3 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     var storePath: AnyKeyPath { fatalError() }
 }
 
-extension ContextBase {
-    var isOverrideStore: Bool {
-        lock {
-            parent?._overrideChildren.values.contains { $0 === self } ?? false
-        }
-    }
-
-    func activateRetain() {
-        if isStateOverridden && !isOverrideStore { return }
-
-        activationRefCount += 1
-    }
-
-    func activationRelease() {
-        if isStateOverridden && !isOverrideStore { return }
-
-        activationRefCount -= 1
-        if activationRefCount == 0 {
-            cancellations.cancelAll(for: activationCancellationKey)
-        }
-    }
-}

@@ -118,11 +118,7 @@ public extension StoreViewProvider where Access == Write {
 private extension Optional {
     subscript (unwrapFallback fallback: UnwrapFallback<Wrapped>) -> Wrapped {
         get {
-            guard let self = self else {
-                reportPathDidFallback()
-                return fallback.value
-            }
-            return self
+            self ?? fallback.value
         }
         set {
             guard self != nil else { return }
@@ -143,11 +139,7 @@ private extension MutableCollection {
                 }
             }
 
-            guard let value = first(where: { $0[keyPath: cursor.idPath] == cursor.id }) else {
-                reportPathDidFallback()
-                return cursor.fallback
-            }
-            return value
+            return first { $0[keyPath: cursor.idPath] == cursor.id } ?? cursor.fallback
         }
         set {
             if cursor.index >= startIndex && cursor.index < endIndex {

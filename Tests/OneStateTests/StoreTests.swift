@@ -18,7 +18,7 @@ class StoreTests: XCTestCase {
 
     func testStoreContextRelease() throws {
         weak var weakStore: Store<TestModel>?
-        var optContext: ChildContext<TestModel, TestModel.State>?
+        var optContext: ChildContext<TestModel, TestModel>?
         do {
             let store = Store<TestModel>(initialState: .init())
             weakStore = store
@@ -29,6 +29,7 @@ class StoreTests: XCTestCase {
         XCTAssertNotNil(optContext)
         weak var weakContext = optContext
         XCTAssertNotNil(weakContext)
+        optContext?.removeRecusively()
         optContext = nil
         XCTAssertNil(weakContext)
         XCTAssertNil(weakStore)

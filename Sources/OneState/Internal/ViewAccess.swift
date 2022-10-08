@@ -9,7 +9,6 @@ class ViewAccess: StoreAccess, ObservableObject {
     var lastStateChange: AnyStateChange?
 
     deinit {
-        contexts.forEach { $0.activationRelease() }
         observationTasks.forEach { $0.cancel() }
     }
 
@@ -32,6 +31,7 @@ extension ViewAccess {
         self.contexts = contexts
         observationTasks = contexts.map { context in
             Task { @MainActor [weak self] in
+                objectWillChange.send()
                 for await update in context.stateUpdates where !Task.isCancelled {
                     await self?.handle(update: update, for: context)
                 }

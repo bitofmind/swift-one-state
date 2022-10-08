@@ -18,8 +18,8 @@ public struct ModelProperty<Value> {
         }
 
         context = ctx
-        index = context.propertyIndex
-        context.propertyIndex += 1
+        index = ThreadState.current.propertyIndex
+        ThreadState.current.propertyIndex += 1
 
         if index == context.properties.count {
             context.properties.append(Box(wrappedValue()))

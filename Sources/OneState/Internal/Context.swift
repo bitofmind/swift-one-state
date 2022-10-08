@@ -25,7 +25,7 @@ class Context<State>: ContextBase {
         fatalError()
     }
 
-    func context<T>(at path: WritableKeyPath<State, T>) -> Context<T> { fatalError() }
+    func model<M: Model>(at path: WritableKeyPath<State, M.State>) -> M { fatalError() }
 
     func sendEvent(_ event: Any, context: ContextBase, callContexts: [CallContext], storeAccess: StoreAccess?) {
         let eventInfo = EventInfo(event: event, path: storePath, context: context, callContexts: callContexts)
@@ -34,6 +34,8 @@ class Context<State>: ContextBase {
     }
 
     func didModify(for access: StoreAccess) { }
+
+    func getModel<M: Model>() -> M { fatalError() }
 }
 
 extension Context {

@@ -63,7 +63,8 @@ public extension Model {
 
     subscript<Models>(dynamicMember path: WritableKeyPath<State, StateModel<Models>>) -> Models where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
         let view = storeView
-        let containerView = StoreView(context: view.context, path: view.path(path.appending(path: \.wrappedValue)), access: view.access)
+        let containerPath = path.appending(path: \.wrappedValue)
+        let containerView = StoreView(context: view.context, path: containerPath, access: view.access)
         let container = containerView.value(for: \.self, isSame: Models.StateContainer.hasSameStructure)
         let elementPaths = container.elementKeyPaths
         let models = StoreAccess.$current.withValue(modelState?.storeAccess.map(Weak.init)) {
@@ -71,6 +72,9 @@ public extension Model {
                 Models.ModelElement(containerView.storeView(for: path))
             }
         }
+
+        view.observeContainer(atPath: path)
+
         return Models.modelContainer(from: models)
     }
 }
@@ -127,59 +131,5 @@ public extension StoreViewProvider  {
 extension StateModel: CustomDumpRepresentable {
     public var customDumpValue: Any {
         wrappedValue
-    }
-}
-
-public extension Model {
-    @discardableResult
-    func activate<P: StoreViewProvider, M: Model>(_ view: P) -> Cancellable where P.State == StateModel<M>, M.StateContainer == M.State, P.Access == Write {
-        M(view.storeView(for: \.wrappedValue)).activate()
-            .cancel(for: context.activationCancellationKey)
-    }
-
-    @discardableResult
-    func activate<P: StoreViewProvider, Models>(_ view: P) -> Cancellable where P.State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.StateContainer: Equatable, P.Access == Write {
-        let containerView = view.storeView(for: \.wrappedValue)
-
-        typealias ActivedModels = [WritableKeyPath<Models.StateContainer, Models.StateContainer.Element>: Models.ModelElement]
-        let elementPaths = containerView.nonObservableState.elementKeyPaths
-
-        return task {
-            var activatedModels = ActivedModels(uniqueKeysWithValues: elementPaths.map { key in
-                let view = containerView.storeView(for: key)
-                let model = Models.ModelElement(view)
-                model.retain()
-                return (key, model)
-            })
-
-            for await update in containerView.stateUpdates {
-                let previous = update.previous
-                let current = update.current
-                let isSame = Models.StateContainer.hasSameStructure(lhs: previous, rhs: current)
-                guard !isSame else { continue }
-
-                let previousKeys = Set(previous.elementKeyPaths)
-                let currentKeys = Set(current.elementKeyPaths)
-
-                for newKey in currentKeys.subtracting(previousKeys) {
-                    let view = containerView.storeView(for: newKey)
-                    let model = Models.ModelElement(view)
-                    model.retain()
-                    activatedModels[newKey] = model
-                }
-
-                for oldKey in previousKeys.subtracting(currentKeys) {
-                    let model = activatedModels[oldKey]
-                    assert(model != nil)
-                    model?.context.activationRelease()
-                    activatedModels[oldKey] = nil
-                }
-            }
-
-            for model in activatedModels.values {
-                model.context.activationRelease()
-            }
-        }
-        .cancel(for: context.activationCancellationKey)
     }
 }
