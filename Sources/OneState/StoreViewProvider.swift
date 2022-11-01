@@ -130,15 +130,15 @@ public extension StoreViewProvider where Access == Write {
         return StoreView(context: view.context, path: unwrapPath, access: view.access)
     }
 
-    subscript<T>(dynamicMember path: WritableKeyPath<State, T?>) -> StoreView<Root, T, Read>? {
+    subscript<T>(dynamicMember path: WritableKeyPath<State, T?>) -> StoreView<Root, T, Write>? {
         storeView(for: path)
     }
 
-    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T>) -> StoreView<Root, T, Read>? where State == S? {
+    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T>) -> StoreView<Root, T, Write>? where State == S? {
         storeView(for: \.self)?.storeView(for: path)
     }
 
-    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T?>) -> StoreView<Root, T, Read>? where State == S? {
+    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T?>) -> StoreView<Root, T, Write>? where State == S? {
         storeView(for: \.self)?.storeView(for: path)
     }
 }
