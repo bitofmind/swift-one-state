@@ -146,10 +146,10 @@ extension Store {
 
             if updateTask == nil {
                 // Try to coalesce updates
-                updateTask = Task {
+                updateTask = Task.detached {
                     while true {
                         let count = self.lock { self.modifyCount }
-                        await Task.yield()
+                        try? await Task.sleep(nanoseconds: NSEC_PER_MSEC*10)
 
                         let shouldBreak = self.lock {
                             guard count == self.modifyCount else { return false }
