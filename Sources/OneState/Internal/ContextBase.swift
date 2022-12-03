@@ -117,7 +117,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     }
 
     func notify(_ update: AnyStateChange) {
-        notifyAncestors(update)
+        notifyAncestors(update.fromChild())
         stateUpdates.yield(update)
         notifyDescendants(update)
 

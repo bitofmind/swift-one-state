@@ -68,6 +68,15 @@ struct AnyStateChange: @unchecked Sendable {
     var isStateOverridden: Bool
     var isOverrideUpdate: Bool
     var callContexts: [CallContext] = []
+    var isFromChild: Bool = false
+}
+
+extension AnyStateChange {
+    func fromChild() -> Self {
+        var result = self
+        result.isFromChild = true
+        return result
+    }
 }
 
 class StoreAccess: @unchecked Sendable {

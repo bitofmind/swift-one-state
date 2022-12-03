@@ -65,7 +65,7 @@ public extension Model {
         let view = storeView
         let containerPath = path.appending(path: \.wrappedValue)
         let containerView = StoreView(context: view.context, path: containerPath, access: view.access)
-        let container = containerView.value(for: \.self, isSame: Models.StateContainer.hasSameStructure)
+        let container = view.context.value(for: containerView.path, access: containerView.access, isSame: Models.StateContainer.hasSameStructure, ignoreChildUpdates: true)
         let elementPaths = container.elementKeyPaths
         let models = StoreAccess.$current.withValue(modelState?.storeAccess.map(Weak.init)) {
             elementPaths.map { path in

@@ -4,7 +4,7 @@ class ViewAccess: StoreAccess, ObservableObject {
     var contexts: [ContextBase] = []
     var observationTasks: [Task<(), Never>] = []
     var lock = Lock()
-    var observedStates: [AnyKeyPath: (AnyStateChange, ContextBase) -> Bool] = [:]
+    var observedStates: [AnyKeyPath: (AnyStateChange) -> Bool] = [:]
     var wasStateOverriden = false
     var lastStateChange: AnyStateChange?
 
@@ -16,7 +16,7 @@ class ViewAccess: StoreAccess, ObservableObject {
        lock {
            guard observedStates.index(forKey: path) == nil else { return }
 
-           observedStates[path] = { update, fromContext in
+           observedStates[path] = { update in
                didUpdate(update)
            }
        }
@@ -59,7 +59,7 @@ private extension ViewAccess {
             }
 
             for equal in observedStates.values {
-                guard equal(update, context) else {
+                guard equal(update) else {
                     self.lastStateChange = update
                     return true
                 }

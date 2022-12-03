@@ -21,7 +21,7 @@ class Context<State>: ContextBase {
         _read { fatalError() }
     }
 
-    func value<T>(for path: KeyPath<State, T>, access: StoreAccess?, isSame: @escaping (T, T) -> Bool) -> T {
+    func value<T>(for path: KeyPath<State, T>, access: StoreAccess?, isSame: @escaping (T, T) -> Bool, ignoreChildUpdates: Bool) -> T {
         fatalError()
     }
 
@@ -67,8 +67,8 @@ extension Context {
 }
 
 extension Context {
-    func value<T: Equatable>(for path: KeyPath<State, T>, access: StoreAccess?) -> T {
-        value(for: path, access: access, isSame: ==)
+    func value<T: Equatable>(for path: KeyPath<State, T>, access: StoreAccess?, ignoreChildUpdates: Bool = false) -> T {
+        value(for: path, access: access, isSame: ==, ignoreChildUpdates: ignoreChildUpdates)
     }
 }
 

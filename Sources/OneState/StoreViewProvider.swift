@@ -51,7 +51,7 @@ public extension StoreViewProvider where State: Equatable&Sendable {
 public extension StoreViewProvider {
     func value<T>(for keyPath: KeyPath<State, T>, isSame: @escaping (T, T) -> Bool) -> T {
         let view = self.storeView
-        return view.context.value(for: view.path.appending(path: keyPath), access: view.access, isSame: isSame)
+        return view.context.value(for: view.path.appending(path: keyPath), access: view.access, isSame: isSame, ignoreChildUpdates: false)
     }
 
     func value<T: Equatable>(for keyPath: KeyPath<State, T>) -> T {
