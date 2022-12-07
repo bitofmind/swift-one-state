@@ -71,7 +71,12 @@ public struct ModelDependency<Value> {
     }
 
     public func reset() {
-        dependencies.set(ObjectIdentifier(path), nil)
+        let key = Protected<ObjectIdentifier?>(nil)
+        _ = ModelDependencyValues(get: { key.value = $0 }, set: { _, _ in })[keyPath: path]
+
+        if let key = key.value {
+            dependencies.set(key, nil)
+        }
     }
 }
 
