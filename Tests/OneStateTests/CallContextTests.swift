@@ -4,7 +4,7 @@ import AsyncAlgorithms
 
 final class CallContextTests: XCTestCase {
     // Currently does not pass repeatedly on all platforms
-    func _testModelEventWithContext() async throws {
+    func testModelEventWithContext() async throws {
         let store = TestStore<EventModel>(initialState: .init())
 
         let countsChannel = AsyncChannel<Int>()

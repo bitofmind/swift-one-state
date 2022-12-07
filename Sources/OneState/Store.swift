@@ -28,6 +28,7 @@ public final class Store<M: Model>: @unchecked Sendable {
     private var currentOverride: StateUpdate<State>?
 
     private var updateTask: Task<(), Never>?
+    private var updateTaskPriority: TaskPriority = .medium
     private var lastFromContext: ContextBase?
     private var lastCallContexts: [CallContext] = []
 
@@ -129,9 +130,10 @@ extension Store {
 
             let callContexts = CallContext.currentContexts
 
-            if let last = lastFromContext, (last !== fromContext || lastCallContexts != callContexts) {
+            var flushNotify: (() -> Void)?
+            if let last = lastFromContext, (last !== fromContext || lastCallContexts != callContexts || Task.currentPriority > updateTaskPriority) {
                 updateTask?.cancel()
-                notify(context: last, callContexts: lastCallContexts)
+                flushNotify = notifier(context: last, callContexts: lastCallContexts)
                 updateTask = nil
             }
 
@@ -146,7 +148,8 @@ extension Store {
 
             if updateTask == nil {
                 // Try to coalesce updates
-                updateTask = Task.detached {
+                updateTaskPriority = Task.currentPriority
+                updateTask = Task {
                     while true {
                         let count = self.lock { self.modifyCount }
                         try? await Task.sleep(nanoseconds: NSEC_PER_MSEC*10)
@@ -155,7 +158,10 @@ extension Store {
                             guard count == self.modifyCount else { return false }
                             guard !Task.isCancelled else { return true }
                             self.updateTask = nil
-                            self.notify(context: fromContext, callContexts: callContexts)
+                            let notifier = self.notifier(context: fromContext, callContexts: callContexts)
+                            self.lock.unlock()
+                            notifier?()
+                            self.lock.lock()
                             return true
                         }
                         
@@ -165,6 +171,7 @@ extension Store {
             }
             
             lock.unlock()
+            flushNotify?()
         }
     }
 
@@ -198,10 +205,10 @@ extension Store {
         }
     }
 
-    func notify(context: ContextBase, callContexts: [CallContext]) {
+    func notifier(context: ContextBase, callContexts: [CallContext]) -> (() -> Void)? {
         let state = currentState
         guard previousState !== state, lastFromContext === context else {
-            return
+            return nil
         }
 
         lastFromContext = nil
@@ -216,11 +223,11 @@ extension Store {
 
         previousState = state
 
-        lock.unlock()
-        if !Task.isCancelled {
-            context.notify(update)
+        return {
+            if !Task.isCancelled {
+                context.notify(update)
+            }
         }
-        lock.lock()
     }
 
     var isUpdateInProgress: Bool {
