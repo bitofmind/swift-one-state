@@ -28,7 +28,6 @@ public final class Store<M: Model>: @unchecked Sendable {
     private var currentOverride: StateUpdate<State>?
 
     private var updateTask: Task<(), Never>?
-    private var updateTaskPriority: TaskPriority = .medium
     private var lastFromContext: ContextBase?
     private var lastCallContexts: [CallContext] = []
 
@@ -131,7 +130,7 @@ extension Store {
             let callContexts = CallContext.currentContexts
 
             var flushNotify: (() -> Void)?
-            if let last = lastFromContext, (last !== fromContext || lastCallContexts != callContexts || Task.currentPriority > updateTaskPriority) {
+            if let last = lastFromContext, (last !== fromContext || lastCallContexts != callContexts) {
                 updateTask?.cancel()
                 flushNotify = notifier(context: last, callContexts: lastCallContexts)
                 updateTask = nil
@@ -148,8 +147,7 @@ extension Store {
 
             if updateTask == nil {
                 // Try to coalesce updates
-                updateTaskPriority = Task.currentPriority
-                updateTask = Task {
+                updateTask = Task(priority: .medium) {
                     while true {
                         let count = self.lock { self.modifyCount }
                         try? await Task.sleep(nanoseconds: NSEC_PER_MSEC*10)
