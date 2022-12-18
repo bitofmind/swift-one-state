@@ -148,12 +148,14 @@ extension Store {
             if updateTask == nil {
                 // Try to coalesce updates
                 updateTask = Task(priority: .medium) {
+                    var waitTime: UInt64 = 0
                     while true {
                         let count = self.lock { self.modifyCount }
                         try? await Task.sleep(nanoseconds: NSEC_PER_MSEC*10)
+                        waitTime += NSEC_PER_MSEC*10
 
                         let shouldBreak = self.lock {
-                            guard count == self.modifyCount else { return false }
+                            guard count == self.modifyCount || waitTime >= NSEC_PER_MSEC*100 else { return false }
                             guard !Task.isCancelled else { return true }
                             self.updateTask = nil
                             let notifier = self.notifier(context: fromContext, callContexts: callContexts)
