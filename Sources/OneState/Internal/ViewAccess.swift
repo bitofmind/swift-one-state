@@ -13,13 +13,23 @@ class ViewAccess: StoreAccess, ObservableObject {
     }
 
     override func willAccess(path: AnyKeyPath, didUpdate: @escaping (AnyStateChange) -> Bool) {
-       lock {
-           guard observedStates.index(forKey: path) == nil else { return }
+        let wasAdded = lock {
+            guard observedStates.index(forKey: path) == nil else { return false }
 
-           observedStates[path] = { update in
-               didUpdate(update)
-           }
-       }
+            observedStates[path] = { update in
+                didUpdate(update)
+            }
+
+            return true
+        }
+
+        if wasAdded {
+            Task { @MainActor in
+                apply(callContexts: CallContext.currentContexts) {
+                    objectWillChange.send()
+                }
+            }
+        }
    }
 
     override var allowAccessToBeOverridden: Bool { true }
