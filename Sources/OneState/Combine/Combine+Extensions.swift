@@ -25,20 +25,19 @@ public extension Model {
 }
 
 public extension StoreViewProvider where State: Sendable {
-    var stateUpdatesPublisher: AnyPublisher<StateUpdate<State>, Never> {
-        let stateUpdates = stateUpdates
-        return PassthroughSubject(stateUpdates).eraseToAnyPublisher()
+    var stateDidUpdatePublisher: AnyPublisher<(), Never> {
+        let stateDidUpdate = stateDidUpdate
+        return PassthroughSubject(stateDidUpdate).eraseToAnyPublisher()
     }
 }
 
 public extension StoreViewProvider where State: Equatable&Sendable {
     var changesPublisher: AnyPublisher<State, Never> {
-        let values = values
-        return PassthroughSubject(values).eraseToAnyPublisher()
+        PassthroughSubject(changes).eraseToAnyPublisher()
     }
+
     var valuesPublisher: AnyPublisher<State, Never> {
-        let values = values
-        return PassthroughSubject(values).eraseToAnyPublisher()
+        PassthroughSubject(values).eraseToAnyPublisher()
     }
 }
 

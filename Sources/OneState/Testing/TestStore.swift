@@ -59,6 +59,8 @@ public extension TestStore {
             M(self)
         }
     }
+
+    var state: State { store.state }
 }
 
 public extension TestStore {

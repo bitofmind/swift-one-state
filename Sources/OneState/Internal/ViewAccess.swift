@@ -1,25 +1,22 @@
 import Foundation
 
 class ViewAccess: StoreAccess, ObservableObject {
-    var contexts: [ContextBase] = []
-    var observationTasks: [Task<(), Never>] = []
+    private(set) var contexts: [ContextBase] = []
+    private var observationTasks: [Task<(), Never>] = []
     var lock = Lock()
-    var observedStates: [AnyKeyPath: (AnyStateChange) -> Bool] = [:]
-    var wasStateOverriden = false
-    var lastStateChange: AnyStateChange?
+    private var observedStates: [AnyKeyPath: ObservedState] = [:]
+    private var wasStateOverriden = false
+    var updateCount = 0
 
     deinit {
         observationTasks.forEach { $0.cancel() }
     }
 
-    override func willAccess(path: AnyKeyPath, didUpdate: @escaping (AnyStateChange) -> Bool) {
+    override func willAccess<StoreModel: Model, Comparable: ComparableValue>(store: Store<StoreModel>, path: KeyPath<StoreModel.State, Comparable.Value>, comparable: Comparable.Type) {
         let wasAdded = lock {
             guard observedStates.index(forKey: path) == nil else { return false }
 
-            observedStates[path] = { update in
-                didUpdate(update)
-            }
-
+            observedStates[path] = _ObservedState(store: store, path: path, comparable: comparable)
             return true
         }
 
@@ -30,9 +27,36 @@ class ViewAccess: StoreAccess, ObservableObject {
                 }
             }
         }
-   }
+    }
 
     override var allowAccessToBeOverridden: Bool { true }
+}
+
+private class ObservedState {
+    func onUpdate(isFromChild: Bool) -> Bool { false }
+}
+
+private final class _ObservedState<StoreModel: Model, Comparable: ComparableValue>: ObservedState {
+    weak var store: Store<StoreModel>?
+    let path: KeyPath<StoreModel.State, Comparable.Value>
+    var value: Comparable
+
+    init(store: Store<StoreModel>, path: KeyPath<StoreModel.State, Comparable.Value>, comparable: Comparable.Type) {
+        self.store = store
+        self.path = path
+        self.value = Comparable(value: store[overridePath: path] ?? store[path: path])
+    }
+
+    override func onUpdate(isFromChild: Bool) -> Bool {
+        guard let store else { return true }
+
+        let newValue = Comparable(value: store[overridePath: path] ?? store[path: path])
+        defer { value = newValue }
+
+        if newValue.ignoreChildUpdates && isFromChild { return true }
+
+        return newValue == value
+    }
 }
 
 extension ViewAccess {
@@ -59,7 +83,7 @@ extension ViewAccess {
 }
 
 private extension ViewAccess {
-    @MainActor func handle(update: AnyStateChange, for context: ContextBase) async {
+    @MainActor func handle(update: StateChange, for context: ContextBase) async {
         guard update.isStateOverridden == update.isOverrideUpdate else { return }
 
         let wasUpdated: Bool = lock {
@@ -68,9 +92,8 @@ private extension ViewAccess {
                 return true
             }
 
-            for equal in observedStates.values {
-                guard equal(update) else {
-                    self.lastStateChange = update
+            for observedState in observedStates.values {
+                guard observedState.onUpdate(isFromChild: update.isFromChild) else {
                     return true
                 }
             }
@@ -80,6 +103,7 @@ private extension ViewAccess {
 
         guard wasUpdated else { return }
 
+        updateCount += 1
         apply(callContexts: update.callContexts) {
             objectWillChange.send()
         }

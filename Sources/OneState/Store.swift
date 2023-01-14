@@ -25,7 +25,7 @@ public final class Store<M: Model>: @unchecked Sendable {
     private var currentState: Shared<State>
     private var modifyCount = 0
 
-    private var currentOverride: StateUpdate<State>?
+    private var overrideState: State?
 
     private var updateTask: Task<(), Never>?
     private var lastFromContext: ContextBase?
@@ -48,51 +48,6 @@ public extension Store {
         M(self)
     }
 
-    func dependency<Value>(_ path: WritableKeyPath<ModelDependencyValues, Value>, _ value: Value) -> Self {
-        updateDependency(path, value)
-        return self
-    }
-
-    /// Access the the lastest update useful for debugging or initial state for state recording
-    var latestUpdate: StateUpdate<State> {
-        .init(
-            stateChange: lock {
-                .init(previous: previousState, current: previousState, isStateOverridden: currentOverride != nil, isOverrideUpdate: false)
-            },
-            getCurrent: { ($0.current as! Shared<State>).value },
-            getPrevious: { ($0.previous as! Shared<State>).value }
-        )
-    }
-
-    /// Used to override state when replaying recorded state
-    var stateOverride: StateUpdate<State>? {
-        get {
-            lock { currentOverride }
-        }
-        set {
-            lock.lock()
-
-            let previous = currentOverride?.stateChange.current ?? currentState
-            let current = newValue?.stateChange.current ?? currentState
-            currentOverride = newValue
-
-            guard previous !== current else { return lock.unlock() }
-
-            let update = AnyStateChange(previous: previous, current: current, isStateOverridden: true, isOverrideUpdate: true)
-            lock.unlock()
-
-            weakContext?.notify(update)
-        }
-    }
-}
-
-extension Store {
-    var sharedState: Shared<State> {
-        lock {
-            currentState
-        }
-    }
-
     var state: State {
         _read {
             lock.lock()
@@ -101,7 +56,24 @@ extension Store {
         }
     }
 
-    subscript<T> (path path: KeyPath<State, T>, fromContext fromContext: ContextBase) -> T {
+    func dependency<Value>(_ path: WritableKeyPath<ModelDependencyValues, Value>, _ value: Value) -> Self {
+        updateDependency(path, value)
+        return self
+    }
+
+    /// Used to override state when replaying recorded state
+    var stateOverride: State? {
+        get { lock { overrideState } }
+        set {
+            lock { overrideState = newValue }
+            weakContext?.notify(StateChange(isStateOverridden: true, isOverrideUpdate: true))
+        }
+    }
+
+}
+
+extension Store {
+    subscript<T> (path path: KeyPath<State, T>) -> T {
         _read {
             lock.lock()
             yield currentState.value[keyPath: path]
@@ -119,7 +91,7 @@ extension Store {
             let isOverrideContext = fromContext.isOverrideContext
             lock.lock()
 
-            if currentOverride != nil, isOverrideContext {
+            if stateOverride != nil, isOverrideContext {
                 // Upgrade to runtime error?
                 assertionFailure("Not allowed to modify state from a overridden store")
                 yield &currentState.value[keyPath: path]
@@ -175,29 +147,11 @@ extension Store {
         }
     }
 
-    subscript<T> (path path: KeyPath<State, T>, shared shared: AnyObject) -> T {
-        _read {
-            let shared = shared as! Shared<State>
-            yield shared.value[keyPath: path]
-        }
-    }
-
-    subscript<T> (path path: WritableKeyPath<State, T>, shared shared: AnyObject) -> T {
-        _read {
-            let shared = shared as! Shared<State>
-            yield shared.value[keyPath: path]
-        }
-        _modify {
-            let shared = shared as! Shared<State>
-            yield &shared.value[keyPath: path]
-        }
-    }
-
     subscript<T> (overridePath path: KeyPath<State, T>) -> T? {
         _read {
             lock.lock()
-            if let override = currentOverride?.current {
-                yield override[keyPath: path]
+            if let stateOverride {
+                yield stateOverride[keyPath: path]
             } else {
                 yield nil
             }
@@ -213,10 +167,8 @@ extension Store {
 
         lastFromContext = nil
 
-        let update = AnyStateChange(
-            previous: previousState,
-            current: state,
-            isStateOverridden: currentOverride != nil,
+        let update = StateChange(
+            isStateOverridden: stateOverride != nil,
             isOverrideUpdate: false,
             callContexts: callContexts
         )
@@ -228,10 +180,6 @@ extension Store {
                 context.notify(update)
             }
         }
-    }
-
-    var isUpdateInProgress: Bool {
-        lock { previousState !== currentState }
     }
 
     var context: ChildContext<M, M> {

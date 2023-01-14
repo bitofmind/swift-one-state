@@ -8,7 +8,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     var _overrideChildren: [AnyKeyPath: ContextBase] = [:]
     @Locked var isOverrideContext: Bool = false
 
-    let stateUpdates = AsyncPassthroughSubject<AnyStateChange>()
+    let stateUpdates = AsyncPassthroughSubject<StateChange>()
 
     struct EventInfo: @unchecked Sendable {
         var event: Any
@@ -25,7 +25,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
 
     let contextCancellationKey = UUID()
 
-    @Locked var containers: [AnyKeyPath: (AnyStateChange) -> ()] = [:]
+    @Locked var containers: [AnyKeyPath: (StateChange) -> ()] = [:]
 
     init(parent: ContextBase?) {
         self.parent = parent
@@ -93,12 +93,12 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         }
     }
 
-    func notifyAncestors(_ update: AnyStateChange) {
+    func notifyAncestors(_ update: StateChange) {
         parent?.notifyAncestors(update)
         parent?.stateUpdates.yield(update)
     }
 
-    func notifyDescendants(_ update: AnyStateChange) {
+    func notifyDescendants(_ update: StateChange) {
         let (children, overrideChildren) = lock {
             (_children.values, _overrideChildren.values)
         }
@@ -116,7 +116,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         }
     }
 
-    func notify(_ update: AnyStateChange) {
+    func notify(_ update: StateChange) {
         notifyAncestors(update.fromChild())
         stateUpdates.yield(update)
         notifyDescendants(update)
@@ -135,9 +135,6 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     }
 
     var cancellations: Cancellations { fatalError() }
-
-    func diff(for change: AnyStateChange, at path: AnyKeyPath) -> String? { fatalError() }
-
     var storePath: AnyKeyPath { fatalError() }
 }
 

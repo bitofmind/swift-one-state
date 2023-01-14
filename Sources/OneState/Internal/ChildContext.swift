@@ -49,7 +49,7 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
 
     override subscript<T> (path path: KeyPath<State, T>) -> T {
         _read {
-            yield store[path: self.path.appending(path: path), fromContext: self]
+            yield store[path: self.path.appending(path: path)]
         }
     }
 
@@ -62,25 +62,14 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
         }
     }
 
-    override subscript<T> (path path: KeyPath<State, T>, shared shared: AnyObject) -> T {
-        _read {
-            yield store[path: self.path.appending(path: path), shared: shared]
-        }
-    }
-
-    override subscript<T> (path path: WritableKeyPath<State, T>, shared shared: AnyObject) -> T {
-        _read {
-            yield store[path: self.path.appending(path: path), shared: shared]
-        }
-        _modify {
-            yield &store[path: self.path.appending(path: path), shared: shared]
-        }
-    }
-
     override subscript<T> (overridePath path: KeyPath<State, T>) -> T? {
         _read {
             yield store[overridePath: self.path.appending(path: path)]
         }
+    }
+
+    override func storePath<StoreState, T>(for path: WritableKeyPath<State, T>) -> WritableKeyPath<StoreState, T>? {
+        self.path.appending(path: path) as? WritableKeyPath<StoreState, T>
     }
 
     override var isStateOverridden: Bool {
@@ -131,41 +120,19 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
     }
 
     override func didModify(for access: StoreAccess) {
-        access.didModify(state: store.sharedState)
+        access.didModify(state: store.state)
     }
 
     override var cancellations: Cancellations {
         store.cancellations
     }
 
-    override func value<T>(for path: KeyPath<State, T>, access: StoreAccess?, isSame: @escaping (T, T) -> Bool, ignoreChildUpdates: Bool) -> T {
+    override func value<Comparable: ComparableValue>(for path: KeyPath<State, Comparable.Value>, access: StoreAccess?, comparable: Comparable.Type) -> Comparable.Value {
         if !StoreAccess.isInViewModelContext, let access = access {
             let fullPath = self.path.appending(path: path)
-            access.willAccess(path: fullPath) { [weak store] update in
-                guard let store = store, update.current is Shared<StoreModel.State> else { return true }
-
-                if ignoreChildUpdates && update.isFromChild { return true }
-
-                return isSame(
-                    store[path: fullPath, shared: update.current],
-                    store[path: fullPath, shared: update.previous]
-                )
-            }
+            access.willAccess(store: store, path: fullPath, comparable: comparable)
         }
 
         return self[path: path, access: access]
-    }
-
-    override func diff(for change: AnyStateChange, at path: AnyKeyPath) -> String? {
-        guard let current = change.current as? Shared<StoreModel.State>,
-              let previous = change.previous as? Shared<StoreModel.State> else {
-            return nil
-        }
-
-        guard let c = current.value[keyPath: path], let p = previous.value[keyPath: path] else {
-            return nil
-        }
-
-        return CustomDump.diff(p, c)
     }
 }

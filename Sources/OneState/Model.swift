@@ -243,13 +243,13 @@ public extension Model {
     }
 
     subscript<S, T: Equatable>(dynamicMember path: WritableKeyPath<S, T>) -> T? where State == S? {
-        _ = value(for: \.self, isSame: State.hasSameStructure) // To trigger update once optional toggles
+        _ = containerValue(for: \.self) // To trigger update once optional toggles
         guard let path = nonObservableState.elementKeyPaths.first?.appending(path: path) else { return nil }
         return value(for: path)
     }
 
     subscript<S, T: Equatable>(dynamicMember path: WritableKeyPath<S, T?>) -> T? where State == S? {
-        _ = value(for: \.self, isSame: State.hasSameStructure) // To trigger update once optional toggles
+        _ = containerValue(for: \.self) // To trigger update once optional toggles
         guard let path = nonObservableState.elementKeyPaths.first?.appending(path: path) else { return nil }
         return value(for: path)
     }
@@ -267,13 +267,14 @@ public extension Model where State: Equatable {
 }
 
 public extension Model {
-    func value<T>(for path: KeyPath<State, T>, isSame: @escaping (T, T) -> Bool) -> T {
+    func containerValue<T: OneState.StateContainer>(for path: KeyPath<State, T>) -> T {
         let view = self.storeView
-        return view.context.value(for: view.path.appending(path: path), access: view.access, isSame: isSame, ignoreChildUpdates: false)
+        return view.context.value(for: view.path.appending(path: path), access: view.access, comparable: StructureComparableValue.self)
     }
 
     func value<T: Equatable>(for path: KeyPath<State, T>) -> T {
-        value(for: path, isSame: ==)
+        let view = self.storeView
+        return view.context.value(for: view.path.appending(path: path), access: view.access, comparable: EquatableComparableValue.self)
     }
 }
 

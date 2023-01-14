@@ -62,16 +62,14 @@ final class Shared<Value> {
     }
 }
 
-struct AnyStateChange: @unchecked Sendable {
-    var previous: AnyObject
-    var current: AnyObject
+struct StateChange: Sendable {
     var isStateOverridden: Bool
     var isOverrideUpdate: Bool
     var callContexts: [CallContext] = []
     var isFromChild: Bool = false
 }
 
-extension AnyStateChange {
+extension StateChange {
     func fromChild() -> Self {
         var result = self
         result.isFromChild = true
@@ -79,9 +77,50 @@ extension AnyStateChange {
     }
 }
 
+protocol ComparableValue<Value>: Equatable {
+    associatedtype Value
+    init(value: Value)
+
+    var ignoreChildUpdates: Bool { get }
+}
+
+struct EquatableComparableValue<Value: Equatable>: ComparableValue {
+    let value: Value
+
+    var ignoreChildUpdates: Bool { false }
+}
+
+struct StructureComparableValue<Value: StateContainer>: ComparableValue {
+    let structureValue: Value.StructureValue
+
+    init(value: Value) {
+        structureValue = value.structureValue
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.structureValue == rhs.structureValue
+    }
+
+    var ignoreChildUpdates: Bool { true }
+}
+
+struct IDCollectionComparableValue<Value: MutableCollection>: ComparableValue where Value.Element: Identifiable  {
+    let structureValue: [Value.Element.ID]
+
+    init(value: Value) {
+        structureValue = value.map(\.id)
+    }
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.structureValue == rhs.structureValue
+    }
+
+    var ignoreChildUpdates: Bool { true }
+}
+
 class StoreAccess: @unchecked Sendable {
-    func willAccess(path: AnyKeyPath, didUpdate: @escaping (AnyStateChange) -> Bool) { }
-    func didModify<State>(state: Shared<State>) { }
+    func willAccess<StoreModel: Model, Comparable: ComparableValue>(store: Store<StoreModel>, path: KeyPath<StoreModel.State, Comparable.Value>, comparable: Comparable.Type) { }
+    func didModify<State>(state: State) { }
     func didSend(event: ContextBase.EventInfo) {}
 
     var allowAccessToBeOverridden: Bool { false }

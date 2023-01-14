@@ -75,15 +75,3 @@ extension StoreView: CustomStringConvertible where State: CustomStringConvertibl
         return context.value(for: view.path(\.description), access: view.access)
     }
 }
-
-@dynamicMemberLookup
-public struct IdentifiableStoreView<Root, State, Access, ID: Hashable>: Identifiable, StoreViewProvider {
-    public var storeView: StoreView<Root, State, Access>
-    var idPath: KeyPath<State, ID>
-
-    public var id: ID {
-        storeView.context[path: storeView.path(idPath), access: storeView.access]
-    }
-}
-
-

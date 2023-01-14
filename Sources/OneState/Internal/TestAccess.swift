@@ -44,9 +44,8 @@ final class TestAccess<State: Equatable>: TestAccessBase {
 
     override func assert<Root, S>(view: StoreView<Root, S, Write>, modify: @escaping (inout S) -> Void, timeout: UInt64, file: StaticString, line: UInt) async {
         lock {
-            let shared = Shared(_expectedState)
-            modify(&view.context[path: view.path, shared: shared])
-            _expectedState = shared.value
+            let storePath: WritableKeyPath<State, S> = view.context.storePath(for: view.path)!
+            modify(&_expectedState[keyPath: storePath])
         }
 
         let expected = expectedState
@@ -85,15 +84,14 @@ final class TestAccess<State: Equatable>: TestAccessBase {
             throw UnwrapError()
         }
 
+        let storePath: WritableKeyPath<State, T?> = view.context.storePath(for: view.path)!
+
         lock {
-            let shared = Shared(_expectedState)
-            view.context[path: view.path, shared: shared] = unwrappedView.nonObservableState
-            _expectedState = shared.value
+            _expectedState[keyPath: storePath] = unwrappedView.nonObservableState
         }
 
         @Sendable func predicate(_ value: State) -> Bool {
-            let shared = Shared(value)
-            return view.context[path: view.path, shared: shared] != nil
+            value[keyPath: storePath] != nil
         }
 
         if predicate(lastAssertedState) {
@@ -108,9 +106,9 @@ final class TestAccess<State: Equatable>: TestAccessBase {
         throw UnwrapError()
     }
 
-    override func didModify<S>(state: Shared<S>) {
+    override func didModify<S>(state: S) {
         Swift.assert(State.self == S.self)
-        stateUpdate.receiveSkipDuplicates(state.value as! State)
+        stateUpdate.receiveSkipDuplicates(state as! State)
     }
 
     override func didSend(event: ContextBase.EventInfo) {

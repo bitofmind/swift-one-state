@@ -1,5 +1,6 @@
 #if canImport(SwiftUI)
 import SwiftUI
+import CustomDump
 
 public extension Binding where Value: Equatable {
     init(_ modelState: ModelState<Value>) {
@@ -67,22 +68,19 @@ public extension StoreViewProvider where Access == Write {
     }
 }
 
-#if canImport(Combine)
-import Combine
-
 public extension View {
+    @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, *)
     func printStateUpdates<P: StoreViewProvider>(for provider: P, name: String = "") -> some View where P.State: Sendable {
-        onReceive(provider.stateUpdatesPublisher.flatMap { update -> AnyPublisher<StateUpdate<P.State>, Never> in
-            if Thread.isMainThread {
-                return Just(update).eraseToAnyPublisher()
-            } else {
-                return Just(update).receive(on: DispatchQueue.main).eraseToAnyPublisher()
+        task {
+            var previous = provider.nonObservableState
+            for await _ in provider.stateDidUpdate {
+                let state = provider.nonObservableState
+                guard let diff = diff(previous, state) else { return }
+                previous = state
+                print("State did update\(name.isEmpty ? "" : " for \(name)"):\n" + diff)
             }
-        }) { update in
-            update.printDiff(name: name)
         }
     }
 }
 
-#endif
 #endif

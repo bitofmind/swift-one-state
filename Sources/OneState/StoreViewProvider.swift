@@ -19,6 +19,15 @@ public protocol StoreViewProvider {
     var storeView: StoreView<Root, State, Access> { get }
 }
 
+public extension StoreViewProvider {
+    var stateDidUpdate: AnyAsyncSequence<()> {
+        let view = self.storeView
+        return .init(view.context.stateUpdates.filter { update in
+            !update.isOverrideUpdate
+        }.map { _ in () })
+    }
+}
+
 public extension StoreViewProvider where State: Sendable {
     func changes(isSame: @escaping @Sendable (State, State) -> Bool) -> CallContextsStream<State> {
         CallContextsStream(allChanges().stream.removeDuplicates {
@@ -49,13 +58,19 @@ public extension StoreViewProvider where State: Equatable&Sendable {
 }
 
 public extension StoreViewProvider {
-    func value<T>(for keyPath: KeyPath<State, T>, isSame: @escaping (T, T) -> Bool) -> T {
+    func containerValue<T: MutableCollection>(for keyPath: KeyPath<State, T>) -> T where T.Element: Identifiable {
         let view = self.storeView
-        return view.context.value(for: view.path.appending(path: keyPath), access: view.access, isSame: isSame, ignoreChildUpdates: false)
+        return view.context.value(for: view.path.appending(path: keyPath), access: view.access, comparable: IDCollectionComparableValue.self)
+    }
+
+    func containerValue<T: StateContainer>(for keyPath: KeyPath<State, T>) -> T {
+        let view = self.storeView
+        return view.context.value(for: view.path.appending(path: keyPath), access: view.access, comparable: StructureComparableValue.self)
     }
 
     func value<T: Equatable>(for keyPath: KeyPath<State, T>) -> T {
-        value(for: keyPath, isSame: ==)
+        let view = self.storeView
+        return view.context.value(for: view.path.appending(path: keyPath), access: view.access, comparable: EquatableComparableValue.self)
     }
 }
 
@@ -145,10 +160,14 @@ public extension StoreViewProvider where Access == Write {
 
 public extension StoreViewProvider {
     func printStateUpdates(name: String = "") where State: Sendable {
-        let stateUpdates = stateUpdates
+        let stateDidUpdate = stateDidUpdate
         Task {
-            for await update in stateUpdates {
-                update.printDiff(name: name)
+            var previous = nonObservableState
+            for await _ in stateDidUpdate {
+                let state = nonObservableState
+                guard let diff = diff(previous, state) else { return }
+                previous = state
+                print("State did update\(name.isEmpty ? "" : " for \(name)"):\n" + diff)
             }
         }
     }
@@ -163,10 +182,7 @@ extension StoreViewProvider {
     func allChanges() -> CallContextsStream<State> {
         let view = self.storeView
         return CallContextsStream(view.context.stateUpdates.map { stateChange -> WithCallContexts<State> in
-            let stateUpdate = StateUpdate(stateChange: stateChange, provider: view)
-            let current = stateUpdate.current
-
-            return WithCallContexts(value: current, callContexts: stateChange.callContexts)
+            WithCallContexts(value: nonObservableState, callContexts: stateChange.callContexts)
         })
     }
 }
@@ -177,16 +193,23 @@ extension StoreViewProvider where Access == Write {
         let containerPath = view.path.appending(path: path).appending(path: \.wrappedValue)
         let context = view.context
         if context.containers[containerPath] == nil {
+            let prevContainer = view.context[path: containerPath]
+            var prevStructure = StructureComparableValue(value: prevContainer)
+            var prevElementPaths = Set(prevContainer.elementKeyPaths)
             context.containers[containerPath] = { update in
-                let prevContainer = view.context[path: containerPath, shared: update.previous]
-                let currentContainer = view.context[path: containerPath, shared: update.current]
+                let currentContainer = view.context[path: containerPath]
+                let currentStructure = StructureComparableValue(value: currentContainer)
 
-                guard !Models.StateContainer.hasSameStructure(lhs: prevContainer, rhs: currentContainer) else {
+                guard prevStructure != currentStructure else {
                     return
                 }
 
-                let prevElementPaths = Set(prevContainer.elementKeyPaths)
                 let currentElementPaths = Set(currentContainer.elementKeyPaths)
+
+                defer {
+                    prevStructure = currentStructure
+                    prevElementPaths = currentElementPaths
+                }
 
                 let addedPaths = currentElementPaths.subtracting(prevElementPaths)
                 let removedPaths = prevElementPaths.subtracting(currentElementPaths)

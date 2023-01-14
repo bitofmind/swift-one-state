@@ -8,20 +8,15 @@ class Context<State>: ContextBase {
         _modify { fatalError() }
     }
 
-    subscript<T> (path path: KeyPath<State, T>, shared shared: AnyObject) -> T {
-        _read { fatalError() }
-    }
-
-    subscript<T> (path path: WritableKeyPath<State, T>, shared shared: AnyObject) -> T {
-        _read { fatalError() }
-        _modify { fatalError() }
-    }
-
     subscript<T> (overridePath path: KeyPath<State, T>) -> T? {
         _read { fatalError() }
     }
 
-    func value<T>(for path: KeyPath<State, T>, access: StoreAccess?, isSame: @escaping (T, T) -> Bool, ignoreChildUpdates: Bool) -> T {
+    func storePath<StoreState, T>(for path: WritableKeyPath<State, T>) -> WritableKeyPath<StoreState, T>? {
+        fatalError()
+    }
+
+    func value<Comparable: ComparableValue>(for path: KeyPath<State, Comparable.Value>, access: StoreAccess?, comparable: Comparable.Type) -> Comparable.Value {
         fatalError()
     }
 
@@ -67,8 +62,8 @@ extension Context {
 }
 
 extension Context {
-    func value<T: Equatable>(for path: KeyPath<State, T>, access: StoreAccess?, ignoreChildUpdates: Bool = false) -> T {
-        value(for: path, access: access, isSame: ==, ignoreChildUpdates: ignoreChildUpdates)
+    func value<T: Equatable>(for path: KeyPath<State, T>, access: StoreAccess?) -> T {
+        value(for: path, access: access, comparable: EquatableComparableValue.self)
     }
 }
 

@@ -45,22 +45,7 @@ extension ObservedModel: StoreViewProvider where M: Model {
 public extension View {
     @MainActor
     func printObservedUpdates<M: Model>(for observedModel: ObservedModel<M>) -> some View {
-        let access = observedModel.access
-        let lastChange = access.lock {
-            defer { access.lastStateChange = nil }
-            return access.lastStateChange
-        }
-
-
-        if let update = lastChange {
-            for context in access.contexts {
-                if let diff = context.diff(for: update, at: context.storePath) {
-                    print("Observed update for \(type(of: observedModel.wrappedValue)):\n", diff)
-                }
-            }
-         }
-
-        return self
+        modifier(PrintObservedUpdatesModifier(model: observedModel.wrappedValue, updateCount: observedModel.access.updateCount))
     }
 }
 
@@ -87,6 +72,28 @@ private extension ModelContainer {
             }
             return context
         }
+    }
+}
+
+private struct PrintObservedUpdatesModifier<M: Model>: ViewModifier {
+    var model: M
+    let updateCount: Int
+    @State var last: M.State?
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                self.last = model.nonObservableState
+            }
+            .onChange(of: updateCount) { updateCount in
+                let current = model.nonObservableState
+                if let last {
+                    if let diff = CustomDump.diff(last, current) {
+                        print("Observed update for \(type(of: model)):\n", diff)
+                    }
+                }
+                self.last = current
+            }
     }
 }
 
