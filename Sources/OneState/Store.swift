@@ -21,8 +21,7 @@ public final class Store<M: Model>: @unchecked Sendable {
     
     private let lock = NSRecursiveLock()
 
-    private var previousState: Shared<State>
-    private var currentState: Shared<State>
+    private var currentState: State
     private var modifyCount = 0
 
     private var overrideState: State?
@@ -38,8 +37,7 @@ public final class Store<M: Model>: @unchecked Sendable {
     let cancellations = Cancellations()
 
     public init(initialState: State) {
-        previousState = Shared(initialState)
-        currentState = previousState
+        currentState = initialState
     }
 }
 
@@ -51,7 +49,7 @@ public extension Store {
     var state: State {
         _read {
             lock.lock()
-            yield currentState.value
+            yield currentState
             lock.unlock()
         }
     }
@@ -76,7 +74,7 @@ extension Store {
     subscript<T> (path path: KeyPath<State, T>) -> T {
         _read {
             lock.lock()
-            yield currentState.value[keyPath: path]
+            yield currentState[keyPath: path]
             lock.unlock()
         }
     }
@@ -84,7 +82,7 @@ extension Store {
     subscript<T> (path path: WritableKeyPath<State, T>, fromContext fromContext: ContextBase) -> T {
         _read {
             lock.lock()
-            yield currentState.value[keyPath: path]
+            yield currentState[keyPath: path]
             lock.unlock()
         }
         _modify {
@@ -94,7 +92,7 @@ extension Store {
             if stateOverride != nil, isOverrideContext {
                 // Upgrade to runtime error?
                 assertionFailure("Not allowed to modify state from a overridden store")
-                yield &currentState.value[keyPath: path]
+                yield &currentState[keyPath: path]
                 lock.unlock()
                 return
             }
@@ -108,11 +106,7 @@ extension Store {
                 updateTask = nil
             }
 
-            if previousState === currentState {
-                currentState = .init(previousState.value)
-            }
-
-            yield &currentState.value[keyPath: path]
+            yield &currentState[keyPath: path]
             lastFromContext = fromContext
             lastCallContexts = callContexts
             modifyCount += 1
@@ -160,8 +154,7 @@ extension Store {
     }
 
     func notifier(context: ContextBase, callContexts: [CallContext]) -> (() -> Void)? {
-        let state = currentState
-        guard previousState !== state, lastFromContext === context else {
+        guard lastFromContext === context else {
             return nil
         }
 
@@ -172,8 +165,6 @@ extension Store {
             isOverrideUpdate: false,
             callContexts: callContexts
         )
-
-        previousState = state
 
         return {
             if !Task.isCancelled {

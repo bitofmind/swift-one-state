@@ -54,14 +54,6 @@ func apply<C: Collection&Sendable>(callContexts: C, execute: @Sendable () -> Voi
     }
 }
 
-final class Shared<Value> {
-    var value: Value
-
-    init(_ value: Value) {
-        self.value = value
-    }
-}
-
 struct StateChange: Sendable {
     var isStateOverridden: Bool
     var isOverrideUpdate: Bool
@@ -81,13 +73,13 @@ protocol ComparableValue<Value>: Equatable {
     associatedtype Value
     init(value: Value)
 
-    var ignoreChildUpdates: Bool { get }
+    static var ignoreChildUpdates: Bool { get }
 }
 
 struct EquatableComparableValue<Value: Equatable>: ComparableValue {
     let value: Value
 
-    var ignoreChildUpdates: Bool { false }
+    static var ignoreChildUpdates: Bool { false }
 }
 
 struct StructureComparableValue<Value: StateContainer>: ComparableValue {
@@ -101,7 +93,7 @@ struct StructureComparableValue<Value: StateContainer>: ComparableValue {
         lhs.structureValue == rhs.structureValue
     }
 
-    var ignoreChildUpdates: Bool { true }
+    static var ignoreChildUpdates: Bool { true }
 }
 
 struct IDCollectionComparableValue<Value: MutableCollection>: ComparableValue where Value.Element: Identifiable  {
@@ -115,7 +107,7 @@ struct IDCollectionComparableValue<Value: MutableCollection>: ComparableValue wh
         lhs.structureValue == rhs.structureValue
     }
 
-    var ignoreChildUpdates: Bool { true }
+    static var ignoreChildUpdates: Bool { true }
 }
 
 class StoreAccess: @unchecked Sendable {

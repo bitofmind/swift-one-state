@@ -89,8 +89,10 @@ final class CallContextTests: XCTestCase {
         let finalCounts = await counts
         let finalCurrentA = await currentA
         let finalCurrentB = await currentB
+
         // Currently does not pass repeatedly on all platforms
-        //XCTAssertEqual(finalCounts, [1, 2, 4, 5])
+        //XCTAssertEqual(finalCounts, [2, 4, 5, 5])
+        _ = finalCounts
         XCTAssertEqual(finalCurrentA, [0, 5, 4, 0])
         XCTAssertEqual(finalCurrentB, [0, 2, 6, 9])
     }

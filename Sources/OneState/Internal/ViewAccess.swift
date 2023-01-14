@@ -33,7 +33,7 @@ class ViewAccess: StoreAccess, ObservableObject {
 }
 
 private class ObservedState {
-    func onUpdate(isFromChild: Bool) -> Bool { false }
+    func onUpdate(isFromChild: Bool) -> Bool { fatalError() }
 }
 
 private final class _ObservedState<StoreModel: Model, Comparable: ComparableValue>: ObservedState {
@@ -48,14 +48,14 @@ private final class _ObservedState<StoreModel: Model, Comparable: ComparableValu
     }
 
     override func onUpdate(isFromChild: Bool) -> Bool {
-        guard let store else { return true }
+        guard let store, !Comparable.ignoreChildUpdates || !isFromChild else {
+            return false
+        }
 
         let newValue = Comparable(value: store[overridePath: path] ?? store[path: path])
+
         defer { value = newValue }
-
-        if newValue.ignoreChildUpdates && isFromChild { return true }
-
-        return newValue == value
+        return newValue != value
     }
 }
 
@@ -93,7 +93,7 @@ private extension ViewAccess {
             }
 
             for observedState in observedStates.values {
-                guard observedState.onUpdate(isFromChild: update.isFromChild) else {
+                guard !observedState.onUpdate(isFromChild: update.isFromChild) else {
                     return true
                 }
             }
