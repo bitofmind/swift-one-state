@@ -6,7 +6,8 @@ class ContextBase: HoldsLock, @unchecked Sendable {
 
     var _children: [AnyKeyPath: ContextBase] = [:]
     var _overrideChildren: [AnyKeyPath: ContextBase] = [:]
-    @Locked var isOverrideContext: Bool = false
+    @Locked var isOverrideContext = false
+    var hasBeenRemoved = false
 
     let stateUpdates = AsyncPassthroughSubject<StateChange>()
 
@@ -38,8 +39,13 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     func onRemoval() {
         cancellations.cancelAll(for: contextCancellationKey)
 
+        let parent = lock {
+            hasBeenRemoved = true
+            defer { self.parent = nil }
+            return self.parent
+        }
+
         parent?.removeContext(self)
-        parent = nil
     }
 
     var regularChildren: [AnyKeyPath: ContextBase] {

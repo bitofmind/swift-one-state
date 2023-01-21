@@ -14,22 +14,28 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
         let key = access.map(ObjectIdentifier.init) ?? ObjectIdentifier(self)
         if let model = lock({ _models[key] }) { return model }
 
-        modelLock {
+        return modelLock {
             let firstAccess = lock { _models.isEmpty }
             ThreadState.current.propertyIndex = 0
+            ThreadState.current.dependencyIndex = 0
             let model = ContextBase.$current.withValue(self) {
                 ContextModel()
             }
+
+            guard !lock({ hasBeenRemoved }) else {
+                return model
+            }
+
             lock { _models[key] = model }
 
-            guard firstAccess, parent != nil, !self.isOverrideContext else { return }
-
-            ContextBase.$current.withValue(nil) {
-                model.onActivate()
+            if firstAccess && !self.isOverrideContext {
+                ContextBase.$current.withValue(nil) {
+                    model.onActivate()
+                }
             }
-        }
 
-        return self.model
+            return model
+        }
     }
 
     override func getModel<M: Model>() -> M {
