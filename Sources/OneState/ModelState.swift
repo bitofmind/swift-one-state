@@ -13,9 +13,9 @@ import Foundation
 ///
 ///     let model = MyModel($store)
 ///
-///     let subModel = SubModel(model.sub)
+///     let subModel = SubModel($store.sub)
 ///
-/// Or by declaring you sub state using `@ModelState`:
+/// But typically your are declaring your sub state using `@ModelState`:
 ///
 ///     let subModel = model.$sub
 ///

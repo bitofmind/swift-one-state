@@ -43,13 +43,15 @@ public protocol Model: ModelContainer {
 
     init()
     
-    /// Is called when model is being activate
+    /// Will be called once the model becomes active in a store
     ///
     /// Useful for handlng the lifetime of a model and set up of longliving tasks.
+    /// Once the models state is removed from the store, it is deactivated and
+    /// all stored cancelleables are cancelled.
     ///
-    /// If more then one view is active for the same state at the same time,
-    /// onActivate is only called for the first appeance and similarly any stored
-    /// cancellables is cancelled not until the last view is no longer being displayed.
+    /// In the typical case that a model is only used in views, `onActivate` will only
+    /// be called for the first appeance and wont deactivate until the last view is no
+    /// longer being displayed.
     func onActivate()
 }
 
@@ -60,9 +62,12 @@ public extension Model {
 public extension Model {
     /// Constructs a model with a view into a store's state
     ///
-    /// A view modal is required to be constructed from a view into a store's state for
+    /// A model is required to be constructed from a view into a store's state for
     /// its `@ModelState` and other dependencies such as `@ModelEnvironment` to be
-    /// set up correclty.
+    /// set up correclty. This  will automatically be handled when using `@StateModel`, but
+    /// sometimes you might  have to manually create the model
+    ///
+    ///     MyModel($store.myModalState)
     init<Provider: StoreViewProvider>(_ viewStore: Provider) where Provider.State == State, Provider.Access == Write {
         let view = viewStore.storeView
         self = view.context.model(at: view.path)
@@ -79,6 +84,8 @@ public extension Model where State: Identifiable {
 }
 
 public extension Model {
+    ///  Register a `perform` closure to be called whe  the returned `Cancellable` is canceled.
+    ///  The returned `Cancellable` will be set up to cancel once the self is destructed.
     @discardableResult
     func onCancel(_ perform: @Sendable @escaping () -> Void) -> Cancellable {
         AnyCancellable(cancellations: context.cancellations) {
@@ -86,17 +93,35 @@ public extension Model {
         }.cancel(for: context.contextCancellationKey)
     }
 
+    /// Cancel all cancellables that have been registered for the provided `key`
+    ///
+    ///     let key = UUID()
+    ///
+    ///     model.task {
+    ///        // work...
+    ///     }.cancel(for: key)
+    ///
+    ///     model.cancelAll(for: key)
     func cancelAll(for key: some Hashable&Sendable) {
         context.cancellations.cancelAll(for: key)
     }
 
+    /// Cancel all cancellables that have been registered for the provided `type`
+    ///
+    ///     enum ID {}
+    ///
+    ///     model.task {
+    ///        // work...
+    ///     }.cancel(for: ID.self)
+    ///
+    ///     model.cancelAll(for: ID.self)
     func cancelAll(for id: Any.Type) {
         context.cancellations.cancelAll(for: ObjectIdentifier(id))
     }
 }
 
 public extension Model {
-    /// Add an action to be called once the model is deactivated
+    /// Add an action to be called once the model is deactivated (same as `onCancel`)
     /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
     @discardableResult
     func onDeactivate(_ perform: @Sendable @escaping () -> Void) -> Cancellable {
@@ -104,7 +129,10 @@ public extension Model {
     }
 
     /// Perform a task for the life time of the model
-    /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
+    /// - Parameter priority: The priority of the  task.
+    /// - Parameter operation: The operation to perform.
+    /// - Parameter catch: Called if the task throws an error
+    /// - Returns: A cancellable to optionally allow cancelling before deactivation.
     @discardableResult
     func task(priority: TaskPriority? = nil, _ operation: @escaping @Sendable () async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
         TaskCancellable(
@@ -119,17 +147,20 @@ public extension Model {
 
     /// Iterate an async sequence for the life time of the model
     ///
-    /// - Parameter catch: Called if the sequence throws an error
+    /// - Parameter sequence: The sequence to iterate..
     /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
-    /// - Returns: A cancellable to optionally allow cancelling before a is deactivated
+    /// - Parameter priority: The priority of the  task.
+    /// - Parameter operation: The operation to perform for each element in the sequence.
+    /// - Parameter catch: Called if the sequence throws an error
+    /// - Returns: A cancellable to optionally allow cancelling before deactivation.
     @discardableResult
-    func forEach<S: AsyncSequence&Sendable>(_ sequence: S, cancelPrevious: Bool = false, priority: TaskPriority? = nil, perform: @escaping @Sendable (S.Element) async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable where S.Element: Sendable {
+    func forEach<S: AsyncSequence&Sendable>(_ sequence: S, cancelPrevious: Bool = false, priority: TaskPriority? = nil, perform operation: @escaping @Sendable (S.Element) async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable where S.Element: Sendable {
         let cancellations = context.cancellations
         let typeDescription = typeDescription
         return task(priority: priority, {
             guard cancelPrevious else {
                 for try await value in sequence {
-                    try await perform(value)
+                    try await operation(value)
                 }
                 return
             }
@@ -146,7 +177,7 @@ public extension Model {
                             guard !Task.isCancelled else { return }
                             do {
                                 try await inViewModelContext {
-                                    try await perform(value)
+                                    try await operation(value)
                                 }
                             } catch is CancellationError {
                                 print()
@@ -163,6 +194,14 @@ public extension Model {
         }, catch: `catch`)
     }
 
+    /// Iterate an async sequence for the life time of the model
+    ///
+    /// - Parameter sequence: The sequence to iterate.
+    /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
+    /// - Parameter priority: The priority of the  task.
+    /// - Parameter operation: The operation to perform for each element in the sequence.
+    /// - Parameter catch: Called if the sequence throws an error
+    /// - Returns: A cancellable to optionally allow cancelling before deactivation.
     @discardableResult
     func forEach<Element: Sendable>(_ sequence: CallContextsStream<Element>, cancelPrevious: Bool = false, priority: TaskPriority? = nil, perform: @escaping @Sendable (Element) async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
         forEach(sequence.stream.map { ($0.value, $0.callContexts) }, cancelPrevious: cancelPrevious, priority: priority, perform: { value, callContexts in
@@ -172,7 +211,7 @@ public extension Model {
         }, catch: `catch`)
     }
 
-    /// Wait until the predicate based on the models state is fullfilled
+    /// Wait until the predicate based on the model's state is fullfilled
     func waitUntil(_ predicate: @autoclosure @escaping @Sendable () -> Bool) async throws {
         let initial = AsyncStream<()> { c in
             c.yield(())
@@ -198,30 +237,40 @@ public extension Model {
         context.sendEvent(event, context: view.context, callContexts: CallContext.currentContexts, storeAccess: view.access)
     }
 
+    /// Returns a sequence of events sent from this model.
     func events() -> CallContextsStream<Event> {
-        let events = context.events
-        return CallContextsStream(events.compactMap {
-            guard let e = $0.event as? Event else { return nil }
+        CallContextsStream(context.events.compactMap { [context] in
+            guard let e = $0.event as? Event, $0.context === context else { return nil }
             return .init(value: e, callContexts: $0.callContexts)
         })
     }
 
+    /// Returns a sequence that emits when events equal to the provided `event` is sent form this model.
     func events(of event: Event) -> CallContextsStream<()> where Event: Equatable&Sendable {
-        let events = context.events
-        return CallContextsStream(events.compactMap {
-            guard let e = $0.event as? Event, e == event else { return nil }
+        CallContextsStream(context.events.compactMap { [context] in
+            guard let e = $0.event as? Event, e == event, $0.context === context else { return nil }
             return .init(value: (), callContexts: $0.callContexts)
         })
     }
 
-    func events<E: Equatable&Sendable>(of event: E) -> CallContextsStream<()> {
+    /// Returns a sequence that emits when events equal to the provided `event` is sent form this model or any of it's descendants.
+    ///
+    ///     forEach(events(of: .someEvent, fromType: ChildModel.self)) { model in ... }
+    ///
+    ///     forEach(events(of: .someEvent)) { (_: ChildModel) in ... }
+    func events<M: Model>(of event: M.Event, fromType modelType: M.Type = M.self) -> CallContextsStream<M> where M.Event: Equatable&Sendable {
         let events = context.events
         return CallContextsStream(events.compactMap {
-            guard let e = $0.event as? E, e == event else { return nil }
-            return .init(value: (), callContexts: $0.callContexts)
+            guard let e = $0.event as? M.Event, e == event, let context = $0.context as? Context<M.State> else { return nil }
+            return .init(value:  M(context: context), callContexts: $0.callContexts)
         })
     }
 
+    /// Returns a sequence of events sent from this model  or any of it's descendants.
+    ///
+    ///     forEach(events(fromType: ChildModel.self)) { event, model in ... }
+    ///
+    ///     forEach(events()) { (event, _: ChildModel) in ... }
     func events<M: Model>(fromType modelType: M.Type = M.self) -> CallContextsStream<(event: M.Event, model: M)> {
         let events = context.events
         return CallContextsStream(events.compactMap {

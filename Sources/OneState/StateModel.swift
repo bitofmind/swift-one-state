@@ -8,7 +8,7 @@ import CustomDump
 ///
 ///     @StateModel<MainModel> var main = .init() // MainModel.State
 ///
-/// This works with different kinds of contaitners as well, such as optional
+/// This works with different kinds of containers as well, such as optional
 /// or arrays of `Identifiable`s:
 ///
 ///     @StateModel<MainModel?> var optMain = nil // MainModel.State?

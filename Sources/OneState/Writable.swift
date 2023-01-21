@@ -1,8 +1,7 @@
 import Foundation
 import CustomDump
 
-@propertyWrapper
-@dynamicMemberLookup
+@propertyWrapper @dynamicMemberLookup
 public struct Writable<Value> {
     public var wrappedValue: Value
     
@@ -22,7 +21,6 @@ public struct Writable<Value> {
 }
 
 extension Writable: Sendable where Value: Sendable {}
-
 extension Writable: Equatable where Value: Equatable {}
 
 extension Writable: Decodable where Value: Decodable {
@@ -48,5 +46,3 @@ extension Writable: CustomDumpRepresentable {
         wrappedValue
     }
 }
-
-

@@ -1,4 +1,4 @@
-// A view into a store's state
+/// A view into a store's state
 @dynamicMemberLookup
 public struct StoreView<Root, State, Access>: @unchecked Sendable {
     var context: Context<Root>
