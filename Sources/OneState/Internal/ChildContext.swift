@@ -1,8 +1,11 @@
 import CustomDump
+import Dependencies
 
 final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<ContextModel.State> {
     typealias StoreState = StoreModel.State
     typealias State = ContextModel.State
+
+    @Dependency(\.uuid) private var _marker
 
     let store: Store<StoreModel>
     let path: WritableKeyPath<StoreState, State>
@@ -140,5 +143,17 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
         }
 
         return self[path: path, access: access]
+    }
+
+    override func withDependencies<Value>(_ operation: () -> Value) -> Value  {
+        if let parent {
+            return parent.withDependencies {
+                withLocalDependencies(operation)
+            }
+        } else {
+            return store.withLocalDependencies {
+                withLocalDependencies(operation)
+            }
+        }
     }
 }

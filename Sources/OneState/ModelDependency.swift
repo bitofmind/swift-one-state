@@ -1,20 +1,22 @@
+import Dependencies
+
 /// Declares a dependency
 ///
-/// A  model access external depenencies by declaring `@ModelDependency`
-/// refering to a predefined `ModelDependencyValues` value
+/// A  model will get access to its [dependencies](https://github.com/pointfreeco/swift-dependencies)
+/// by declaring `@ModelDependency` referring to a predefined `DependencyValues` value
 ///
 ///     struct MyServer {
 ///         var hello: (String) async -> String
 ///     }
 ///
-///     private enum MyServerKey: ModelDependencyKey {
-///         static let defaultValue = { "Hello \($0)" }
-///     }
-///
-///     extension ModelDependencyValues {
+///     extension DependencyValues {
 ///         var myServer: MyServer {
 ///             get { self[MyServerKey.self] }
 ///             set { self[MyServer.self] = newValue }
+///         }
+///
+///         private enum MyServerKey: DependencyKey {
+///             static let liveValue = { "Hello \($0)" }
 ///         }
 ///     }
 ///
@@ -26,8 +28,8 @@
 ///         }
 ///     }
 ///
-///   `ModelDependency` takes a keyPath allowing to furhter
-///   narrow in on a value:
+/// `ModelDependency` takes a keyPath allowing to further
+///  narrow in on a value:
 ///
 ///     @ModelDependency(\.myServer.hello) hello
 ///
@@ -37,32 +39,38 @@
 ///
 @propertyWrapper @dynamicMemberLookup
 public struct ModelDependency<Value> {
-    let dependencies: ModelDependencyValues
-    let path: KeyPath<ModelDependencyValues, Value>
+    let context: ContextBase
+    let path: KeyPath<DependencyValues, Value>
+    let index: Int
 
-    public init(_ path: KeyPath<ModelDependencyValues, Value>) {
+    public init(_ path: KeyPath<DependencyValues, Value>) {
         guard let context = ContextBase.current else {
             fatalError("ModelDependency can only be used from a Model with an injected store view.")
         }
 
-        dependencies = ModelDependencyValues {
-            context.dependencyValue(key: $0)
-        } set: {
-            context.dependencies[$0] = $1
-        }
+        self.context = context
         self.path = path
+        self.index = ThreadState.current.dependencyIndex
+        ThreadState.current.dependencyIndex += 1
     }
 
     public var wrappedValue: Value {
         get {
-            dependencies[keyPath: path]
+            context.withDependencies {
+                Dependency(self.path).wrappedValue
+            }
         }
         nonmutating set {
-            guard let path = path as? WritableKeyPath<ModelDependencyValues, Value> else {
+            guard let path = path as? WritableKeyPath<DependencyValues, Value> else {
                 fatalError("Dependency is not writable")
             }
-            var d = dependencies
-            d[keyPath: path] = newValue
+
+            context.lock {
+                context.dependencies.removeAll { $0.index == index }
+                context.dependencies.append((index, {
+                    $0[keyPath: path] = newValue
+                }))
+            }
         }
     }
 
@@ -71,11 +79,8 @@ public struct ModelDependency<Value> {
     }
 
     public func reset() {
-        let key = Protected<ObjectIdentifier?>(nil)
-        _ = ModelDependencyValues(get: { key.value = $0 }, set: { _, _ in })[keyPath: path]
-
-        if let key = key.value {
-            dependencies.set(key, nil)
+        context.lock {
+            context.dependencies.removeAll { $0.index == index }
         }
     }
 }
@@ -85,19 +90,5 @@ extension ModelDependency: Sendable where Value: Sendable {}
 extension ModelDependency: StoreViewProvider where Value: Model {
     public var storeView: StoreView<Value.State, Value.State, Write> {
         wrappedValue.storeView
-    }
-}
-
-extension ContextBase {
-    func dependencyValue(key: ObjectIdentifier) -> Any? {
-        var value = dependencies[key]
-
-        var parent = self.parent
-        while value == nil, let p = parent {
-            value = p.dependencies[key]
-            parent = p.parent
-        }
-
-        return value
     }
 }

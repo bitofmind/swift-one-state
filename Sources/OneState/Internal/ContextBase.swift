@@ -1,4 +1,5 @@
 import Foundation
+import Dependencies
 
 class ContextBase: HoldsLock, @unchecked Sendable {
     var lock = Lock()
@@ -19,7 +20,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     }
     let events = AsyncPassthroughSubject<EventInfo>()
 
-    @Locked var dependencies: [ObjectIdentifier: Any] = [:]
+    var dependencies: [(index: Int, apply: (inout DependencyValues) -> Void)] = []
     @Locked var properties: [Any] = []
 
     @TaskLocal static var current: ContextBase?
@@ -142,5 +143,17 @@ class ContextBase: HoldsLock, @unchecked Sendable {
 
     var cancellations: Cancellations { fatalError() }
     var storePath: AnyKeyPath { fatalError() }
+
+    func withLocalDependencies<Value>(_ operation: () -> Value) -> Value {
+        Dependencies.withDependencies(from: self) {
+            for (_, apply) in dependencies {
+                apply(&$0)
+            }
+        } operation: {
+            operation()
+        }
+    }
+
+    func withDependencies<Value>(_ operation: () -> Value) -> Value { fatalError() }
 }
 

@@ -128,6 +128,7 @@ struct Weak<T: AnyObject>: @unchecked Sendable {
 final class ThreadState: @unchecked Sendable {
     var stateModelCount = 0
     var propertyIndex = 0
+    var dependencyIndex = 0
 
     init() {}
 

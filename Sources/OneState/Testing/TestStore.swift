@@ -1,5 +1,6 @@
 import Foundation
 import AsyncAlgorithms
+import Dependencies
 
 public final class TestStore<M: Model> where M.State: Equatable&Sendable {
     let store: Store<M>
@@ -9,8 +10,18 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
 
     public typealias State = M.State
 
-    public init(initialState: State, file: StaticString = #file, line: UInt = #line, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void = assertNoFailure) {
-        store = .init(initialState: initialState)
+    /// Creates a store for testing.
+    ///
+    ///     TestStore<AppView>(initialState: .init()) {
+    ///        $0.uuid = .incrementing
+    ///        $0.locale = Locale(identifier: "en_US")
+    ///     }
+    ///
+    /// - Parameter initialState:The store's initial state.
+    /// - Parameter dependencies: The overriden dependencies of the store.
+    ///
+    public init(initialState: State, dependencies: @escaping (inout DependencyValues) -> Void = { _ in }, file: StaticString = #file, line: UInt = #line, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void = assertNoFailure) {
+        store = .init(initialState: initialState, dependencies: dependencies)
 
         access = TestAccess(
             state: initialState,
@@ -43,13 +54,6 @@ extension TestStore: Sendable where State: Sendable {}
 extension TestStore: StoreViewProvider {
     public var storeView: StoreView<State, State, Write> {
         store.storeView
-    }
-}
-
-public extension TestStore {
-    func dependency<Value>(_ path: WritableKeyPath<ModelDependencyValues, Value>, _ value: Value) -> Self {
-        store.updateDependency(path, value)
-        return self
     }
 }
 

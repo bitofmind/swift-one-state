@@ -1,4 +1,5 @@
 import Foundation
+import Dependencies
 
 /// A store holds the state of an application or part of a applicaton
 ///
@@ -16,14 +17,21 @@ import Foundation
 ///             }
 ///         }
 ///     }
+///
+/// You can override default dependenies via the `dependencies` closure callback:
+///
+///     Store<AppView>(initialState: .init()) {
+///         $0.uuid = .incrementing
+///     }
+///
 public final class Store<M: Model>: @unchecked Sendable {
     public typealias State = M.State
-    
+
+    @Dependency(\.uuid) private var _marker
     private let lock = NSRecursiveLock()
 
     private var currentState: State
     private var modifyCount = 0
-
     private var overrideState: State?
 
     private var updateTask: Task<(), Never>?
@@ -31,13 +39,24 @@ public final class Store<M: Model>: @unchecked Sendable {
     private var lastCallContexts: [CallContext] = []
 
     private(set) weak var weakContext: ChildContext<M, M>?
-    private var dependencies: [ObjectIdentifier: Any] = [:]
     private var hasBeenActivated = false
+    private let dependencies: (inout DependencyValues) -> Void
 
     let cancellations = Cancellations()
 
-    public init(initialState: State) {
+    /// Creates a store.
+    ///
+    ///     Store<AppView>(initialState: .init()) {
+    ///        $0.uuid = .incrementing
+    ///        $0.locale = Locale(identifier: "en_US")
+    ///     }
+    ///
+    /// - Parameter initialState:The store's initial state.
+    /// - Parameter dependencies: The overriden dependencies of the store.
+    ///
+    public init(initialState: State, dependencies: @escaping (inout DependencyValues) -> Void = { _ in }) {
         currentState = initialState
+        self.dependencies = dependencies
     }
 }
 
@@ -54,11 +73,6 @@ public extension Store {
         }
     }
 
-    func dependency<Value>(_ path: WritableKeyPath<ModelDependencyValues, Value>, _ value: Value) -> Self {
-        updateDependency(path, value)
-        return self
-    }
-
     /// Used to override state when replaying recorded state
     var stateOverride: State? {
         get { lock { overrideState } }
@@ -67,7 +81,6 @@ public extension Store {
             weakContext?.notify(StateChange(isStateOverridden: true, isOverrideUpdate: true))
         }
     }
-
 }
 
 extension Store {
@@ -181,10 +194,6 @@ extension Store {
         }
 
         let context = ChildContext<M, M>(store: self, path: \.self, parent: nil)
-        for (key, value) in dependencies {
-            context.dependencies[key] = value
-        }
-
         weakContext = context
 
         guard !hasBeenActivated else {
@@ -194,22 +203,16 @@ extension Store {
 
         hasBeenActivated = true
         lock.unlock()
-        ContextBase.$current.withValue(nil) {
-            context.model.onActivate()
-        }
-        return context
-     }
 
-    func updateDependency<Value>(_ path: WritableKeyPath<ModelDependencyValues, Value>, _ value: Value) {
-        var d = ModelDependencyValues { _ in
-            nil
-        } set: { key, value in
-            self.lock {
-                self.dependencies[key] = value
-            }
-            self.weakContext?.dependencies[key] = value
+        return context
+    }
+
+    func withLocalDependencies<Value>(_ operation: () -> Value) -> Value {
+        withDependencies(from: self) {
+            dependencies(&$0)
+        } operation: {
+            operation()
         }
-        d[keyPath: path] = value
     }
 }
 
