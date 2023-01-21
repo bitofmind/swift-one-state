@@ -5,7 +5,7 @@ public protocol Cancellable {
     /// Cancel the activity.
     func cancel()
 
-    /// Cancel the activity when `cancelAll(for: key)` is called for the  provided `key`
+    /// Cancel the activity of a model when  when `model.cancelAll(for: key)` is called for the  provided `key`
     /// If `cancelInFlight` is true,  any previous activty set up to be cancelled for `key`
     /// is first cancelled.
     ///
@@ -24,9 +24,27 @@ public extension Cancellable {
     func cancel(for id: Any.Type, cancelInFlight: Bool = false) -> Self {
         cancel(for: ObjectIdentifier(id), cancelInFlight: cancelInFlight)
     }
+
+    /// Cancels any previously active task (using a key based of source location).
+    ///
+    ///     func onReload() {
+    ///         task { ... }.cancelInFlight()
+    ///     }
+    @discardableResult
+    func cancelInFlight(file: String = #fileID, line: Int = #line) -> Self {
+        cancel(for: FileAndLine(file: file, line: line), cancelInFlight: true)
+    }
 }
 
-/// Activites created while the context is active ( while perform is execute or any nested tasks) will be cancelllable by the provided `key`.
+/// Activites created while the context is active (while perform is executed or any nested tasks) will be cancelllable by the provided `key`.
+///
+///     withCancellationContext(myKey) {
+///         task { }
+///         forEach { }
+///     }
+///
+///     cancelAll(for: myKey)
+///
 public func withCancellationContext(_ key: some Hashable&Sendable, perform: () throws -> Void) rethrows {
     try AnyCancellable.$contexts.withValue(AnyCancellable.contexts + [CancellableKey(key: key)]) {
         try perform()
@@ -39,6 +57,15 @@ public func withCancellationContext(_ key: some Hashable&Sendable, perform: () a
     }
 }
 
+/// Activites created while the context is active (while perform is executed or any nested tasks) will be cancelllable by the provided `id`.
+///
+///     withCancellationContext(MyKey.self) {
+///         task { }
+///         forEach { }
+///     }
+///
+///     cancelAll(for: MyKey.self)
+///
 public func withCancellationContext(_ id: Any.Type, perform: () throws -> Void) rethrows {
     try withCancellationContext(ObjectIdentifier(id), perform: perform)
 }
@@ -47,9 +74,13 @@ public func withCancellationContext(_ id: Any.Type, perform: () async throws -> 
     try await withCancellationContext(ObjectIdentifier(id), perform: perform)
 }
 
-
 struct CancellableKey: Hashable, @unchecked Sendable {
     var key: AnyHashable
+}
+
+struct FileAndLine: Hashable, Sendable {
+    var file: String
+    var line: Int
 }
 
 struct AnyCancellable: Cancellable, InternalCancellable {
