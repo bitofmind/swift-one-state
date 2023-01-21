@@ -124,6 +124,33 @@ class CancelletionTests: XCTestCase {
         XCTAssertEqual(count, 4)
     }
 
+    func testCancelInFlightAlt() async throws {
+        @Locked var count = 0
+
+        do {
+            let store = TestStore<CounterModel>(initialState: .init())
+            @TestModel var model = store.model
+
+            for _ in 1...5 {
+                model.task {
+                    try await withTaskCancellationHandler {
+                        try await Task.sleep(nanoseconds: NSEC_PER_MSEC*100)
+                    } onCancel: {
+                        $count.wrappedValue += 1
+                    }
+                    $count.wrappedValue += 50
+                }
+                .cancelInFlight()
+
+                try await Task.sleep(nanoseconds: NSEC_PER_MSEC*10)
+            }
+
+            XCTAssertEqual(count, 4)
+        }
+
+        XCTAssertEqual(count, 5)
+    }
+
     func testForEachCancelPrevious() async throws {
         @Locked var count = 0
         let channel = AsyncChannel<Int>()
