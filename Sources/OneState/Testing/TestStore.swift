@@ -1,6 +1,8 @@
 import Foundation
 import AsyncAlgorithms
 import Dependencies
+import XCTestDynamicOverlay
+import CustomDump
 
 public final class TestStore<M: Model> where M.State: Equatable&Sendable {
     let store: Store<M>
@@ -20,13 +22,9 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
     /// - Parameter initialState:The store's initial state.
     /// - Parameter dependencies: The overriden dependencies of the store.
     ///
-    public init(initialState: State, dependencies: @escaping (inout DependencyValues) -> Void = { _ in }, file: StaticString = #file, line: UInt = #line, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void = assertNoFailure) {
+    public init(initialState: State, dependencies: @escaping (inout DependencyValues) -> Void = { _ in }, file: StaticString = #file, line: UInt = #line) {
         store = .init(initialState: initialState, dependencies: dependencies)
-
-        access = TestAccess(
-            state: initialState,
-            onTestFailure: onTestFailure
-        )
+        access = TestAccess(state: initialState)
 
         self.file = file
         self.line = line
@@ -36,15 +34,29 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
         store.context.removeRecusively()
         
         for info in store.cancellations.activeTasks {
-            access.onTestFailure(.tasksAreStillRunning(modelName: info.modelName, taskCount: info.count), file: file, line: line)
+            XCTFail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", file: file, line: line)
         }
 
         for event in access.eventUpdate.values {
-            access.onTestFailure(.eventNotExhausted(event: event.event), file: file, line: line)
+            XCTFail("Event not handled: \(String(describing: event))", file: file, line: line)
         }
 
         if access.stateUpdate.values.count > 1 {
-            access.onTestFailure(.stateNotExhausted(lastAsserted: access.lastAssertedState, actual: store.state), file: file, line: line)
+            let lastAsserted = access.lastAssertedState
+            let actual = store.state
+            let difference = diff(lastAsserted, actual, format: .proportional)
+                .map { "\($0.indent(by: 4))\n\n(Last asserted: −, Actual: +)" }
+            ??  """
+                Last asserted:
+                \(String(describing: lastAsserted).indent(by: 2))
+                Actual:
+                \(String(describing: actual).indent(by: 2))
+                """
+
+            XCTFail("""
+                State not exhausted: …
+                \(difference)
+                """, file: file, line: line)
         }
     }
 }
@@ -87,7 +99,7 @@ public extension TestStore {
 
             if hasTimedout  {
                 for info in activeTasks {
-                    access.onTestFailure(.tasksAreStillRunning(modelName: info.modelName, taskCount: info.count), file: file, line: line)
+                    XCTFail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", file: file, line: line)
                 }
                 break
             }

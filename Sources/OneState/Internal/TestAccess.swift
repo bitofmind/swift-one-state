@@ -1,4 +1,6 @@
 import Foundation
+import CustomDump
+import XCTestDynamicOverlay
 
 class TestAccessBase: StoreAccess {
     func assert<Root, State>(view: StoreView<Root, State, Write>, modify: @escaping (inout State) -> Void, timeout: UInt64, file: StaticString, line: UInt) async {
@@ -17,7 +19,6 @@ class TestAccessBase: StoreAccess {
 final class TestAccess<State: Equatable>: TestAccessBase {
     var lock = Lock()
     private var _expectedState: State
-    let onTestFailure: @Sendable (TestFailure<State>) -> Void
     var expectedState: State { lock { _expectedState } }
 
     final class Update<T> {
@@ -29,18 +30,13 @@ final class TestAccess<State: Equatable>: TestAccessBase {
     let stateUpdate = Update<State>()
     let eventUpdate = Update<ContextBase.EventInfo>()
 
-    init(state: State, onTestFailure: @escaping @Sendable (TestFailure<State>) -> Void = assertNoFailure) {
+    init(state: State) {
         self._expectedState = state
-        self.onTestFailure = onTestFailure
         stateUpdate.receive(state)
     }
 
     var lastAssertedState: State { stateUpdate.values.first! }
     var lastReceivedState: State { stateUpdate.values.last! }
-
-    func onTestFailure(_ kind: TestFailure<State>.Kind, file: StaticString, line: UInt) {
-        onTestFailure(.init(kind: kind, file: file, line: line))
-    }
 
     override func assert<Root, S>(view: StoreView<Root, S, Write>, modify: @escaping (inout S) -> Void, timeout: UInt64, file: StaticString, line: UInt) async {
         lock {
@@ -61,7 +57,21 @@ final class TestAccess<State: Equatable>: TestAccessBase {
             return await Task.yield()
         }
 
-        onTestFailure(.assertStateMismatch(expected: expected, actual: lastReceivedState), file: file, line: line)
+        let actual = lastReceivedState
+        let difference = diff(expected, actual, format: .proportional)
+            .map { "\($0.indent(by: 4))\n\n(Expected: −, Actual: +)" }
+        ??  """
+            Expected:
+            \(String(describing: expected).indent(by: 2))
+            Actual:
+            \(String(describing: actual).indent(by: 2))
+            """
+
+        XCTFail(
+            """
+            State change does not match expectation: …
+            \(difference)
+            """, file: file, line: line)
     }
 
     override func receive<Event: Equatable>(_ event: Event, context: ContextBase, timeout: UInt64, file: StaticString, line: UInt) async {
@@ -73,7 +83,7 @@ final class TestAccess<State: Equatable>: TestAccessBase {
         }
 
         if await !eventUpdate.consume(upUntil: predicate, timeout: timeout) {
-            onTestFailure(.receiveEventTimeout(event: event), file: file, line: line)
+            XCTFail("Timeout while waiting to receive event: \(String(describing: event))", file: file, line: line)
         }
 
         await Task.yield()
@@ -102,7 +112,7 @@ final class TestAccess<State: Equatable>: TestAccessBase {
             return TestView(storeView: unwrappedView)
         }
 
-        onTestFailure(.unwrapFailed, file: file, line: line)
+        XCTFail("Failed to unwrap value", file: file, line: line)
         throw UnwrapError()
     }
 
@@ -162,5 +172,12 @@ extension TestAccess.Update {
         }
 
         return false
+    }
+}
+
+extension String {
+    func indent(by indent: Int) -> String {
+        let indentation = String(repeating: " ", count: indent)
+        return indentation + replacingOccurrences(of: "\n", with: "\n\(indentation)")
     }
 }
