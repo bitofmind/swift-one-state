@@ -24,10 +24,11 @@ import Dependencies
 ///         $0.uuid = .incrementing
 ///     }
 ///
+@dynamicMemberLookup
 public final class Store<M: Model>: @unchecked Sendable {
     public typealias State = M.State
 
-    @Dependency(\.uuid) private var _marker
+    @Dependency(\.uuid) private var dependencies
     private let lock = NSRecursiveLock()
 
     private var currentState: State
@@ -40,7 +41,6 @@ public final class Store<M: Model>: @unchecked Sendable {
 
     private(set) weak var weakContext: ChildContext<M, M>?
     private var hasBeenActivated = false
-    private let dependencies: (inout DependencyValues) -> Void
 
     let cancellations = Cancellations()
 
@@ -56,7 +56,11 @@ public final class Store<M: Model>: @unchecked Sendable {
     ///
     public init(initialState: State, dependencies: @escaping (inout DependencyValues) -> Void = { _ in }) {
         currentState = initialState
-        self.dependencies = dependencies
+        withDependencies(from: self) {
+            dependencies(&$0)
+        } operation: {
+            _dependencies = Dependency(\.uuid)
+        }
     }
 }
 
@@ -209,8 +213,6 @@ extension Store {
 
     func withLocalDependencies<Value>(_ operation: () -> Value) -> Value {
         withDependencies(from: self) {
-            dependencies(&$0)
-        } operation: {
             operation()
         }
     }
