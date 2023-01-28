@@ -9,6 +9,25 @@ public protocol ModelContainer {
     var models: [ModelElement] { get }
 }
 
+public extension ModelContainer {
+    init<Provider: StoreViewProvider>(_ viewStore: Provider) where Provider.State == StateModel<Self>, Provider.Access == Write, StateContainer: OneState.StateContainer, StateContainer.Element == ModelElement.State {
+        let view = viewStore.storeView
+        let containerPath = view.path(\.wrappedValue)
+        let containerView = StoreView(context: view.context, path: containerPath, access: view.access)
+        let container = view.context.value(for: containerView.path, access: containerView.access, comparable: StructureComparableValue.self)
+        let elementPaths = container.elementKeyPaths
+        let models = StoreAccess.$current.withValue(view.access.map(Weak.init)) {
+            elementPaths.map { path in
+                ModelElement(containerView.storeView(for: path))
+            }
+        }
+
+        view.observeContainer(atPath: \.self)
+
+        self = Self.modelContainer(from: models)
+    }
+}
+
 extension Model where StateContainer == State, ModelElement == Self {
     public static func modelContainer(from elements: [Self]) -> Self {
         elements[0]

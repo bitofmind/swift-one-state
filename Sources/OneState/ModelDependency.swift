@@ -57,7 +57,7 @@ public struct ModelDependency<Value> {
     public var wrappedValue: Value {
         get {
             context.withDependencies {
-                Dependency(self.path).wrappedValue
+                Dependency(path).wrappedValue
             }
         }
         nonmutating set {

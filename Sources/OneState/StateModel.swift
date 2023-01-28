@@ -42,6 +42,10 @@ public struct StateModel<Container: ModelContainer> {
     public init(wrappedValue: Container.StateContainer) {
         _wrappedValue = wrappedValue
     }
+
+    public init(_ container: Container.StateContainer) {
+        _wrappedValue = container
+    }
 }
 
 extension StateModel: Sendable where Container.StateContainer: Sendable {}
@@ -62,20 +66,7 @@ public extension Model {
     }
 
     subscript<Models>(dynamicMember path: WritableKeyPath<State, StateModel<Models>>) -> Models where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
-        let view = storeView
-        let containerPath = path.appending(path: \.wrappedValue)
-        let containerView = StoreView(context: view.context, path: containerPath, access: view.access)
-        let container = view.context.value(for: containerView.path, access: containerView.access, comparable: StructureComparableValue.self)
-        let elementPaths = container.elementKeyPaths
-        let models = StoreAccess.$current.withValue(modelState?.storeAccess.map(Weak.init)) {
-            elementPaths.map { path in
-                Models.ModelElement(containerView.storeView(for: path))
-            }
-        }
-
-        view.observeContainer(atPath: path)
-
-        return Models.modelContainer(from: models)
+        Models(storeView.storeView(for: path))
     }
 }
 

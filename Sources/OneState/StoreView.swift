@@ -57,13 +57,13 @@ extension StoreView: Equatable where State: Equatable {
     }
 }
 
-extension StoreView {
+public extension StoreView {
     func path<T>(_ keyPath: KeyPath<State, T>) -> KeyPath<Root, T>{
         storeView.path.appending(path: keyPath)
     }
 }
 
-extension StoreView where Access == Write {
+public extension StoreView where Access == Write {
     func path<T>(_ keyPath: WritableKeyPath<State, T>) -> WritableKeyPath<Root, T>{
         storeView.path.appending(path: keyPath)
     }
