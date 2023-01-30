@@ -63,9 +63,9 @@ extension ViewAccess {
     func startObserving(from contexts: [ContextBase]) {
         stopObserving()
         self.contexts = contexts
-        observationTasks = contexts.map { context in
+        observationTasks = contexts.map {  [weak self] context in
             Task { @MainActor [weak self] in
-                objectWillChange.send()
+                self?.objectWillChange.send()
                 for await update in context.stateUpdates where !Task.isCancelled {
                     await self?.handle(update: update, for: context)
                 }
