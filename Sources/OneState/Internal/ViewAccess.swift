@@ -4,11 +4,9 @@ class ViewAccess: StoreAccess, ObservableObject {
     private var lock = Lock()
     private var observations: [ObjectIdentifier: Observation] = [:]
     private(set) var updateCount = 0
-    private var modifyCount = 0
 
     override func willAccess<StoreModel: Model, Comparable: ComparableValue>(store: Store<StoreModel>, from context: ContextBase, path: KeyPath<StoreModel.State, Comparable.Value>, comparable: Comparable.Type) {
-        let modifyCount = lock { self.modifyCount }
-        let observedState: ObservedState? = lock {
+        lock {
             let id = ObjectIdentifier(context)
 
             let observation = observations[id] ?? {
@@ -26,42 +24,20 @@ class ViewAccess: StoreAccess, ObservableObject {
                 return observation
             }()
 
-            guard observation.observedStates.index(forKey: path) == nil else { return nil }
+            guard observation.observedStates.index(forKey: path) == nil else { return }
 
-            let observedState = _ObservedState(store: store, path: path, comparable: comparable)
-            observation.observedStates[path] = observedState
-
-            return observedState
+            observation.observedStates[path] = _ObservedState(store: store, path: path, comparable: comparable)
         }
-
-        if let observedState {
-            Task { @MainActor in
-                // Handle race where an update might not be picked up due to observation not being fully active yet
-                let wasModified = lock { self.modifyCount != modifyCount }
-                let didUpdate = observedState.update()
-                if wasModified || didUpdate {
-                    apply(callContexts: CallContext.currentContexts) {
-                        objectWillChange.send()
-                    }
-                }
-            }
-        }
-    }
-
-    override func didModify<S>(state: S) {
-        lock { modifyCount &+= 1 }
     }
 
     override var allowAccessToBeOverridden: Bool { true }
 }
 
 private class ObservedState {
-    func update() -> Bool { fatalError() }
     func onUpdate(_ update: StateUpdate, in context: ContextBase) -> Bool { fatalError() }
 }
 
 private final class _ObservedState<StoreModel: Model, Comparable: ComparableValue>: ObservedState {
-    private var lock = Lock()
     weak var store: Store<StoreModel>?
     let path: KeyPath<StoreModel.State, Comparable.Value>
     var value: Comparable
@@ -70,33 +46,21 @@ private final class _ObservedState<StoreModel: Model, Comparable: ComparableValu
         self.store = store
         self.path = path
         self.value = Comparable(value: store[overridePath: path] ?? store[path: path])
-   }
-
-    override func update() -> Bool {
-        lock {
-            guard let store else { return false }
-
-            let newValue = Comparable(value: store[overridePath: path] ?? store[path: path])
-
-            defer { value = newValue }
-            return newValue != value
-        }
     }
 
     override func onUpdate(_ update: StateUpdate, in context: ContextBase) -> Bool {
-        let shouldUpdate = lock {
-            guard !context.hasBeenRemoved else {
-                return false
-            }
-
-            if Comparable.ignoreChildUpdates, update.fromContext.isDescendant(of: context) {
-                return false
-            }
-
-            return true
+        guard let store, !context.hasBeenRemoved else {
+            return false
         }
 
-        return shouldUpdate && self.update()
+        if Comparable.ignoreChildUpdates, update.fromContext.isDescendant(of: context) {
+            return false
+        }
+
+        let newValue = Comparable(value: store[overridePath: path] ?? store[path: path])
+
+        defer { value = newValue }
+        return newValue != value
     }
 }
 
@@ -124,13 +88,15 @@ private final class Observation {
     }
 
     func didUpdate(for update: StateUpdate, from context: ContextBase) -> Bool {
-        if wasStateOverriden != update.isStateOverridden {
-            wasStateOverriden = update.isStateOverridden
-            return true
-        }
+        lock {
+            if wasStateOverriden != update.isStateOverridden {
+                wasStateOverriden = update.isStateOverridden
+                return true
+            }
 
-        return observedStates.values.reduce(false) {
-            $1.onUpdate(update, in: context) || $0
+            return observedStates.values.reduce(false) {
+                $1.onUpdate(update, in: context) || $0
+            }
         }
     }
 }
