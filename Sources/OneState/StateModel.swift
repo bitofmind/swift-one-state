@@ -60,7 +60,7 @@ extension StateModel: CustomStringConvertible {
 
 public extension Model {
     subscript<M: Model>(dynamicMember path: WritableKeyPath<State, StateModel<M>>) -> M where M.StateContainer == M.State {
-        StoreAccess.$current.withValue(modelState?.storeAccess.map(Weak.init)) {
+        StoreAccess.with(modelState?.storeAccess) {
             M(storeView(for: path.appending(path: \.wrappedValue)))
         }
     }

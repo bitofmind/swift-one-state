@@ -54,19 +54,11 @@ func apply<C: Collection&Sendable>(callContexts: C, execute: @Sendable () -> Voi
     }
 }
 
-struct StateChange: Sendable {
+struct StateUpdate: Sendable {
     var isStateOverridden: Bool
     var isOverrideUpdate: Bool
     var callContexts: [CallContext] = []
-    var isFromChild: Bool = false
-}
-
-extension StateChange {
-    func fromChild() -> Self {
-        var result = self
-        result.isFromChild = true
-        return result
-    }
+    var fromContext: ContextBase
 }
 
 protocol ComparableValue<Value>: Equatable {
@@ -111,7 +103,7 @@ struct IDCollectionComparableValue<Value: MutableCollection>: ComparableValue wh
 }
 
 class StoreAccess: @unchecked Sendable {
-    func willAccess<StoreModel: Model, Comparable: ComparableValue>(store: Store<StoreModel>, path: KeyPath<StoreModel.State, Comparable.Value>, comparable: Comparable.Type) { }
+    func willAccess<StoreModel: Model, Comparable: ComparableValue>(store: Store<StoreModel>, from context: ContextBase, path: KeyPath<StoreModel.State, Comparable.Value>, comparable: Comparable.Type) { }
     func didModify<State>(state: State) { }
     func didSend(event: ContextBase.EventInfo) {}
 
@@ -119,6 +111,10 @@ class StoreAccess: @unchecked Sendable {
 
     @TaskLocal static var current: Weak<StoreAccess>?
     @TaskLocal static var isInViewModelContext = false
+
+    static func with<T>(_ access: (some StoreAccess)?, operation: () -> T) -> T {
+        StoreAccess.$current.withValue(access.map(Weak.init), operation: operation)
+    }
 }
 
 struct Weak<T: AnyObject>: @unchecked Sendable {

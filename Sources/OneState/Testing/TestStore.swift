@@ -71,7 +71,7 @@ extension TestStore: StoreViewProvider {
 
 public extension TestStore {
     var model: M {
-        StoreAccess.$current.withValue(Weak(value: access)) {
+        StoreAccess.with(access) {
             M(self)
         }
     }

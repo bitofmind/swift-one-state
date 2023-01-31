@@ -25,11 +25,19 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
                 ContextModel()
             }
 
-            guard !lock({ hasBeenRemoved }) else {
+            guard !self.hasBeenRemoved else {
                 return model
             }
 
-            lock { _models[key] = model }
+            lock {
+                _models[key] = model
+
+                for (key, value) in _models {
+                    if value.modelState?.storeAccess == nil && key != ObjectIdentifier(self) {
+                        _models[key] = nil
+                    }
+                }
+            }
 
             if firstAccess && !self.isOverrideContext {
                 ContextBase.$current.withValue(nil) {
@@ -139,7 +147,7 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
     override func value<Comparable: ComparableValue>(for path: KeyPath<State, Comparable.Value>, access: StoreAccess?, comparable: Comparable.Type) -> Comparable.Value {
         if !StoreAccess.isInViewModelContext, let access = access {
             let fullPath = self.path.appending(path: path)
-            access.willAccess(store: store, path: fullPath, comparable: comparable)
+            access.willAccess(store: store, from: self, path: fullPath, comparable: comparable)
         }
 
         return self[path: path, access: access]

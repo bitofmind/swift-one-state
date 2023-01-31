@@ -82,7 +82,7 @@ public extension Store {
         get { lock { overrideState } }
         set {
             lock { overrideState = newValue }
-            weakContext?.notify(StateChange(isStateOverridden: true, isOverrideUpdate: true))
+            weakContext?.notify(StateUpdate(isStateOverridden: true, isOverrideUpdate: true, fromContext: context))
         }
     }
 }
@@ -126,7 +126,7 @@ extension Store {
             yield &currentState[keyPath: path]
             lastFromContext = fromContext
             lastCallContexts = callContexts
-            modifyCount += 1
+            modifyCount &+= 1
 
             if updateTask == nil {
                 // Try to coalesce updates
@@ -177,10 +177,11 @@ extension Store {
 
         lastFromContext = nil
 
-        let update = StateChange(
+        let update = StateUpdate(
             isStateOverridden: stateOverride != nil,
             isOverrideUpdate: false,
-            callContexts: callContexts
+            callContexts: callContexts,
+            fromContext: context
         )
 
         return {

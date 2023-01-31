@@ -8,9 +8,9 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     var _children: [AnyKeyPath: ContextBase] = [:]
     var _overrideChildren: [AnyKeyPath: ContextBase] = [:]
     @Locked var isOverrideContext = false
-    var hasBeenRemoved = false
+    @Locked var hasBeenRemoved = false
 
-    let stateUpdates = AsyncPassthroughSubject<StateChange>()
+    let stateUpdates = AsyncPassthroughSubject<StateUpdate>()
 
     struct EventInfo: @unchecked Sendable {
         var event: Any
@@ -27,7 +27,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
 
     let contextCancellationKey = UUID()
 
-    @Locked var containers: [AnyKeyPath: (StateChange) -> ()] = [:]
+    @Locked var containers: [AnyKeyPath: (StateUpdate) -> ()] = [:]
 
     init(parent: ContextBase?) {
         self.parent = parent
@@ -40,8 +40,8 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     func onRemoval() {
         cancellations.cancelAll(for: contextCancellationKey)
 
+        self.hasBeenRemoved = true
         let parent = lock {
-            hasBeenRemoved = true
             defer { self.parent = nil }
             return self.parent
         }
@@ -100,32 +100,45 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         }
     }
 
-    func notifyAncestors(_ update: StateChange) {
-        parent?.notifyAncestors(update)
-        parent?.stateUpdates.yield(update)
+    private func notifyUpdate(_ update: StateUpdate) {
+        guard !hasBeenRemoved else { return }
+        stateUpdates.yield(update)
     }
 
-    func notifyDescendants(_ update: StateChange) {
+    func notifyAncestors(_ update: StateUpdate) {
+        parent?.notifyAncestors(update)
+        parent?.notifyUpdate(update)
+    }
+
+    func notifyDescendants(_ update: StateUpdate) {
         let (children, overrideChildren) = lock {
             (_children.values, _overrideChildren.values)
         }
 
         for child in children {
-            child.stateUpdates.yield(update)
+            child.notifyUpdate(update)
             child.notifyDescendants(update)
         }
 
         for child in overrideChildren {
             if update.isOverrideUpdate {
-                child.stateUpdates.yield(update)
+                child.notifyUpdate(update)
             }
             child.notifyDescendants(update)
         }
     }
 
-    func notify(_ update: StateChange) {
-        notifyAncestors(update.fromChild())
-        stateUpdates.yield(update)
+    func isDescendant(of context: ContextBase) -> Bool {
+        guard let parent, context !== self else { return false }
+
+        if parent === context { return true }
+
+        return parent.isDescendant(of: context)
+    }
+
+    func notify(_ update: StateUpdate) {
+        notifyAncestors(update)
+        notifyUpdate(update)
         notifyDescendants(update)
 
         for container in containers.values {

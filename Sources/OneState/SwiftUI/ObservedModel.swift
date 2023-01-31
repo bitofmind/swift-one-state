@@ -5,7 +5,7 @@ import CustomDump
 @propertyWrapper
 @dynamicMemberLookup
 public struct ObservedModel<M: ModelContainer>: DynamicProperty {
-    @StateObject fileprivate var access = ViewAccess()
+    @StateObject var access = ViewAccess()
 
     public init(wrappedValue: M) {
         self.wrappedValue = wrappedValue
@@ -21,18 +21,11 @@ public struct ObservedModel<M: ModelContainer>: DynamicProperty {
     }
 
     public mutating func update() {
-        let contexts = wrappedValue.checkedContexts()
-        let prevContexts = access.contexts
-
         wrappedValue = M.modelContainer(from: wrappedValue.models.compactMap { model in
-            StoreAccess.$current.withValue(Weak(value: access)) {
+            StoreAccess.with(access) {
                 M.ModelElement(context: model.context)
             }
         })
-
-        guard !contexts.elementsEqual(prevContexts, by: ===) else { return }
-
-        access.startObserving(from: contexts)
     }
 }
 

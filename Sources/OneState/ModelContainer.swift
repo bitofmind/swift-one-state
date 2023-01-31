@@ -16,7 +16,7 @@ public extension ModelContainer {
         let containerView = StoreView(context: view.context, path: containerPath, access: view.access)
         let container = view.context.value(for: containerView.path, access: containerView.access, comparable: StructureComparableValue.self)
         let elementPaths = container.elementKeyPaths
-        let models = StoreAccess.$current.withValue(view.access.map(Weak.init)) {
+        let models = StoreAccess.with(view.access) {
             elementPaths.map { path in
                 ModelElement(containerView.storeView(for: path))
             }
