@@ -21,7 +21,10 @@ public struct ObservedModel<M: ModelContainer>: DynamicProperty {
     }
 
     public mutating func update() {
-        wrappedValue = M.modelContainer(from: wrappedValue.models.compactMap { model in
+        let hasBeenRemoved = wrappedValue.models.reduce(false) { $0 || $1.context.hasBeenRemoved }
+        guard !hasBeenRemoved else { return }
+
+        wrappedValue = M.modelContainer(from: wrappedValue.models.map { model in
             StoreAccess.with(access) {
                 M.ModelElement(context: model.context)
             }

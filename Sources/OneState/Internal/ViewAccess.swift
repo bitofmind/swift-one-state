@@ -71,9 +71,10 @@ private final class Observation {
     var wasStateOverriden = false
 
     init(context: ContextBase, onChange: @escaping (StateUpdate) -> Void) {
-        cancel = Task { [weak self] in
-            for await update in context.stateUpdates where !Task.isCancelled {
-                guard let self, update.isStateOverridden == update.isOverrideUpdate else { continue }
+        let stateUpdates = context.stateUpdates
+        cancel = Task { [weak self, weak context] in
+            for await update in stateUpdates where !Task.isCancelled {
+                guard let self, let context, update.isStateOverridden == update.isOverrideUpdate else { continue }
 
                 let wasUpdated = self.didUpdate(for: update, from: context)
                 guard wasUpdated else { continue }

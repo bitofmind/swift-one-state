@@ -31,6 +31,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
 
     init(parent: ContextBase?) {
         self.parent = parent
+        self.hasBeenRemoved = parent?.$hasBeenRemoved ?? false
     }
 
     deinit {

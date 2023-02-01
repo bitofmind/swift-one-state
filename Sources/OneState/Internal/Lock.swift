@@ -58,6 +58,11 @@ struct Locked<Value> {
         get { fatalError() }
         set { fatalError() }
     }
+
+    var projectedValue: Value {
+        get { _wrappedValue }
+        set { _wrappedValue = newValue }
+    }
 }
 
 final class Protected<Value: Sendable>: @unchecked Sendable {

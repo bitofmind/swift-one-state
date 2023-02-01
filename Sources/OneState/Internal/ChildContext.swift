@@ -12,6 +12,12 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
     private var _models: [ObjectIdentifier: ContextModel] = [:]
     private var modelLock = Lock()
 
+    init(store: Store<StoreModel>, path: WritableKeyPath<StoreState, State>, parent: ContextBase?) {
+        self.store = store
+        self.path = path
+        super.init(parent: parent)
+    }
+
     var model: ContextModel {
         let access = StoreAccess.current?.value
         let key = access.map(ObjectIdentifier.init) ?? ObjectIdentifier(self)
@@ -51,12 +57,6 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
 
     override func getModel<M: Model>() -> M {
         model as! M
-    }
-
-    init(store: Store<StoreModel>, path: WritableKeyPath<StoreState, State>, parent: ContextBase?) {
-        self.store = store
-        self.path = path
-        super.init(parent: parent)
     }
 
     override func onRemoval() {
