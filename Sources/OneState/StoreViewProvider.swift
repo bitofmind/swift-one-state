@@ -188,16 +188,18 @@ extension StoreViewProvider {
 }
 
 extension StoreViewProvider where Access == Write {
-    func observeContainer<Models>(atPath path: WritableKeyPath<State, StateModel<Models>>) where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
+    func observeContainer<Models: ModelContainer>(ofType: Models.Type, atPath path: WritableKeyPath<State, Models.StateContainer>) where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
         let view = storeView
-        let containerPath = view.path.appending(path: path).appending(path: \.wrappedValue)
+        let containerPath = view.path.appending(path: path)
         let context = view.context
         if context.containers[containerPath] == nil {
             let prevContainer = view.context[path: containerPath]
             var prevStructure = StructureComparableValue(value: prevContainer)
             var prevElementPaths = Set(prevContainer.elementKeyPaths)
-            context.containers[containerPath] = { update in
-                let currentContainer = view.context[path: containerPath]
+            context.containers[containerPath] = { [weak context, weak containerContext = view.context] update in
+                guard let context, let containerContext else { return }
+
+                let currentContainer = containerContext[path: containerPath]
                 let currentStructure = StructureComparableValue(value: currentContainer)
 
                 guard prevStructure != currentStructure else {
@@ -217,7 +219,7 @@ extension StoreViewProvider where Access == Write {
                 for addedPath in addedPaths {
                     let childPath = containerPath.appending(path: addedPath)
                     if context.allChildren[childPath] == nil {
-                        let containerView = StoreView(context: view.context, path: childPath, access: nil)
+                        let containerView = StoreView(context: containerContext, path: childPath, access: nil)
                         _ = Models.ModelElement(containerView)
                     }
                 }
@@ -229,6 +231,10 @@ extension StoreViewProvider where Access == Write {
                 }
             }
         }
+    }
+
+    func observeContainer<Models>(atPath path: WritableKeyPath<State, StateModel<Models>>) where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
+        observeContainer(ofType: Models.self, atPath: path.appending(path: \.wrappedValue))
     }
 }
 

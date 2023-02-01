@@ -10,9 +10,9 @@ public protocol ModelContainer {
 }
 
 public extension ModelContainer {
-    init<Provider: StoreViewProvider>(_ viewStore: Provider) where Provider.State == StateModel<Self>, Provider.Access == Write, StateContainer: OneState.StateContainer, StateContainer.Element == ModelElement.State {
-        let view = viewStore.storeView
-        let containerPath = view.path(\.wrappedValue)
+    init<Provider: StoreViewProvider>(_ provider: Provider) where Provider.State == StateContainer, Provider.Access == Write, StateContainer: OneState.StateContainer, StateContainer.Element == ModelElement.State {
+        let view = provider.storeView
+        let containerPath = view.path
         let containerView = StoreView(context: view.context, path: containerPath, access: view.access)
         let container = view.context.value(for: containerView.path, access: containerView.access, comparable: StructureComparableValue.self)
         let elementPaths = container.elementKeyPaths
@@ -22,9 +22,13 @@ public extension ModelContainer {
             }
         }
 
-        view.observeContainer(atPath: \.self)
-
         self = Self.modelContainer(from: models)
+
+        view.observeContainer(ofType: type(of: self), atPath: \.self)
+    }
+
+    init<Provider: StoreViewProvider>(_ storeView: Provider) where Provider.State == StateModel<Self>, Provider.Access == Write, StateContainer: OneState.StateContainer, StateContainer.Element == ModelElement.State {
+        self.init(storeView.storeView(for: \.wrappedValue))
     }
 }
 
