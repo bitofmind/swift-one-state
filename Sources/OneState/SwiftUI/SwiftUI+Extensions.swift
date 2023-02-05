@@ -39,6 +39,7 @@ public extension Model {
     }
 }
 
+@discardableResult
 public func withAnimation<Result>(_ animation: Animation? = .default, _ body: () throws -> Result) rethrows -> Result {
     try withCallContext(body: body) { action in
         SwiftUI.withAnimation(animation) {
@@ -47,6 +48,7 @@ public func withAnimation<Result>(_ animation: Animation? = .default, _ body: ()
     }
 }
 
+@discardableResult
 public func withTransaction<Result>(_ transaction: Transaction, _ body: () throws -> Result) rethrows -> Result {
     try withCallContext(body: body) { action in
          SwiftUI.withTransaction(transaction) {
@@ -56,14 +58,12 @@ public func withTransaction<Result>(_ transaction: Transaction, _ body: () throw
 }
 
 public extension StoreViewProvider where Access == Write {
-    subscript<T>(dynamicMember path: WritableKeyPath<State, Writable<T?>>) -> Binding<StoreView<Root, T, Write>?> {
+    subscript<T>(dynamicMember path: WritableKeyPath<State, Writable<T?>>) -> Binding<StoreView<Root, T?, Write>> {
         let view = self.storeView
         return .init {
             view.storeView(for: path.appending(path: \.wrappedValue))
         } set: { newValue in
-            view.setValue(newValue.map {
-                $0.context[path: $0.path, access: view.access]
-            }, at: path)
+            view.setValue(newValue.nonObservableState, at: path)
         }
     }
 }

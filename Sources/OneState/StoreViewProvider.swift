@@ -74,19 +74,7 @@ public extension StoreViewProvider {
     }
 }
 
-public extension StoreViewProvider {
-    func storeView<T>(for keyPath: KeyPath<State, T>) -> StoreView<Root, T, Read> {
-        let view = storeView
-        return StoreView(context: view.context, path: view.path(keyPath), access: view.access)
-    }
-}
-
 public extension StoreViewProvider where Access == Write {
-    func storeView<T>(for keyPath: WritableKeyPath<State, T>) -> StoreView<Root, T, Write> {
-        let view = storeView
-        return StoreView(context: view.context, path: view.path(keyPath), access: view.access)
-    }
-
     func setValue<T>(_ value: T, at keyPath: WritableKeyPath<State, Writable<T>>) {
         let view = storeView
         return view.context[path: view.path(keyPath), access: view.access] = .init(wrappedValue: value)
@@ -108,18 +96,6 @@ public extension StoreViewProvider {
         let view = storeView
         let unwrapPath = view.path.appending(path: \.[unwrap: path])
         return StoreView(context: view.context, path: unwrapPath, access: view.access)
-    }
-
-    subscript<T>(dynamicMember path: KeyPath<State, T?>) -> StoreView<Root, T, Read>? {
-        storeView(for: path)
-    }
-
-    subscript<S, T>(dynamicMember path: KeyPath<S, T>) -> StoreView<Root, T, Read>? where State == S? {
-        storeView(for: \.self)?.storeView(for: path)
-    }
-
-    subscript<S, T>(dynamicMember path: KeyPath<S, T?>) -> StoreView<Root, T, Read>? where State == S? {
-        storeView(for: \.self)?.storeView(for: path)
     }
 }
 
@@ -144,18 +120,6 @@ public extension StoreViewProvider where Access == Write {
         let unwrapPath = view.path.appending(path: \.[unwrap: path])
         return StoreView(context: view.context, path: unwrapPath, access: view.access)
     }
-
-    subscript<T>(dynamicMember path: WritableKeyPath<State, T?>) -> StoreView<Root, T, Write>? {
-        storeView(for: path)
-    }
-
-    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T>) -> StoreView<Root, T, Write>? where State == S? {
-        storeView(for: \.self)?.storeView(for: path)
-    }
-
-    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T?>) -> StoreView<Root, T, Write>? where State == S? {
-        storeView(for: \.self)?.storeView(for: path)
-    }
 }
 
 public extension StoreViewProvider {
@@ -170,6 +134,20 @@ public extension StoreViewProvider {
                 print("State did update\(name.isEmpty ? "" : " for \(name)"):\n" + diff)
             }
         }
+    }
+}
+
+extension StoreViewProvider {
+    func storeView<T>(for keyPath: KeyPath<State, T>) -> StoreView<Root, T, Read> {
+        let view = storeView
+        return StoreView(context: view.context, path: view.path(keyPath), access: view.access)
+    }
+}
+
+extension StoreViewProvider where Access == Write {
+    func storeView<T>(for keyPath: WritableKeyPath<State, T>) -> StoreView<Root, T, Write> {
+        let view = storeView
+        return StoreView(context: view.context, path: view.path(keyPath), access: view.access)
     }
 }
 

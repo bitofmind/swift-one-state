@@ -10,10 +10,6 @@ class TestAccessBase: StoreAccess {
     func receive<Event: Equatable>(_ event: Event, context: ContextBase, timeout: UInt64, file: StaticString, line: UInt) async {
         fatalError()
     }
-
-    func unwrap<Root, T>(view: StoreView<Root, T?, Write>, timeout: UInt64, file: StaticString, line: UInt) async throws -> TestView<Root, T> {
-        fatalError()
-    }
 }
 
 final class TestAccess<State: Equatable>: TestAccessBase {
@@ -89,33 +85,6 @@ final class TestAccess<State: Equatable>: TestAccessBase {
         await Task.yield()
     }
 
-    override func unwrap<Root, T>(view: StoreView<Root, T?, Write>, timeout: UInt64, file: StaticString, line: UInt) async throws -> TestView<Root, T> {
-        guard let unwrappedView: StoreView = view.storeView(for: \.self) else {
-            throw UnwrapError()
-        }
-
-        let storePath: WritableKeyPath<State, T?> = view.context.storePath(for: view.path)!
-
-        lock {
-            _expectedState[keyPath: storePath] = unwrappedView.nonObservableState
-        }
-
-        @Sendable func predicate(_ value: State) -> Bool {
-            value[keyPath: storePath] != nil
-        }
-
-        if predicate(lastAssertedState) {
-            return TestView(storeView: unwrappedView)
-        }
-
-        if await stateUpdate.consume(upUntil: predicate, keepLast: true, timeout: timeout) {
-            return TestView(storeView: unwrappedView)
-        }
-
-        XCTFail("Failed to unwrap value", file: file, line: line)
-        throw UnwrapError()
-    }
-
     override func didModify<S>(state: S) {
         Swift.assert(State.self == S.self)
         stateUpdate.receiveSkipDuplicates(state as! State)
@@ -125,8 +94,6 @@ final class TestAccess<State: Equatable>: TestAccessBase {
         eventUpdate.receive(event)
     }
 }
-
-struct UnwrapError: Error {}
 
 extension TestAccess.Update {
     func receiveSkipDuplicates(_ value: T) where T: Equatable {

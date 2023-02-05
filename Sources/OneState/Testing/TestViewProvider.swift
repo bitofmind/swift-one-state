@@ -25,10 +25,6 @@ public extension TestViewProvider {
     subscript<T>(dynamicMember path: WritableKeyPath<State, T>) -> TestView<Root, T> {
         .init(storeView: testView.storeView.storeView(for: path))
     }
-
-    func unwrap<T>(timeoutNanoseconds timeout: UInt64 = NSEC_PER_SEC, file: StaticString = #file, line: UInt = #line) async throws -> TestView<Root, T> where State == T? {
-        try await access.unwrap(view: testView.storeView, timeout: timeout, file: file, line: line)
-    }
 }
 
 @dynamicMemberLookup

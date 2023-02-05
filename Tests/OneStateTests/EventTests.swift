@@ -45,7 +45,7 @@ final class EventTests: XCTestCase {
 
 
         parent.setOptChild(id: 5)
-        try await $parent.optChild.unwrap().assert(.init(id: 5))
+        await $parent.optChild.assert(.init(id: 5))
 
         @TestModel var optChild = try XCTUnwrap(parent.$optChild)
         optChild.send(.count(7))

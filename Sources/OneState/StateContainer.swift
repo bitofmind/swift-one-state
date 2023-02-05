@@ -40,50 +40,6 @@ public extension MutableCollection where Element: Identifiable {
 }
 
 extension Array: StateContainer where Element: Identifiable {}
-
-public extension StoreViewProvider {
-    func containerStoreViewElements<Container: MutableCollection>(for path: KeyPath<State, Container>) -> [StoreView<Root, Container.Element, Read>] where Container.Element: Identifiable {
-        let containerView = storeView(for: path)
-        let container = containerView.containerValue(for: \.self)
-        return container.elementKeyPaths.map { path in
-            containerView.storeView(for: path)
-        }
-    }
-
-    func containerStoreViewElements<Container: StateContainer>(for path: KeyPath<State, Container>) -> [StoreView<Root, Container.Element, Read>] {
-        let containerView = storeView(for: path)
-        let container = containerView.containerValue(for: \.self)
-        return container.elementKeyPaths.map { path in
-            containerView.storeView(for: path)
-        }
-    }
-
-    func storeView<T>(for path: KeyPath<State, T?>) -> StoreView<Root, T, Read>? {
-        containerStoreViewElements(for: path).first
-    }
-}
-
-public extension StoreViewProvider where Access == Write {
-    func containerStoreViewElements<Container: MutableCollection>(for path: WritableKeyPath<State, Container>) -> [StoreView<Root, Container.Element, Write>] where Container.Element: Identifiable {
-        let containerView = storeView(for: path)
-        let container = containerView.containerValue(for: \.self)
-        return container.elementKeyPaths.map { path in
-            containerView.storeView(for: path)
-        }
-    }
-    
-    func containerStoreViewElements<Container: StateContainer>(for path: WritableKeyPath<State, Container>) -> [StoreView<Root, Container.Element, Write>] {
-        let containerView = storeView(for: path)
-        let container = containerView.containerValue(for: \.self)
-        return container.elementKeyPaths.map { path in
-            containerView.storeView(for: path)
-        }
-    }
-
-    func storeView<T>(for path: WritableKeyPath<State, T?>) -> StoreView<Root, T, Write>? {
-        containerStoreViewElements(for: path).first
-    }
-}
     
 private extension Optional {
     subscript (unwrapFallback fallback: UnwrapFallback<Wrapped>) -> Wrapped {
