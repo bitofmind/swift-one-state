@@ -42,9 +42,9 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
             XCTFail("Event not handled: \(String(describing: event))", file: file, line: line)
         }
 
-        if access.stateUpdate.values.count > 1 {
-            let lastAsserted = access.lastAssertedState
-            let actual = store.state
+        let lastAsserted = access.lastAssertedState
+        let actual = store.state
+        if access.stateUpdate.values.count > 1, lastAsserted != actual {
             let difference = diff(lastAsserted, actual, format: .proportional)
                 .map { "\($0.indent(by: 4))\n\n(Last asserted: −, Actual: +)" }
             ??  """
