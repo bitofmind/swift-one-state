@@ -108,22 +108,22 @@ private struct ParentModel: Model {
     @ModelState var state: State
 
     func onActivate() {
-        forEach($state.$child.events()) { event in
+        forEach(events(from: \.$child)) { event in
             state.receivedEvents.append(event)
             state.receivedIds.append(10 + state.child.id)
         }
 
-        forEach($state.$childAlt.events()) { event in
+        forEach(events(from: \.$childAlt)) { event in
             state.receivedEvents.append(event)
             state.receivedIds.append(30 + state.childAlt.id)
         }
 
-        forEach($state.$optChild.events()) { event, child in
+        forEach(events(from: \.$optChild)) { event, child in
             state.receivedEvents.append(event)
             state.receivedIds.append(20 + child.id)
         }
 
-        forEach($state.$children.events()) { event, child in
+        forEach(events(from: \.$children)) { event, child in
             state.receivedEvents.append(event)
             state.receivedIds.append(40 + child.id)
         }

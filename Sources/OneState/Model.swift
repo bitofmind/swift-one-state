@@ -1,5 +1,6 @@
 import Foundation
 import AsyncAlgorithms
+import CustomDump
 
 /// Holds a model that drives SwiftUI views
 ///
@@ -45,12 +46,12 @@ public protocol Model: ModelContainer {
     
     /// Will be called once the model becomes active in a store
     ///
-    /// Useful for handlng the lifetime of a model and set up of longliving tasks.
+    /// Useful for handling the lifetime of a model and set up of long-living tasks.
     /// Once the models state is removed from the store, it is deactivated and
-    /// all stored cancelleables are cancelled.
+    /// all stored cancellables are cancelled.
     ///
     /// In the typical case that a model is only used in views, `onActivate` will only
-    /// be called for the first appeance and wont deactivate until the last view is no
+    /// be called for the first appearance and wont deactivate until the last view is no
     /// longer being displayed.
     func onActivate()
 }
@@ -64,7 +65,7 @@ public extension Model {
     ///
     /// A model is required to be constructed from a view into a store's state for
     /// its `@ModelState` and other dependencies such as `@ModelEnvironment` to be
-    /// set up correclty. This  will automatically be handled when using `@StateModel`, but
+    /// set up correctly. This  will automatically be handled when using `@StateModel`, but
     /// sometimes you might  have to manually create the model
     ///
     ///     MyModel($store.myModalState)
@@ -84,7 +85,7 @@ public extension Model where State: Identifiable {
 }
 
 public extension Model {
-    ///  Register a `perform` closure to be called whe  the returned `Cancellable` is canceled.
+    ///  Register a `perform` closure to be called when the returned `Cancellable` is canceled.
     ///  The returned `Cancellable` will be set up to cancel once the self is destructed.
     @discardableResult
     func onCancel(_ perform: @Sendable @escaping () -> Void) -> Cancellable {
@@ -116,7 +117,7 @@ public extension Model {
     ///
     ///     model.cancelAll(for: ID.self)
     func cancelAll(for id: Any.Type) {
-        context.cancellations.cancelAll(for: ObjectIdentifier(id))
+        context.cancellations.cancelAll(for: id)
     }
 }
 
@@ -236,7 +237,9 @@ public extension Model {
         let view = storeView
         context.sendEvent(event, context: view.context, callContexts: CallContext.currentContexts, storeAccess: view.access)
     }
+}
 
+public extension Model {
     /// Returns a sequence of events sent from this model.
     func events() -> CallContextsStream<Event> {
         CallContextsStream(context.events.compactMap { [context] in
@@ -245,7 +248,38 @@ public extension Model {
         })
     }
 
-    /// Returns a sequence that emits when events equal to the provided `event` is sent form this model.
+    /// Returns a sequence that emits when events of type `eventType` is sent from this model or any of its descendants.
+    func events<E: Sendable>(ofType eventType: E.Type = E.self) -> CallContextsStream<E> {
+        CallContextsStream(context.events.compactMap {
+            guard let e = $0.event as? E else { return nil }
+            return .init(value: e, callContexts: $0.callContexts)
+        })
+    }
+
+    /// Returns a sequence of events sent from this model or any of its descendants.
+    ///
+    ///     forEach(events(fromType: ChildModel.self)) { event, model in ... }
+    ///
+    ///     forEach(events()) { (event, _: ChildModel) in ... }
+    func events<M: Model>(fromType modelType: M.Type = M.self) -> CallContextsStream<(event: M.Event, model: M)> {
+        let events = context.events
+        return CallContextsStream(events.compactMap {
+            guard let event = $0.event as? M.Event, let context = $0.context as? Context<M.State> else { return nil }
+            return .init(value: (event, M(context: context)), callContexts: $0.callContexts)
+        })
+    }
+
+    /// Returns a sequence that emits when events of type `eventType` is sent from model or any of its descendants of the type `fromType`.
+    func events<E: Sendable, M: Model>(ofType eventType: E.Type = E.self, fromType modelType: M.Type = M.self) -> CallContextsStream<(event: E, model: M)> {
+        CallContextsStream(context.events.compactMap {
+            guard let event = $0.event as? E, let context = $0.context as? Context<M.State> else { return nil }
+            return .init(value: (event, M(context: context)), callContexts: $0.callContexts)
+        })
+    }
+}
+
+public extension Model {
+    /// Returns a sequence that emits when events equal to the provided `event` is sent from this model.
     func events(of event: Event) -> CallContextsStream<()> where Event: Equatable&Sendable {
         CallContextsStream(context.events.compactMap { [context] in
             guard let e = $0.event as? Event, e == event, $0.context === context else { return nil }
@@ -253,7 +287,15 @@ public extension Model {
         })
     }
 
-    /// Returns a sequence that emits when events equal to the provided `event` is sent form this model or any of it's descendants.
+    /// Returns a sequence that emits when events equal to the provided `event` is sent from this model or any of its descendants.
+    func events<E: Equatable&Sendable>(of event: E) -> CallContextsStream<()> {
+        CallContextsStream(context.events.compactMap {
+            guard let e = $0.event as? E, e == event else { return nil }
+            return .init(value: (), callContexts: $0.callContexts)
+        })
+    }
+
+    /// Returns a sequence that emits when events equal to the provided `event` is sent from this model or any of its descendants.
     ///
     ///     forEach(events(of: .someEvent, fromType: ChildModel.self)) { model in ... }
     ///
@@ -266,17 +308,35 @@ public extension Model {
         })
     }
 
-    /// Returns a sequence of events sent from this model  or any of it's descendants.
-    ///
-    ///     forEach(events(fromType: ChildModel.self)) { event, model in ... }
-    ///
-    ///     forEach(events()) { (event, _: ChildModel) in ... }
-    func events<M: Model>(fromType modelType: M.Type = M.self) -> CallContextsStream<(event: M.Event, model: M)> {
-        let events = context.events
-        return CallContextsStream(events.compactMap {
-            guard let event = $0.event as? M.Event, let context = $0.context as? Context<M.State> else { return nil }
-            return .init(value: (event, M(context: context)), callContexts: $0.callContexts)
+    /// Returns a sequence that emits when events equal to the provided `event` is sent from this model or any of its descendants of type `fromType`.
+    func events<E: Equatable&Sendable, M: Model>(of event: E, fromType modelType: M.Type = M.self) -> CallContextsStream<M> {
+        CallContextsStream(context.events.compactMap {
+            guard let e = $0.event as? E, e == event, let context = $0.context as? Context<M.State> else { return nil }
+            return .init(value:  M(context: context), callContexts: $0.callContexts)
         })
+    }
+}
+
+public extension Model {
+    func changes<T: Equatable>(of path: KeyPath<State, T>) -> CallContextsStream<T> {
+        storeView(for: path).changes
+    }
+
+    func values<T: Equatable>(of path: KeyPath<State, T>) -> CallContextsStream<T> {
+        storeView(for: path).values
+    }
+
+    @discardableResult
+    func printStateUpdates<T>(of path: KeyPath<State, T>, name: String = "") -> Cancellable where T: Sendable&Equatable {
+        forEach(values(of: path).adjacentPairs()) { previous, current in
+            guard let diff = diff(previous, current) else { return }
+            print("State did update\(name.isEmpty ? "" : " for \(name)"):\n" + diff)
+        }.cancel(for: TestStoreScope.self)
+    }
+
+    @discardableResult
+    func printStateUpdates(name: String = "") -> Cancellable where State: Sendable&Equatable {
+        printStateUpdates(of: \.self, name: name)
     }
 }
 
@@ -316,14 +376,14 @@ public extension Model where State: Equatable {
 }
 
 public extension Model {
-    func containerValue<T: OneState.StateContainer>(for path: KeyPath<State, T>) -> T {
-        let view = self.storeView
-        return view.context.value(for: view.path.appending(path: path), access: view.access, comparable: StructureComparableValue.self)
-    }
-
     func value<T: Equatable>(for path: KeyPath<State, T>) -> T {
         let view = self.storeView
         return view.context.value(for: view.path.appending(path: path), access: view.access, comparable: EquatableComparableValue.self)
+    }
+
+    func containerValue<T: OneState.StateContainer>(for path: KeyPath<State, T>) -> T {
+        let view = self.storeView
+        return view.context.value(for: view.path.appending(path: path), access: view.access, comparable: StructureComparableValue.self)
     }
 }
 
@@ -331,12 +391,17 @@ extension Model {
     var storeView: StoreView<State, State, Write> {
         let modelState = self.modelState
         guard let context = modelState?.context as? Context<State> else {
-            fatalError("Model \(type(of: self)) is used before fully initialized")
+            fatalError("Model \(type(of: self)) is used before fully initialised")
         }
         return .init(context: context, path: \.self, access: modelState?.storeAccess)
     }
 
     func storeView<T>(for keyPath: WritableKeyPath<State, T>) -> StoreView<State, T, Write> {
+        let view = storeView
+        return StoreView(context: view.context, path: view.path(keyPath), access: view.access)
+    }
+
+    func storeView<T>(for keyPath: KeyPath<State, T>) -> StoreView<State, T, Read> {
         let view = storeView
         return StoreView(context: view.context, path: view.path(keyPath), access: view.access)
     }

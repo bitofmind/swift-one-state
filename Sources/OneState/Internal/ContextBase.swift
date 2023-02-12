@@ -93,11 +93,11 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         }
     }
 
-    func removeRecusively() {
+    func removeRecursively() {
         onRemoval()
 
         for child in allChildren.values {
-            child.removeRecusively()
+            child.removeRecursively()
         }
     }
 

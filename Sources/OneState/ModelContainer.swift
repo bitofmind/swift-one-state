@@ -77,3 +77,33 @@ extension Array: ModelContainer where Element: Model, Element.State: Identifiabl
         self
     }
 }
+
+extension Optional {
+    subscript<T> (unwrap path: KeyPath<Wrapped, T>) -> T? {
+        self?[keyPath: path]
+    }
+
+    subscript<T> (unwrap path: KeyPath<Wrapped, T?>) -> T? {
+        self?[keyPath: path]
+    }
+
+    subscript<T> (unwrap path: WritableKeyPath<Wrapped, T>) -> T? {
+        get {
+            self?[keyPath: path]
+        }
+        set {
+            if let value = newValue {
+                self?[keyPath: path] = value
+            }
+        }
+    }
+
+    subscript<T> (unwrap path: WritableKeyPath<Wrapped, T?>) -> T? {
+        get {
+            self?[keyPath: path]
+        }
+        set {
+            self?[keyPath: path] = newValue
+        }
+    }
+}

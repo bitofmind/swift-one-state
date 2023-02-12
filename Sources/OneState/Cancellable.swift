@@ -6,7 +6,7 @@ public protocol Cancellable {
     func cancel()
 
     /// Cancel the activity of a model when  when `model.cancelAll(for: key)` is called for the  provided `key`
-    /// If `cancelInFlight` is true,  any previous activty set up to be cancelled for `key`
+    /// If `cancelInFlight` is true,  any previous activity set up to be cancelled for `key`
     /// is first cancelled.
     ///
     ///     model.task { ... }.cancel(for: myKey)
@@ -36,7 +36,7 @@ public extension Cancellable {
     }
 }
 
-/// Activites created while the context is active (while perform is executed or any nested tasks) will be cancelllable by the provided `key`.
+/// Activities created while the context is active (while perform is executed or any nested tasks) will be cancellable by the provided `key`.
 ///
 ///     withCancellationContext(myKey) {
 ///         task { }
@@ -57,7 +57,7 @@ public func withCancellationContext(_ key: some Hashable&Sendable, perform: () a
     }
 }
 
-/// Activites created while the context is active (while perform is executed or any nested tasks) will be cancelllable by the provided `id`.
+/// Activities created while the context is active (while perform is executed or any nested tasks) will be cancellable by the provided `id`.
 ///
 ///     withCancellationContext(MyKey.self) {
 ///         task { }
@@ -225,6 +225,11 @@ final class Cancellations: @unchecked Sendable {
             $0.onCancel()
         }
     }
+
+    func cancelAll(for id: Any.Type) {
+        cancelAll(for: ObjectIdentifier(id))
+    }
+
 
     var activeTasks: [(modelName: String, count: Int)] {
         lock {

@@ -58,6 +58,12 @@ extension StateModel: CustomStringConvertible {
     }
 }
 
+extension StateModel: CustomDumpRepresentable {
+    public var customDumpValue: Any {
+        wrappedValue
+    }
+}
+
 public extension Model {
     subscript<M: Model>(dynamicMember path: WritableKeyPath<State, StateModel<M>>) -> M where M.StateContainer == M.State {
         StoreAccess.with(modelState?.storeAccess) {
@@ -70,9 +76,29 @@ public extension Model {
     }
 }
 
-public extension StoreViewProvider  {
-    func events<Models: ModelContainer>() -> CallContextsStream<(event: Models.ModelElement.Event, model: Models.ModelElement)> where State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable {
-        let containerView = storeView(for: \.wrappedValue)
+public extension StoreViewProvider where Access == Write {
+    subscript<Models>(dynamicMember path: WritableKeyPath<State, StateModel<Models>>) -> StoreView<Root, StateModel<Models>, Write> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
+        observeContainer(atPath: path)
+        return storeView(for: path)
+    }
+
+    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T>) -> StoreView<Root, T?, Write> where State == S? {
+        let view = storeView
+        let unwrapPath = view.path.appending(path: \.[unwrap: path])
+        return StoreView(context: view.context, path: unwrapPath, access: view.access)
+    }
+
+    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T?>) -> StoreView<Root, T?, Write> where State == S? {
+        let view = storeView
+        let unwrapPath = view.path.appending(path: \.[unwrap: path])
+        return StoreView(context: view.context, path: unwrapPath, access: view.access)
+    }
+}
+
+public extension Model {
+    func events<Models: ModelContainer>(from path: WritableKeyPath<State, StateModel<Models>>) -> CallContextsStream<(event: Models.ModelElement.Event, model: Models.ModelElement)> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable {
+        let containerView = storeView(for: path).wrappedValue
+        containerView.observeContainer(ofType: Models.self, atPath: \.self)
         let events = storeView.context.events
 
         return CallContextsStream(events.compactMap { e -> WithCallContexts<(event: Models.ModelElement.Event, model: Models.ModelElement)>? in
@@ -93,15 +119,14 @@ public extension StoreViewProvider  {
         })
     }
 
-    func events<Models: ModelContainer>(of event: Models.ModelElement.Event) -> CallContextsStream<Models.ModelElement> where State == StateModel<Models>, Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable&Equatable  {
-        let events = events()
-        return CallContextsStream(events.stream.compactMap {
+    func events<Models: ModelContainer>(of event: Models.ModelElement.Event, from path: WritableKeyPath<State, StateModel<Models>>) -> CallContextsStream<Models.ModelElement> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable&Equatable {
+        CallContextsStream(events(from: path).stream.compactMap {
             $0.value.event == event ? .init(value: $0.value.model, callContexts: $0.callContexts) : nil
         })
     }
 
-    func events<M: Model>() -> CallContextsStream<M.Event> where State == StateModel<M>, M.StateContainer == M.State, Access == Write {
-        let events = M(storeView(for: \.wrappedValue)).context.events
+    func events<M: Model>(from path: WritableKeyPath<State, StateModel<M>>) -> CallContextsStream<M.Event> where M.StateContainer == M.State {
+        let events = M(storeView(for: path).wrappedValue).context.events
 
         return CallContextsStream(events.compactMap {
             guard let e = $0.event as? M.Event else { return nil }
@@ -109,8 +134,8 @@ public extension StoreViewProvider  {
         })
     }
 
-    func events<M: Model>(of event: M.Event) -> CallContextsStream<()> where State == StateModel<M>, M.StateContainer == M.State, Access == Write, M.Event: Equatable&Sendable {
-        let events = M(storeView(for: \.wrappedValue)).context.events
+    func events<M: Model>(of event: M.Event, from path: WritableKeyPath<State, StateModel<M>>) -> CallContextsStream<()> where M.StateContainer == M.State, M.Event: Equatable&Sendable {
+        let events = M(storeView(for: path).wrappedValue).context.events
 
         return CallContextsStream(events.compactMap {
             guard let e = $0.event as? M.Event, e == event else { return nil }
@@ -119,8 +144,3 @@ public extension StoreViewProvider  {
     }
 }
 
-extension StateModel: CustomDumpRepresentable {
-    public var customDumpValue: Any {
-        wrappedValue
-    }
-}

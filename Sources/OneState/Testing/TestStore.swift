@@ -20,7 +20,7 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
     ///     }
     ///
     /// - Parameter initialState:The store's initial state.
-    /// - Parameter dependencies: The overriden dependencies of the store.
+    /// - Parameter dependencies: The overridden dependencies of the store.
     ///
     public init(initialState: State, dependencies: @escaping (inout DependencyValues) -> Void = { _ in }, file: StaticString = #file, line: UInt = #line) {
         store = .init(initialState: initialState, dependencies: dependencies)
@@ -31,8 +31,9 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
     }
 
     deinit {
-        store.context.removeRecusively()
-        
+        store.cancellations.cancelAll(for: TestStoreScope.self)
+        store.context.removeRecursively()
+
         for info in store.cancellations.activeTasks {
             XCTFail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", file: file, line: line)
         }
@@ -85,8 +86,10 @@ public extension TestStore {
     }
 
     func exhaustTasks(timeoutNanoseconds timeout: UInt64 = NSEC_PER_SEC, file: StaticString = #file, line: UInt = #line) async {
+        store.cancellations.cancelAll(for: TestStoreScope.self)
+
         let start = DispatchTime.now().uptimeNanoseconds
-        var hasTimedout: Bool {
+        var hasTimedOut: Bool {
             start.distance(to: DispatchTime.now().uptimeNanoseconds) >= timeout
         }
 
@@ -97,7 +100,7 @@ public extension TestStore {
                 break
             }
 
-            if hasTimedout  {
+            if hasTimedOut  {
                 for info in activeTasks {
                     XCTFail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", file: file, line: line)
                 }
@@ -108,3 +111,5 @@ public extension TestStore {
         }
     }
 }
+
+enum TestStoreScope {}

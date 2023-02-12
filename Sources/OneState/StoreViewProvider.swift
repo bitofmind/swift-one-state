@@ -4,9 +4,9 @@ import CustomDump
 /// Conforming types exposes a view into the store holding its state
 ///
 /// Typically conforming types are also declared as `@dynamicMemberLookup`
-/// to allow convienent access to a stores states members.
+/// to allow convenient access to a stores states members.
 ///
-/// Most common when accessing a sub state is that you get anothter store view
+/// Most common when accessing a sub state is that you get another store view
 /// back instead of the raw value. This allows you to construct viewModels with direct
 /// view into a store:
 ///
@@ -77,6 +77,7 @@ public extension StoreViewProvider {
 public extension StoreViewProvider where Access == Write {
     func setValue<T>(_ value: T, at keyPath: WritableKeyPath<State, Writable<T>>) {
         let view = storeView
+        guard !view.context.isOverrideContext else { return }
         return view.context[path: view.path(keyPath), access: view.access] = .init(wrappedValue: value)
     }
 }
@@ -102,38 +103,6 @@ public extension StoreViewProvider {
 public extension StoreViewProvider where Access == Write {
     subscript<T>(dynamicMember path: WritableKeyPath<State, T>) -> StoreView<Root, T, Write> {
         storeView(for: path)
-    }
-
-    subscript<Models>(dynamicMember path: WritableKeyPath<State, StateModel<Models>>) -> StoreView<Root, StateModel<Models>, Write> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
-        observeContainer(atPath: path)
-        return storeView(for: path)
-    }
-
-    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T>) -> StoreView<Root, T?, Write> where State == S? {
-        let view = storeView
-        let unwrapPath = view.path.appending(path: \.[unwrap: path])
-        return StoreView(context: view.context, path: unwrapPath, access: view.access)
-    }
-
-    subscript<S, T>(dynamicMember path: WritableKeyPath<S, T?>) -> StoreView<Root, T?, Write> where State == S? {
-        let view = storeView
-        let unwrapPath = view.path.appending(path: \.[unwrap: path])
-        return StoreView(context: view.context, path: unwrapPath, access: view.access)
-    }
-}
-
-public extension StoreViewProvider {
-    func printStateUpdates(name: String = "") where State: Sendable {
-        let stateDidUpdate = stateDidUpdate
-        Task {
-            var previous = nonObservableState
-            for await _ in stateDidUpdate {
-                let state = nonObservableState
-                guard let diff = diff(previous, state) else { return }
-                previous = state
-                print("State did update\(name.isEmpty ? "" : " for \(name)"):\n" + diff)
-            }
-        }
     }
 }
 
@@ -204,7 +173,7 @@ extension StoreViewProvider where Access == Write {
 
                 for removedPath in removedPaths {
                     if let childContext = context.allChildren[containerPath.appending(path: removedPath)] {
-                        childContext.removeRecusively()
+                        childContext.removeRecursively()
                     }
                 }
             }
@@ -213,35 +182,5 @@ extension StoreViewProvider where Access == Write {
 
     func observeContainer<Models>(atPath path: WritableKeyPath<State, StateModel<Models>>) where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
         observeContainer(ofType: Models.self, atPath: path.appending(path: \.wrappedValue))
-    }
-}
-
-private extension Optional {
-    subscript<T> (unwrap path: KeyPath<Wrapped, T>) -> T? {
-        self?[keyPath: path]
-    }
-
-    subscript<T> (unwrap path: KeyPath<Wrapped, T?>) -> T? {
-        self?[keyPath: path]
-    }
-
-    subscript<T> (unwrap path: WritableKeyPath<Wrapped, T>) -> T? {
-        get {
-            self?[keyPath: path]
-        }
-        set {
-            if let value = newValue {
-                self?[keyPath: path] = value
-            }
-        }
-    }
-
-    subscript<T> (unwrap path: WritableKeyPath<Wrapped, T?>) -> T? {
-        get {
-            self?[keyPath: path]
-        }
-        set {
-            self?[keyPath: path] = newValue
-        }
     }
 }

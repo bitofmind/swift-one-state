@@ -75,7 +75,7 @@ public extension View {
             var previous = provider.nonObservableState
             for await _ in provider.stateDidUpdate {
                 let state = provider.nonObservableState
-                guard let diff = diff(previous, state) else { return }
+                guard let diff = diff(previous, state) else { continue }
                 previous = state
                 print("State did update\(name.isEmpty ? "" : " for \(name)"):\n" + diff)
             }

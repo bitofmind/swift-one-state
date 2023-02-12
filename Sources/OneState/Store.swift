@@ -1,9 +1,9 @@
 import Foundation
 import Dependencies
 
-/// A store holds the state of an application or part of a applicaton
+/// A store holds the state of an application or part of a application
 ///
-/// From its state or a sub-state of that state, models are insantiated to maintain
+/// From its state or a sub-state of that state, models are instantiated to maintain
 /// the state and drive the refreshes of SwiftUI views
 ///
 /// Typically you set up you store in your app's scene:
@@ -18,7 +18,7 @@ import Dependencies
 ///         }
 ///     }
 ///
-/// You can override default dependenies via the `dependencies` closure callback:
+/// You can override default dependencies via the `dependencies` closure callback:
 ///
 ///     Store<AppView>(initialState: .init()) {
 ///         $0.uuid = .incrementing
@@ -34,6 +34,7 @@ public final class Store<M: Model>: @unchecked Sendable {
     private var currentState: State
     private var modifyCount = 0
     private var overrideState: State?
+    private var overrideSinkState: State
 
     private var updateTask: Task<(), Never>?
     private var lastFromContext: ContextBase?
@@ -52,10 +53,11 @@ public final class Store<M: Model>: @unchecked Sendable {
     ///     }
     ///
     /// - Parameter initialState:The store's initial state.
-    /// - Parameter dependencies: The overriden dependencies of the store.
+    /// - Parameter dependencies: The overridden dependencies of the store.
     ///
     public init(initialState: State, dependencies: @escaping (inout DependencyValues) -> Void = { _ in }) {
         currentState = initialState
+        overrideSinkState = initialState
         withDependencies(from: self) {
             dependencies(&$0)
         } operation: {
@@ -107,9 +109,8 @@ extension Store {
             lock.lock()
 
             if stateOverride != nil, isOverrideContext {
-                // Upgrade to runtime error?
-                assertionFailure("Not allowed to modify state from a overridden store")
-                yield &currentState[keyPath: path]
+                // Not allowed to modify state on an overridden store
+                yield &overrideSinkState[keyPath: path]
                 lock.unlock()
                 return
             }

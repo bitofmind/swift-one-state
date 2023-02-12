@@ -3,7 +3,7 @@ import Foundation
 /// Declares a view models state
 ///
 /// A model conforming to `Model` must declare its state  using `@ModelState` where
-/// the type is matching its associatedtype `State`.
+/// the type is matching its associated type `State`.
 ///
 ///     struct MyModel: Model {
 ///         @ModelState private var state: State

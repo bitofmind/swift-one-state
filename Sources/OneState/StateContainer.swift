@@ -83,7 +83,7 @@ private extension MutableCollection {
     }
 }
 
-// Crash in keypath append if using struct instead of class
+// Crash in key path append if using struct instead of class
 private class UnwrapFallback<Value>: Hashable, @unchecked Sendable {
     var value: Value
     
@@ -98,7 +98,7 @@ private class UnwrapFallback<Value>: Hashable, @unchecked Sendable {
     func hash(into hasher: inout Hasher) { }
 }
 
-// Crash in keypath append if using struct instead of class
+// Crash in key path append if using struct instead of class
 private class Cursor<Value, ID: Hashable, Index>: Hashable, @unchecked Sendable  {
     let idPath: KeyPath<Value, ID>
     let id: ID

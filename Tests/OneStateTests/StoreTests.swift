@@ -29,7 +29,7 @@ class StoreTests: XCTestCase {
         XCTAssertNotNil(optContext)
         weak var weakContext = optContext
         XCTAssertNotNil(weakContext)
-        optContext?.removeRecusively()
+        optContext?.removeRecursively()
         optContext = nil
         XCTAssertNil(weakContext)
         XCTAssertNil(weakStore)

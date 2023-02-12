@@ -4,7 +4,7 @@ import AsyncAlgorithms
 /// Declares a value stored outside of a model's store
 ///
 /// This is useful for state that is derived or cached from the models state,
-/// where we don't want the value to refelected in the state it self
+/// where we don't want the value to be reflected in the state it self.
 ///
 ///     @ModelProperty var cancellable: AnyCancellable? = nil
 @propertyWrapper
@@ -13,11 +13,11 @@ public struct ModelProperty<Value> {
     let index: Int
 
     public init(wrappedValue: @escaping @autoclosure () -> Value) {
-        guard let ctx = ContextBase.current else {
+        guard let context = ContextBase.current else {
             fatalError("Not allowed to access a ViewModel's property when not presented from a view")
         }
 
-        context = ctx
+        self.context = context
         index = ThreadState.current.propertyIndex
         ThreadState.current.propertyIndex += 1
 
