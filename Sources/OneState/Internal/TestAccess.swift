@@ -3,7 +3,7 @@ import CustomDump
 import XCTestDynamicOverlay
 
 class TestAccessBase: StoreAccess {
-    func assert<Root, State>(view: StoreView<Root, State, Write>, modify: @escaping (inout State) -> Void, timeout: UInt64, file: StaticString, line: UInt) async {
+    func assert<Root, State: Equatable>(view: StoreView<Root, State, Write>, modify: @escaping (inout State) -> Void, timeout: UInt64, file: StaticString, line: UInt) async {
         fatalError()
     }
 
@@ -16,6 +16,7 @@ final class TestAccess<State: Equatable>: TestAccessBase {
     var lock = Lock()
     private var _expectedState: State
     var expectedState: State { lock { _expectedState } }
+    var exhaustivity = Exhaustivity.on
 
     final class Update<T> {
         private var lock = Lock()
@@ -34,40 +35,70 @@ final class TestAccess<State: Equatable>: TestAccessBase {
     var lastAssertedState: State { stateUpdate.values.first! }
     var lastReceivedState: State { stateUpdate.values.last! }
 
-    override func assert<Root, S>(view: StoreView<Root, S, Write>, modify: @escaping (inout S) -> Void, timeout: UInt64, file: StaticString, line: UInt) async {
-        lock {
-            let storePath: WritableKeyPath<State, S> = view.context.storePath(for: view.path)!
-            modify(&_expectedState[keyPath: storePath])
-        }
+    override func assert<Root, S: Equatable>(view: StoreView<Root, S, Write>, modify: @escaping (inout S) -> Void, timeout: UInt64, file: StaticString, line: UInt) async {
+        let storePath: WritableKeyPath<State, S> = view.context.storePath(for: view.path)!
+        lock { modify(&_expectedState[keyPath: storePath]) }
 
+        let exhaustivity = lock { self.exhaustivity }
         let expected = expectedState
         @Sendable func predicate(_ value: State) -> Bool {
-            value == expected
+            if exhaustivity == .on {
+                return value == expected
+            } else {
+                var copy = value
+                modify(&copy[keyPath: storePath])
+                return copy == value
+            }
+        }
+
+        func diffMessage<T: Equatable>(expected: T, actual: T) -> String? {
+            guard expected != actual else { return nil }
+            return diff(expected, actual, format: .proportional)
+                .map { "\($0.indent(by: 4))\n\n(Expected: −, Actual: +)" }
+            ??  """
+                Expected:
+                \(String(describing: expected).indent(by: 2))
+                Actual:
+                \(String(describing: actual).indent(by: 2))
+                """
+        }
+
+        func printNonExhaustiveDifference() {
+            guard exhaustivity == .off(showSkippedAssertions: true),
+                  let message = diffMessage(expected: expected, actual: lastReceivedState)
+            else { return }
+
+            fail(message, file: file, line: line)
         }
 
         if predicate(lastAssertedState) {
+            printNonExhaustiveDifference()
             return await Task.yield()
         }
 
         if await stateUpdate.consume(upUntil: predicate, keepLast: true, timeout: timeout) {
+            printNonExhaustiveDifference()
             return await Task.yield()
         }
 
-        let actual = lastReceivedState
-        let difference = diff(expected, actual, format: .proportional)
-            .map { "\($0.indent(by: 4))\n\n(Expected: −, Actual: +)" }
-        ??  """
-            Expected:
-            \(String(describing: expected).indent(by: 2))
-            Actual:
-            \(String(describing: actual).indent(by: 2))
-            """
+        if exhaustivity == .on {
+            let localDiff = diffMessage(expected: expected[keyPath: storePath], actual: lastReceivedState[keyPath: storePath])
+            let totalDiff = diffMessage(expected: expected, actual: lastReceivedState)
 
-        XCTFail(
-            """
-            State change does not match expectation: …
-            \(difference)
-            """, file: file, line: line)
+            if let localDiff {
+                XCTFail(localDiff, file: file, line: line)
+            } else if let totalDiff {
+                XCTFail(totalDiff, file: file, line: line)
+            }
+        } else {
+            var expected = lastReceivedState
+            modify(&expected[keyPath: storePath])
+            let localDiff = diffMessage(expected: expected[keyPath: storePath], actual: lastReceivedState[keyPath: storePath])
+
+            if let localDiff {
+                XCTFail(localDiff, file: file, line: line)
+            }
+        }
     }
 
     override func receive<Event: Equatable>(_ event: Event, context: ContextBase, timeout: UInt64, file: StaticString, line: UInt) async {
@@ -78,7 +109,7 @@ final class TestAccess<State: Equatable>: TestAccessBase {
             return true
         }
 
-        if await !eventUpdate.consume(upUntil: predicate, timeout: timeout) {
+        if await !eventUpdate.consume(where: predicate, timeout: timeout) {
             XCTFail("Timeout while waiting to receive event: \(String(describing: event))", file: file, line: line)
         }
 
@@ -92,6 +123,18 @@ final class TestAccess<State: Equatable>: TestAccessBase {
 
     override func didSend(event: ContextBase.EventInfo) {
         eventUpdate.receive(event)
+    }
+
+    func fail(_ message: String, file: StaticString, line: UInt) {
+        switch lock({ exhaustivity }) {
+        case .on:
+            XCTFail(message, file: file, line: line)
+
+        case .off(showSkippedAssertions: true):
+            print(message)
+
+        case .off: break
+        }
     }
 }
 
@@ -130,6 +173,27 @@ extension TestAccess.Update {
 
                     return true
                 }
+
+                return false
+            }
+
+            if result { return true }
+
+            await Task.yield()
+        }
+
+        return false
+    }
+
+    func consume(where predicate: @escaping @Sendable (T) -> Bool, timeout: UInt64) async -> Bool {
+        let start = DispatchTime.now().uptimeNanoseconds
+        while start.distance(to: DispatchTime.now().uptimeNanoseconds) < timeout {
+            let result: Bool = lock {
+                if let index = _values.firstIndex(where: predicate) {
+                    _values.remove(at: index)
+                    return true
+                }
+
                 return false
             }
 

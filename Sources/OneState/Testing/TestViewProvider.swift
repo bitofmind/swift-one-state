@@ -2,7 +2,7 @@ import Foundation
 
 public protocol TestViewProvider {
     associatedtype Root
-    associatedtype State
+    associatedtype State: Equatable
 
     var testView: TestView<Root, State> { get }
 }
@@ -28,7 +28,7 @@ public extension TestViewProvider {
 }
 
 @dynamicMemberLookup
-public struct TestView<Root, State> {
+public struct TestView<Root, State: Equatable> {
     let storeView: StoreView<Root, State, Write>
 }
 

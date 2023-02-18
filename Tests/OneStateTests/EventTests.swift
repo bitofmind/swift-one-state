@@ -19,7 +19,10 @@ final class EventTests: XCTestCase {
             $0.receivedEvents = [.empty, .count(2) , .count(3), .empty]
         }
 
-        store.exhaustEvents()
+        await $model.receive(.empty)
+        await $model.receive(.count(2))
+        await $model.receive(.count(3))
+        await $model.receive(.empty)
     }
 
     func testChildEvents() async throws {
@@ -42,7 +45,6 @@ final class EventTests: XCTestCase {
             $0.receivedEvents.append(.count(9))
             $0.receivedIds.append(30 + childAlt.id)
         }
-
 
         parent.setOptChild(id: 5)
         await $parent.optChild.assert(.init(id: 5))
@@ -77,7 +79,12 @@ final class EventTests: XCTestCase {
             $0.receivedIds +=  [40 + child1.id, 40 + child2.id]
         }
 
-        store.exhaustEvents()
+        await $child.receive(.count(3))
+        await $childAlt.receive(.count(9))
+        await $optChild.receive(.count(7))
+        await $child2.receive(.count(1))
+        await $child1.receive(.empty)
+        await $child2.receive(.count(2))
     }
 }
 

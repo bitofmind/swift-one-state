@@ -35,16 +35,16 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
         store.context.cancelActiveContextRecursively()
 
         for info in store.cancellations.activeTasks {
-            XCTFail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", file: file, line: line)
+            access.fail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", file: file, line: line)
         }
 
         for event in access.eventUpdate.values {
-            XCTFail("Event not handled: \(String(describing: event))", file: file, line: line)
+            access.fail("Event `\(String(describing: event.event))` sent from `\(event.context.typeDescription)` was not handled", file: file, line: line)
         }
 
         let lastAsserted = access.lastAssertedState
         let actual = store.state
-        if access.stateUpdate.values.count > 1, lastAsserted != actual {
+        if access.stateUpdate.values.count > 0, lastAsserted != actual {
             let difference = diff(lastAsserted, actual, format: .proportional)
                 .map { "\($0.indent(by: 4))\n\n(Last asserted: −, Actual: +)" }
             ??  """
@@ -54,7 +54,7 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
                 \(String(describing: actual).indent(by: 2))
                 """
 
-            XCTFail("""
+            access.fail("""
                 State not exhausted: …
                 \(difference)
                 """, file: file, line: line)
@@ -78,15 +78,23 @@ public extension TestStore {
     }
 
     var state: State { store.state }
+
+    var exhaustivity: Exhaustivity {
+        get { access.lock { access.exhaustivity } }
+        set { access.lock { access.exhaustivity = newValue } }
+    }
+}
+
+public enum Exhaustivity: Equatable, Sendable {
+  case on
+  case off(showSkippedAssertions: Bool)
+  public static let off = off(showSkippedAssertions: false)
 }
 
 public extension TestStore {
-    func exhaustEvents() {
-        access.eventUpdate.consumeAll()
-    }
-
     func exhaustTasks(timeoutNanoseconds timeout: UInt64 = NSEC_PER_SEC, file: StaticString = #file, line: UInt = #line) async {
         store.cancellations.cancelAll(for: TestStoreScope.self)
+        store.context.cancelActiveContextRecursively()
 
         let start = DispatchTime.now().uptimeNanoseconds
         var hasTimedOut: Bool {
@@ -102,7 +110,7 @@ public extension TestStore {
 
             if hasTimedOut  {
                 for info in activeTasks {
-                    XCTFail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", file: file, line: line)
+                    access.fail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", file: file, line: line)
                 }
                 break
             }
