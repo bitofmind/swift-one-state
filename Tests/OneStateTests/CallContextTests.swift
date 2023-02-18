@@ -5,6 +5,7 @@ import AsyncAlgorithms
 final class CallContextTests: XCTestCase {
     func testModelEventWithContext() async throws {
         let store = TestStore<EventModel>(initialState: .init())
+        @TestModel var model = store.model
 
         let countsChannel = AsyncChannel<Int>()
         async let counts = Array(countsChannel.prefix(4))
@@ -36,8 +37,6 @@ final class CallContextTests: XCTestCase {
         }
 
         await syncChannel.send(())
-
-        @TestModel var model = store.model
 
         model.forEach(model.events()) { event in
             switch event {

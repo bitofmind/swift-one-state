@@ -16,7 +16,8 @@ final class TestAccess<State: Equatable>: TestAccessBase {
     var lock = Lock()
     private var _expectedState: State
     var expectedState: State { lock { _expectedState } }
-    var exhaustivity = Exhaustivity.on
+    var exhaustivity: Exhaustivity = .full
+    var showSkippedAssertions = false
 
     final class Update<T> {
         private var lock = Lock()
@@ -39,10 +40,11 @@ final class TestAccess<State: Equatable>: TestAccessBase {
         let storePath: WritableKeyPath<State, S> = view.context.storePath(for: view.path)!
         lock { modify(&_expectedState[keyPath: storePath]) }
 
-        let exhaustivity = lock { self.exhaustivity }
+        let isExhaustive = lock { self.exhaustivity.contains(.state) }
+        let showSkippedAssertions = lock { self.showSkippedAssertions }
         let expected = expectedState
         @Sendable func predicate(_ value: State) -> Bool {
-            if exhaustivity == .on {
+            if isExhaustive {
                 return value == expected
             } else {
                 var copy = value
@@ -64,11 +66,11 @@ final class TestAccess<State: Equatable>: TestAccessBase {
         }
 
         func printNonExhaustiveDifference() {
-            guard exhaustivity == .off(showSkippedAssertions: true),
+            guard showSkippedAssertions, !isExhaustive,
                   let message = diffMessage(expected: expected, actual: lastReceivedState)
             else { return }
 
-            fail(message, file: file, line: line)
+            fail(message, for: .state, file: file, line: line)
         }
 
         if predicate(lastAssertedState) {
@@ -81,7 +83,7 @@ final class TestAccess<State: Equatable>: TestAccessBase {
             return await Task.yield()
         }
 
-        if exhaustivity == .on {
+        if isExhaustive {
             let localDiff = diffMessage(expected: expected[keyPath: storePath], actual: lastReceivedState[keyPath: storePath])
             let totalDiff = diffMessage(expected: expected, actual: lastReceivedState)
 
@@ -125,15 +127,11 @@ final class TestAccess<State: Equatable>: TestAccessBase {
         eventUpdate.receive(event)
     }
 
-    func fail(_ message: String, file: StaticString, line: UInt) {
-        switch lock({ exhaustivity }) {
-        case .on:
+    func fail(_ message: String, for area: Exhaustivity, file: StaticString, line: UInt) {
+        if lock({ exhaustivity.contains(area) }) {
             XCTFail(message, file: file, line: line)
-
-        case .off(showSkippedAssertions: true):
+        } else if lock({ showSkippedAssertions }) {
             print(message)
-
-        case .off: break
         }
     }
 }

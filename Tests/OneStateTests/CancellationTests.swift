@@ -104,7 +104,7 @@ class CancelletionTests: XCTestCase {
                     $count.wrappedValue += 1
                 }
                 $count.wrappedValue += 5
-            }
+            } catch: { _ in }
             .cancel(for: CancelKey.self, cancelInFlight: true)
 
             let _ = await v
@@ -139,13 +139,15 @@ class CancelletionTests: XCTestCase {
                         $count.wrappedValue += 1
                     }
                     $count.wrappedValue += 50
-                }
-                .cancelInFlight()
+                } catch: { _ in }
+                .cancel(for: CancelKey.self, cancelInFlight: true)
 
                 try await Task.sleep(nanoseconds: NSEC_PER_MSEC*10)
             }
 
             XCTAssertEqual(count, 4)
+
+            model.cancelAll(for: CancelKey.self)
         }
 
         XCTAssertEqual(count, 5)

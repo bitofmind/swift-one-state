@@ -35,11 +35,11 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
         store.context.cancelActiveContextRecursively()
 
         for info in store.cancellations.activeTasks {
-            access.fail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", file: file, line: line)
+            access.fail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", for: .tasks, file: file, line: line)
         }
 
         for event in access.eventUpdate.values {
-            access.fail("Event `\(String(describing: event.event))` sent from `\(event.context.typeDescription)` was not handled", file: file, line: line)
+            access.fail("Event `\(String(describing: event.event))` sent from `\(event.context.typeDescription)` was not handled", for: .events, file: file, line: line)
         }
 
         let lastAsserted = access.lastAssertedState
@@ -57,8 +57,10 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
             access.fail("""
                 State not exhausted: …
                 \(difference)
-                """, file: file, line: line)
+                """, for: .state, file: file, line: line)
         }
+
+        store.context.removeRecursively()
     }
 }
 
@@ -83,41 +85,28 @@ public extension TestStore {
         get { access.lock { access.exhaustivity } }
         set { access.lock { access.exhaustivity = newValue } }
     }
-}
 
-public enum Exhaustivity: Equatable, Sendable {
-  case on
-  case off(showSkippedAssertions: Bool)
-  public static let off = off(showSkippedAssertions: false)
-}
-
-public extension TestStore {
-    func exhaustTasks(timeoutNanoseconds timeout: UInt64 = NSEC_PER_SEC, file: StaticString = #file, line: UInt = #line) async {
-        store.cancellations.cancelAll(for: TestStoreScope.self)
-        store.context.cancelActiveContextRecursively()
-
-        let start = DispatchTime.now().uptimeNanoseconds
-        var hasTimedOut: Bool {
-            start.distance(to: DispatchTime.now().uptimeNanoseconds) >= timeout
-        }
-
-        while true {
-            let activeTasks = store.cancellations.activeTasks
-
-            if activeTasks.isEmpty {
-                break
-            }
-
-            if hasTimedOut  {
-                for info in activeTasks {
-                    access.fail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", file: file, line: line)
-                }
-                break
-            }
-
-            await Task.yield()
-        }
+    var showSkippedAssertions: Bool {
+        get { access.lock { access.showSkippedAssertions } }
+        set { access.lock { access.showSkippedAssertions = newValue } }
     }
+}
+
+public struct Exhaustivity: OptionSet, Equatable, Sendable {
+    public let rawValue: Int
+
+    public init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
+}
+
+public extension Exhaustivity {
+    static let state = Self(rawValue: 1 << 0)
+    static let events = Self(rawValue: 1 << 1)
+    static let tasks = Self(rawValue: 1 << 2)
+
+    static let off: Self = []
+    static let full: Self = [.state, .events, .tasks]
 }
 
 enum TestStoreScope {}
