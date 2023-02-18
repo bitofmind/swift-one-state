@@ -32,7 +32,7 @@ public final class TestStore<M: Model> where M.State: Equatable&Sendable {
 
     deinit {
         store.cancellations.cancelAll(for: TestStoreScope.self)
-        store.context.removeRecursively()
+        store.context.cancelActiveContextRecursively()
 
         for info in store.cancellations.activeTasks {
             XCTFail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", file: file, line: line)

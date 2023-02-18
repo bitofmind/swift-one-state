@@ -160,11 +160,13 @@ extension TaskCancellable {
         self.init(name: name, cancellations: cancellations) { onDone in
             Task(priority: priority) {
                 do {
-                    try await inViewModelContext {
-                        defer { onDone() }
+                    try await CallContext.$streamContexts.withValue(.init([])) {
+                        try await inViewModelContext {
+                            defer { onDone() }
 
-                        guard !Task.isCancelled else { return }
-                        try await operation()
+                            guard !Task.isCancelled else { return }
+                            try await operation()
+                        }
                     }
                 } catch {
                     `catch`?(error)
@@ -233,7 +235,6 @@ final class Cancellations: @unchecked Sendable {
 
     var activeTasks: [(modelName: String, count: Int)] {
         lock {
-
             registered.values.reduce(into: [String: Int]()) { dict, c in
                 if let task = c as? TaskCancellable {
                     dict[task.name, default: 0] += 1

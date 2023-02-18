@@ -26,6 +26,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     @TaskLocal static var current: ContextBase?
 
     let contextCancellationKey = UUID()
+    let activateContextKey = UUID()
 
     @Locked var containers: [AnyKeyPath: (StateUpdate) -> ()] = [:]
 
@@ -101,6 +102,14 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         }
     }
 
+    func cancelActiveContextRecursively() {
+        cancellations.cancelAll(for: activateContextKey)
+
+        for child in allChildren.values {
+            child.cancelActiveContextRecursively()
+        }
+    }
+
     private func notifyUpdate(_ update: StateUpdate) {
         guard !hasBeenRemoved else { return }
         stateUpdates.yield(update)
@@ -169,5 +178,13 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     }
 
     func withDependencies<Value>(_ operation: () -> Value) -> Value { fatalError() }
+
+    var callContextEvents: CallContextsStream<ContextBase.EventInfo> {
+        CallContextsStream(events.map {
+            .init(value: $0, callContexts: $0.callContexts)
+        })
+    }
+
+    var typeDescription: String { fatalError() }
 }
 

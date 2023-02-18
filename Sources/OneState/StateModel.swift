@@ -1,7 +1,7 @@
 import Foundation
 import CustomDump
 
-/// Declare what model to used to represent a models states variable
+/// Declare what model to use to represent a models states variable
 ///
 /// Instead of manually creating a `Model` from a `StoreView`you can instead
 /// set up a state with `@StateModel` to declare its type:
@@ -96,12 +96,11 @@ public extension StoreViewProvider where Access == Write {
 }
 
 public extension Model {
-    func events<Models: ModelContainer>(from path: WritableKeyPath<State, StateModel<Models>>) -> CallContextsStream<(event: Models.ModelElement.Event, model: Models.ModelElement)> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable {
+    func events<Models: ModelContainer>(from path: WritableKeyPath<State, StateModel<Models>>) -> AnyAsyncSequence<(event: Models.ModelElement.Event, model: Models.ModelElement)> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable {
         let containerView = storeView(for: path).wrappedValue
         containerView.observeContainer(ofType: Models.self, atPath: \.self)
-        let events = storeView.context.events
 
-        return CallContextsStream(events.compactMap { e -> WithCallContexts<(event: Models.ModelElement.Event, model: Models.ModelElement)>? in
+        return AnyAsyncSequence(storeView.context.callContextEvents.compactMap { e -> (event: Models.ModelElement.Event, model: Models.ModelElement)? in
             guard let event = e.event as? Models.ModelElement.Event,
                   let containerPath = containerView.context.storePath.appending(path: containerView.path)
             else { return nil }
@@ -111,7 +110,7 @@ public extension Model {
             for path in container.elementKeyPaths {
                 if let elementPath = containerPath.appending(path: path), elementPath == e.path {
                     let context = e.context as! Context<Models.ModelElement.State>
-                    return WithCallContexts(value: (event, Models.ModelElement(context: context)), callContexts: e.callContexts)
+                    return (event, Models.ModelElement(context: context))
                 }
             }
 
@@ -119,27 +118,25 @@ public extension Model {
         })
     }
 
-    func events<Models: ModelContainer>(of event: Models.ModelElement.Event, from path: WritableKeyPath<State, StateModel<Models>>) -> CallContextsStream<Models.ModelElement> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable&Equatable {
-        CallContextsStream(events(from: path).stream.compactMap {
-            $0.value.event == event ? .init(value: $0.value.model, callContexts: $0.callContexts) : nil
+    func events<Models: ModelContainer>(of event: Models.ModelElement.Event, from path: WritableKeyPath<State, StateModel<Models>>) -> AnyAsyncSequence<Models.ModelElement> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State, Models.ModelElement.Event: Sendable&Equatable {
+        AnyAsyncSequence(events(from: path).compactMap {
+            $0.event == event ? $0.model : nil
         })
     }
 
-    func events<M: Model>(from path: WritableKeyPath<State, StateModel<M>>) -> CallContextsStream<M.Event> where M.StateContainer == M.State {
+    func events<M: Model>(from path: WritableKeyPath<State, StateModel<M>>) -> AnyAsyncSequence<M.Event> where M.StateContainer == M.State {
         let events = M(storeView(for: path).wrappedValue).context.events
-
-        return CallContextsStream(events.compactMap {
+        return AnyAsyncSequence(events.compactMap {
             guard let e = $0.event as? M.Event else { return nil }
-            return .init(value: e, callContexts: $0.callContexts)
+            return e
         })
     }
 
-    func events<M: Model>(of event: M.Event, from path: WritableKeyPath<State, StateModel<M>>) -> CallContextsStream<()> where M.StateContainer == M.State, M.Event: Equatable&Sendable {
+    func events<M: Model>(of event: M.Event, from path: WritableKeyPath<State, StateModel<M>>) -> AnyAsyncSequence<()> where M.StateContainer == M.State, M.Event: Equatable&Sendable {
         let events = M(storeView(for: path).wrappedValue).context.events
-
-        return CallContextsStream(events.compactMap {
+        return AnyAsyncSequence(events.compactMap {
             guard let e = $0.event as? M.Event, e == event else { return nil }
-            return .init(value: (), callContexts: $0.callContexts)
+            return ()
         })
     }
 }

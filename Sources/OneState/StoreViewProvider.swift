@@ -29,30 +29,26 @@ public extension StoreViewProvider {
 }
 
 public extension StoreViewProvider where State: Sendable {
-    func changes(isSame: @escaping @Sendable (State, State) -> Bool) -> CallContextsStream<State> {
-        CallContextsStream(allChanges().stream.removeDuplicates {
-            isSame($0.value, $1.value)
-        })
+    func changes(isSame: @escaping @Sendable (State, State) -> Bool) -> AnyAsyncSequence<State> {
+        AnyAsyncSequence(allChanges().removeDuplicates(by: isSame))
     }
 
-    func values(isSame: @escaping @Sendable (State, State) -> Bool) -> CallContextsStream<State> {
-        let state = AsyncStream<WithCallContexts<State>> { c in
-            c.yield(.init(value: nonObservableState, callContexts: []))
+    func values(isSame: @escaping @Sendable (State, State) -> Bool) -> AnyAsyncSequence<State> {
+        let state = AsyncStream<State> { c in
+            c.yield(nonObservableState)
             c.finish()
         }
         let changes = changes(isSame: isSame)
-        return CallContextsStream(chain(state, changes.stream).removeDuplicates {
-            isSame($0.value, $1.value)
-        })
+        return AnyAsyncSequence(chain(state, changes).removeDuplicates(by: isSame))
     }
 }
 
 public extension StoreViewProvider where State: Equatable&Sendable {
-    var changes: CallContextsStream<State> {
+    var changes: AnyAsyncSequence<State> {
         changes(isSame: { $0 == $1 })
     }
 
-    var values: CallContextsStream<State> {
+    var values: AnyAsyncSequence<State> {
         values(isSame: { $0 == $1 })
     }
 }
@@ -129,7 +125,7 @@ extension StoreViewProvider {
     func allChanges() -> CallContextsStream<State> {
         let view = self.storeView
         return CallContextsStream(view.context.stateUpdates.map { stateChange -> WithCallContexts<State> in
-            WithCallContexts(value: nonObservableState, callContexts: stateChange.callContexts)
+            WithCallContexts(value: view.nonObservableState, callContexts: stateChange.callContexts)
         })
     }
 }

@@ -61,17 +61,32 @@ public struct AnyAsyncSequence<Element>: AsyncSequence {
 
 extension AnyAsyncSequence: @unchecked Sendable where Element: Sendable {}
 
-public struct CallContextsStream<Element>: AsyncSequence {
-    let stream: AnyAsyncSequence<WithCallContexts<Element>>
-    let makeAsyncIteratorClosure: () -> AnyAsyncIterator<Element>
+struct CallContextsIterator<Element>: AsyncIteratorProtocol {
+    let nextClosure: () async -> WithCallContexts<Element>?
 
-    init<S: AsyncSequence>(_ sequence: S) where S.Element == WithCallContexts<Element> {
-        stream = AnyAsyncSequence(sequence)
-        makeAsyncIteratorClosure = { AnyAsyncIterator(sequence.map(\.value).makeAsyncIterator()) }
+    init<T: AsyncIteratorProtocol>(_ iterator: T) where T.Element == WithCallContexts<Element> {
+        var iterator = iterator
+        nextClosure = { try? await iterator.next() }
     }
 
-    public func makeAsyncIterator() -> AnyAsyncIterator<Element> {
-        AnyAsyncIterator(makeAsyncIteratorClosure())
+    func next() async -> Element? {
+        let value = await nextClosure()
+        CallContext.streamContexts.value = value?.callContexts ?? []
+        return value?.value
+    }
+}
+
+extension CallContextsIterator: @unchecked Sendable where Element: Sendable {}
+
+struct CallContextsStream<Element>: AsyncSequence {
+    let makeAsyncIteratorClosure: () -> CallContextsIterator<Element>
+
+    init<S: AsyncSequence>(_ sequence: S) where S.Element == WithCallContexts<Element> {
+        makeAsyncIteratorClosure = { CallContextsIterator(sequence.makeAsyncIterator()) }
+    }
+
+    func makeAsyncIterator() -> CallContextsIterator<Element> {
+        makeAsyncIteratorClosure()
     }
 }
 

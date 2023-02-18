@@ -14,6 +14,7 @@ struct CallContext: Identifiable, Sendable, Equatable {
     }
 
     @TaskLocal static var currentContexts: [CallContext] = []
+    @TaskLocal static var streamContexts = Protected<[CallContext]>([])
 
     static let _nextId = Protected(0)
     static var nextId: Int {

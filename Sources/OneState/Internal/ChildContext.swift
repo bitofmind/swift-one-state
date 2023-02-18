@@ -47,7 +47,9 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
 
             if firstAccess && !self.isOverrideContext {
                 ContextBase.$current.withValue(nil) {
-                    model.onActivate()
+                    withCancellationContext(activateContextKey) {
+                        model.onActivate()
+                    }
                 }
             }
 
@@ -163,5 +165,9 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
                 withLocalDependencies(operation)
             }
         }
+    }
+
+    override var typeDescription: String {
+        String(describing: ContextModel.self)
     }
 }

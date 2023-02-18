@@ -2,9 +2,9 @@ import Foundation
 import AsyncAlgorithms
 import CustomDump
 
-/// Holds a model that drives SwiftUI views
+/// A type that models the state and logic that drives SwiftUI views
 ///
-/// A minimal  model must at least declare its state using `@ModelState`
+/// A minimal model must at least declare its state using `@ModelState`
 ///
 ///     struct MyModel: Model {
 ///         struct State: Equatable {
@@ -135,7 +135,7 @@ public extension Model {
     /// - Parameter catch: Called if the task throws an error
     /// - Returns: A cancellable to optionally allow cancelling before deactivation.
     @discardableResult
-    func task(priority: TaskPriority? = nil, _ operation: @escaping @Sendable () async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
+    func task(priority: TaskPriority? = nil, _ operation: @escaping @Sendable () async throws -> Void, `catch`: @escaping @Sendable (Error) -> Void) -> Cancellable {
         TaskCancellable(
             name: typeDescription,
             cancellations: context.cancellations,
@@ -144,6 +144,15 @@ public extension Model {
             catch: `catch`
         )
         .cancel(for: context.contextCancellationKey)
+    }
+
+    /// Perform a task for the life time of the model
+    /// - Parameter priority: The priority of the  task.
+    /// - Parameter operation: The operation to perform.
+    /// - Returns: A cancellable to optionally allow cancelling before deactivation.
+    @discardableResult
+    func task(priority: TaskPriority? = nil, _ operation: @escaping @Sendable () async -> Void) -> Cancellable {
+        task(priority: priority, operation, catch: { _ in })
     }
 
     /// Iterate an async sequence for the life time of the model
@@ -161,7 +170,12 @@ public extension Model {
         return task(priority: priority, {
             guard cancelPrevious else {
                 for try await value in sequence {
-                    try await operation(value)
+                    let streamContexts = CallContext.streamContexts.value
+                    CallContext.streamContexts.value.removeAll()
+
+                    try await CallContext.$currentContexts.withValue(streamContexts) {
+                        try await operation(value)
+                    }
                 }
                 return
             }
@@ -169,6 +183,9 @@ public extension Model {
             let cancelID = UUID()
             try await withTaskCancellationHandler {
                 for try await value in sequence {
+                    let streamContexts = CallContext.streamContexts.value
+                    CallContext.streamContexts.value.removeAll()
+
                     cancellations.cancelAll(for: cancelID)
                     TaskCancellable(
                         name: typeDescription,
@@ -178,7 +195,9 @@ public extension Model {
                             guard !Task.isCancelled else { return }
                             do {
                                 try await inViewModelContext {
-                                    try await operation(value)
+                                    try await CallContext.$currentContexts.withValue(streamContexts) {
+                                        try await operation(value)
+                                    }
                                 }
                             } catch is CancellationError {
                                 print()
@@ -192,27 +211,10 @@ public extension Model {
             } onCancel: {
                 cancellations.cancelAll(for: cancelID)
             }
-        }, catch: `catch`)
+        }, catch: { `catch`?($0) })
     }
 
-    /// Iterate an async sequence for the life time of the model
-    ///
-    /// - Parameter sequence: The sequence to iterate.
-    /// - Parameter cancelPrevious: If true, will cancel any preciously async work initiated from`perform`.
-    /// - Parameter priority: The priority of the  task.
-    /// - Parameter operation: The operation to perform for each element in the sequence.
-    /// - Parameter catch: Called if the sequence throws an error
-    /// - Returns: A cancellable to optionally allow cancelling before deactivation.
-    @discardableResult
-    func forEach<Element: Sendable>(_ sequence: CallContextsStream<Element>, cancelPrevious: Bool = false, priority: TaskPriority? = nil, perform: @escaping @Sendable (Element) async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable {
-        forEach(sequence.stream.map { ($0.value, $0.callContexts) }, cancelPrevious: cancelPrevious, priority: priority, perform: { value, callContexts in
-            try await CallContext.$currentContexts.withValue(callContexts) {
-                try await perform(value)
-            }
-        }, catch: `catch`)
-    }
-
-    /// Wait until the predicate based on the model's state is fullfilled
+    /// Wait until the predicate based on the model's state is fulfilled
     func waitUntil(_ predicate: @autoclosure @escaping @Sendable () -> Bool) async throws {
         let initial = AsyncStream<()> { c in
             c.yield(())
@@ -241,18 +243,18 @@ public extension Model {
 
 public extension Model {
     /// Returns a sequence of events sent from this model.
-    func events() -> CallContextsStream<Event> {
-        CallContextsStream(context.events.compactMap { [context] in
+    func events() -> AnyAsyncSequence<Event> {
+        AnyAsyncSequence(context.callContextEvents.compactMap { [context] in
             guard let e = $0.event as? Event, $0.context === context else { return nil }
-            return .init(value: e, callContexts: $0.callContexts)
+            return e
         })
     }
 
     /// Returns a sequence that emits when events of type `eventType` is sent from this model or any of its descendants.
-    func events<E: Sendable>(ofType eventType: E.Type = E.self) -> CallContextsStream<E> {
-        CallContextsStream(context.events.compactMap {
+    func events<E: Sendable>(ofType eventType: E.Type = E.self) -> AnyAsyncSequence<E> {
+        AnyAsyncSequence(context.callContextEvents.compactMap {
             guard let e = $0.event as? E else { return nil }
-            return .init(value: e, callContexts: $0.callContexts)
+            return e
         })
     }
 
@@ -261,37 +263,36 @@ public extension Model {
     ///     forEach(events(fromType: ChildModel.self)) { event, model in ... }
     ///
     ///     forEach(events()) { (event, _: ChildModel) in ... }
-    func events<M: Model>(fromType modelType: M.Type = M.self) -> CallContextsStream<(event: M.Event, model: M)> {
-        let events = context.events
-        return CallContextsStream(events.compactMap {
+    func events<M: Model>(fromType modelType: M.Type = M.self) -> AnyAsyncSequence<(event: M.Event, model: M)> {
+        AnyAsyncSequence(context.callContextEvents.compactMap {
             guard let event = $0.event as? M.Event, let context = $0.context as? Context<M.State> else { return nil }
-            return .init(value: (event, M(context: context)), callContexts: $0.callContexts)
+            return (event, M(context: context))
         })
     }
 
     /// Returns a sequence that emits when events of type `eventType` is sent from model or any of its descendants of the type `fromType`.
-    func events<E: Sendable, M: Model>(ofType eventType: E.Type = E.self, fromType modelType: M.Type = M.self) -> CallContextsStream<(event: E, model: M)> {
-        CallContextsStream(context.events.compactMap {
+    func events<E: Sendable, M: Model>(ofType eventType: E.Type = E.self, fromType modelType: M.Type = M.self) -> AnyAsyncSequence<(event: E, model: M)> {
+        AnyAsyncSequence(context.callContextEvents.compactMap {
             guard let event = $0.event as? E, let context = $0.context as? Context<M.State> else { return nil }
-            return .init(value: (event, M(context: context)), callContexts: $0.callContexts)
+            return (event, M(context: context))
         })
     }
 }
 
 public extension Model {
     /// Returns a sequence that emits when events equal to the provided `event` is sent from this model.
-    func events(of event: Event) -> CallContextsStream<()> where Event: Equatable&Sendable {
-        CallContextsStream(context.events.compactMap { [context] in
+    func events(of event: Event) -> AnyAsyncSequence<()> where Event: Equatable&Sendable {
+        AnyAsyncSequence(context.callContextEvents.compactMap { [context] in
             guard let e = $0.event as? Event, e == event, $0.context === context else { return nil }
-            return .init(value: (), callContexts: $0.callContexts)
+            return ()
         })
     }
 
     /// Returns a sequence that emits when events equal to the provided `event` is sent from this model or any of its descendants.
-    func events<E: Equatable&Sendable>(of event: E) -> CallContextsStream<()> {
-        CallContextsStream(context.events.compactMap {
+    func events<E: Equatable&Sendable>(of event: E) -> AnyAsyncSequence<()> {
+        AnyAsyncSequence(context.callContextEvents.compactMap {
             guard let e = $0.event as? E, e == event else { return nil }
-            return .init(value: (), callContexts: $0.callContexts)
+            return ()
         })
     }
 
@@ -300,29 +301,28 @@ public extension Model {
     ///     forEach(events(of: .someEvent, fromType: ChildModel.self)) { model in ... }
     ///
     ///     forEach(events(of: .someEvent)) { (_: ChildModel) in ... }
-    func events<M: Model>(of event: M.Event, fromType modelType: M.Type = M.self) -> CallContextsStream<M> where M.Event: Equatable&Sendable {
-        let events = context.events
-        return CallContextsStream(events.compactMap {
+    func events<M: Model>(of event: M.Event, fromType modelType: M.Type = M.self) -> AnyAsyncSequence<M> where M.Event: Equatable&Sendable {
+        AnyAsyncSequence(context.callContextEvents.compactMap {
             guard let e = $0.event as? M.Event, e == event, let context = $0.context as? Context<M.State> else { return nil }
-            return .init(value:  M(context: context), callContexts: $0.callContexts)
+            return M(context: context)
         })
     }
 
     /// Returns a sequence that emits when events equal to the provided `event` is sent from this model or any of its descendants of type `fromType`.
-    func events<E: Equatable&Sendable, M: Model>(of event: E, fromType modelType: M.Type = M.self) -> CallContextsStream<M> {
-        CallContextsStream(context.events.compactMap {
+    func events<E: Equatable&Sendable, M: Model>(of event: E, fromType modelType: M.Type = M.self) -> AnyAsyncSequence<M> {
+        AnyAsyncSequence(context.callContextEvents.compactMap {
             guard let e = $0.event as? E, e == event, let context = $0.context as? Context<M.State> else { return nil }
-            return .init(value:  M(context: context), callContexts: $0.callContexts)
+            return M(context: context)
         })
     }
 }
 
 public extension Model {
-    func changes<T: Equatable>(of path: KeyPath<State, T>) -> CallContextsStream<T> {
+    func changes<T: Equatable&Sendable>(of path: KeyPath<State, T>) -> AnyAsyncSequence<T> {
         storeView(for: path).changes
     }
 
-    func values<T: Equatable>(of path: KeyPath<State, T>) -> CallContextsStream<T> {
+    func values<T: Equatable&Sendable>(of path: KeyPath<State, T>) -> AnyAsyncSequence<T> {
         storeView(for: path).values
     }
 
