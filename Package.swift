@@ -14,7 +14,7 @@ let package = Package(
         .library(name: "OneState", targets: ["OneState"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "0.0.3"),
+        .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "0.1.0"),
         .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "0.6.0"),
         .package(url: "https://github.com/pointfreeco/xctest-dynamic-overlay", from: "0.8.0"),
         .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "0.1.0")
