@@ -1,6 +1,8 @@
 import Foundation
 import CustomDump
 
+/// Grants write access to part of a model's state.
+/// Useful for creating of Binding that is required by many SwiftUI controls.
 @propertyWrapper @dynamicMemberLookup
 public struct Writable<Value> {
     public var wrappedValue: Value

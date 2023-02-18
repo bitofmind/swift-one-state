@@ -4,6 +4,17 @@ import CustomDump
 
 @propertyWrapper
 @dynamicMemberLookup
+/// Declares a model that will invalidates a view whenever any observed state changes.
+///
+///   struct MyView: View {
+///     @ObservedModel var model: MyModel
+///
+///     var body: some View {
+///       Button("Log in \(model.userName)") {
+///         model.loginButtonTapped()
+///       }
+///     }
+///   }
 public struct ObservedModel<M: ModelContainer>: DynamicProperty {
     @StateObject var access = ViewAccess()
 
