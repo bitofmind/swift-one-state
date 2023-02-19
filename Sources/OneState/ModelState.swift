@@ -60,3 +60,9 @@ public extension ModelState {
         context.isStateOverridden
     }
 }
+
+public extension ModelState {
+    func transaction<T>(_ perform: (inout State) throws -> T) rethrows -> T {
+        try perform(&wrappedValue)
+    }
+}
