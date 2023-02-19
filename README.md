@@ -6,22 +6,10 @@ One State is a library for composing models for driving SwiftUI views that comes
   * [Related Libraries](#related-libraries)
 - [Documentation](#documentation)
   * [Models, Stores and Composition](#models--stores-and-composition)
-    + [Accessing State](#accessing-state)
-    + [Store](#store)
-    + [Composition with @StateModel](#composition-with--statemodel)
   * [SwiftUI Integration](#swiftui-integration)
-    + [Bindings](#bindings)
-    + [Animations](#animations)
-    + [State Change Observation](#state-change-observation)
   * [Lifetime and Asynchronous Work](#lifetime-and-asynchronous-work)
-    + [Tasks](#tasks)
-    + [Asynchronous Sequences](#asynchronous-sequences)
-    + [Model Activation](#model-activation)
-    + [Cancellation](#cancellation)
-    + [Cancel in Flight](#cancel-in-flight)
   * [Events](#events)
   * [Dependencies](#dependencies)
-    + [Overriding Dependencies](#overriding-dependencies)
   * [Testing](#testing)
 - [Cheat Sheet](#cheat-sheet)
 - [Troubleshooting](#troubleshooting)
@@ -41,7 +29,7 @@ Much like SwiftUI's composition of views, One State uses well-integrated modern 
 ### Related Libraries
 
 **[OneStateExtensions](https://github.com/bitofmind/swift-one-state-extensions)**: Extensions for [CasePaths](https://github.com/pointfreeco/swift-case-paths) and [IdentifiedCollections](https://github.com/pointfreeco/swift-identified-collections).\
-**[OneStateRecorder](https://github.com/bitofmind/swift-one-state-recorder)**: Utility for recording and replaying of model state changes.\
+**[OneStateRecorder](https://github.com/bitofmind/swift-one-state-recorder)**: Utility for recording and replaying of model state changes.
 
 
 ## Documentation
@@ -153,7 +141,7 @@ As your app model's state is composed of all child states, adding derived proper
 One State models have been designed to integrate well with SwiftUI. Where you typically conform your models to `ObservableObject` in plain vanilla SwiftUI projects, and get access and view updates by using `@ObservedObject` in your SwiftUI views, in One State you instead conform your models to `Model` and uses `@ObservedModel` to get access and trigger view updates of your views.
 
 ```swift
-stuct CounterView: View {
+struct CounterView: View {
   @ObservedModel var model: CounterModel
   
   var body: some View {
@@ -261,13 +249,13 @@ func incrementTapped() {
 
 To help debugging, you can add print modifiers to your views, either to print all state changes for a model:
 
-```Swift
+```swift
 view.printStateUpdates(for: $model)
 ```
 
 Or to only print when the view was updated due to a state change:
 
-```Swift
+```swift
 view.printObservedUpdates(for: $model)
 ```
 
@@ -415,7 +403,7 @@ struct CounterRowModel: Model {
 
 Now you can explicitly ask for events from composed models where your will conveniently also receive an instance of the sending model.
 
-```
+```swift
 forEach(events(from: \.$counters)) { event, counter in
   switch event {
   case .onRemove:
@@ -428,7 +416,7 @@ forEach(events(from: \.$counters)) { event, counter in
 
 And when you are interested only in a specific event, it will be enough to write:
 
-```
+```swift
 forEach(events(of: .onDismiss, from: \.$factPrompt)) { _ in
   state.factPrompt = nil
 }
@@ -470,7 +458,7 @@ extension DependencyValues {
 
 And models will declare `@ModelDependency` properties to get access to its dependencies.
 
-```
+```swift
 struct FactPromptModel: Model {
   struct State: Equatable {
     let count: Int
@@ -497,7 +485,7 @@ struct FactPromptModel: Model {
 
 When setting up your store you can provide a trailing closure where you can override default dependencies. This is especially useful for testing and previews.
 
-```
+```swift
 let store = Store<AppModel>(initialState: .init()) {
   $0.factClient.fetch = { "\($0) is a great number!" }
 }
