@@ -1,3 +1,5 @@
 .swiftpm
 .DS_Store
 Package.resolved
+xcuserdata/
+
