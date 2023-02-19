@@ -97,7 +97,7 @@ A model can be composed by other models where the most common composition is to 
 struct CounterRowModel: Model, Identifiable {
   struct State: Equatable, Identifiable {
     var id: UUID
-    @StateModel<CountModel> var counter = 0
+    @StateModel<CountModel> var counter = .init()
   }
 
   @ModelState private var state: State
@@ -325,7 +325,7 @@ All tasks started on a model are automatically cancelled once a model is deactiv
 let operationID = "operationID"
 
 func startOperation() {
-  task { ...}.cancel(for: operationID)
+  task { ... }.cancel(for: operationID)
 }
 
 func stopOperation() {
@@ -336,7 +336,7 @@ func stopOperation() {
 By using a cancellation context you can group several operations to allow cancellation of them all as a group:
 
 ```swift
-enum OperationID {} // A type can as work as an id
+enum OperationID {} // A type can also work as an id
 
 withCancellationContext(for: OperationID.self) {
   task { }
@@ -351,7 +351,7 @@ If you perform an asynchronous operation it sometimes makes sense to cancel any 
 
 ```swift
 func startOperation() {
-  task { ...}.cancel(for: operationID, cancelInFlight: true)
+  task { ... }.cancel(for: operationID, cancelInFlight: true)
 }
 ```
 
@@ -361,7 +361,7 @@ If you don't need to cancel your operation from somewhere else you can let One S
 
 ```swift
 func startOperation() {
-  task { ...}.cancelInFlight()
+  task { ... }.cancelInFlight()
 }
 ```
 
@@ -518,7 +518,7 @@ class CounterFactTests: XCTestCase {
   func testExample() async throws {
     let id = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
     
-    let store = TestStore<AppModel>(initialState: .init(counters: [])) {
+    let store = TestStore<AppModel>(initialState: .init()) {
       $0.factClient.fetch = { "\($0) is a good number." }
       $0.uuid = .constant(id)
     }
@@ -578,24 +578,24 @@ One State comes with several core types and property wrappers.
 
 **@ModelState**: Declares a model's state.\
 **@ModelDependency**: Declares a model dependency.\
-**@ModelProperty**: Declares a value stored outside of a model's state.\
+**@ModelProperty**: Declares a value stored outside of a model's state.
 
 
 *Part of a model's State:*
 
 **@StateModel**: Declare what model to use to represent a sub-model's state.\
-**@Writable**: Grant write access to part of a model's state.\
+**@Writable**: Grant write access to part of a model's state.
 
 
 *SwiftUI integration:*
 
-**@ObservedModel**: Declares a model that will update the view on model state changes.\
+**@ObservedModel**: Declares a model that will update the view on model state changes.
 
 
 *Testing:*
 
 **TestStore**: A store used for testing.\
-**@TestModel**: Declares a model used for testing.\
+**@TestModel**: Declares a model used for testing.
 
 ## Troubleshooting
 

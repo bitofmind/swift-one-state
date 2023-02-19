@@ -6,7 +6,8 @@ import Dependencies
 class CounterFactTests: XCTestCase {
     func testExample() async throws {
         let id = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
-        let store = TestStore<AppModel>(initialState: .init(counters: [])) {
+
+        let store = TestStore<AppModel>(initialState: .init()) {
             $0.factClient.fetch = { "\($0) is a good number." }
             $0.uuid = .constant(id)
         }
@@ -30,11 +31,11 @@ class CounterFactTests: XCTestCase {
 
         @TestModel var factPromptModel = try XCTUnwrap(appModel.$factPrompt)
 
-        factPromptModel.send(.onDismiss)
+        factPromptModel.dismissTapped()
         await $factPromptModel.receive(.onDismiss)
         await $appModel.factPrompt.assert(nil)
 
-        counterRowModel.send(.onRemove)
+        counterRowModel.removeButtonTapped()
         await $counterRowModel.receive(.onRemove)
         await $appModel.counters.assert([])
     }

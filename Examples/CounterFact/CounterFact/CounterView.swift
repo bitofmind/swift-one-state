@@ -72,6 +72,10 @@ struct CounterRowModel: Model, Identifiable, Sendable {
     }
 
     @ModelState private var state: State
+
+    func removeButtonTapped() {
+        send(.onRemove)
+    }
 }
 
 struct CounterRowView: View {
@@ -85,7 +89,7 @@ struct CounterRowView: View {
 
             Button("Remove") {
                 OneState.withAnimation {
-                    model.send(.onRemove)
+                    model.removeButtonTapped()
                 }
             }
         }
@@ -181,6 +185,10 @@ struct FactPromptModel: Model {
             state.fact = try await fetchFact(state.count)
         } catch: { _ in }
     }
+
+    func dismissTapped() {
+        send(.onDismiss)
+    }
 }
 
 struct FactPromptView: View {
@@ -208,7 +216,7 @@ struct FactPromptView: View {
                 }
 
                 Button("Dismiss") {
-                    model.send(.onDismiss)
+                    model.dismissTapped()
                 }
             }
         }
@@ -222,7 +230,7 @@ struct FactPromptView: View {
 }
 
 struct CounterView_Previews: PreviewProvider {
-    static let store = Store<AppModel>(initialState: .init(counters: []))
+    static let store = Store<AppModel>(initialState: .init())
 
     static var previews: some View {
         NavigationView {
