@@ -20,7 +20,7 @@ struct CounterModel: Model {
     }
 
     @ModelDependency(\.factClient.fetch) var fetchFact
-    @ModelState var state: State
+    @ModelState private var state: State
 
     func decrementTapped() {
         state.count -= 1
@@ -68,7 +68,7 @@ struct CounterRowModel: Model, Identifiable, Sendable {
     }
 
     enum Event {
-        case removeButtonTapped
+        case onRemove
     }
 
     @ModelState private var state: State
@@ -85,7 +85,7 @@ struct CounterRowView: View {
 
             Button("Remove") {
                 OneState.withAnimation {
-                    model.send(.removeButtonTapped)
+                    model.send(.onRemove)
                 }
             }
         }
@@ -104,14 +104,14 @@ struct AppModel: Model, Sendable {
     }
 
     @ModelDependency(\.uuid) var uuid
-    @ModelState var state: State
+    @ModelState private var state: State
 
     func onActivate() {
-        forEach(events(of: .removeButtonTapped)) { (counter: CounterRowModel) in
+        forEach(events(of: .onRemove)) { (counter: CounterRowModel) in
             state.counters.removeAll { [id = counter.id] in $0.id == id }
         }
 
-        forEach(events(of: .dismissButtonTapped, from: \.$factPrompt)) { _ in
+        forEach(events(of: .onDismiss, from: \.$factPrompt)) { _ in
             state.factPrompt = nil
         }
 
@@ -168,7 +168,7 @@ struct FactPromptModel: Model {
     }
 
     enum Event {
-        case dismissButtonTapped
+        case onDismiss
     }
 
     @ModelDependency(\.factClient.fetch) var fetchFact
@@ -208,7 +208,7 @@ struct FactPromptView: View {
                 }
 
                 Button("Dismiss") {
-                    model.send(.dismissButtonTapped)
+                    model.send(.onDismiss)
                 }
             }
         }

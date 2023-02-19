@@ -5,7 +5,7 @@ struct CounterModel: Model {
         var count = 0
     }
 
-    @ModelState var state: State
+    @ModelState private var state: State
 
     func increment() {
         state.count += 1
@@ -18,7 +18,7 @@ struct TwoCountersModel: Model {
         @StateModel<CounterModel> var counter2 = .init(count: 2)
     }
 
-    @ModelState var state: State
+    @ModelState private var state: State
 }
 
 struct EventModel: Model, Identifiable {
@@ -33,7 +33,7 @@ struct EventModel: Model, Identifiable {
         case count(Int)
     }
 
-    @ModelState var state: State
+    @ModelState private var state: State
 
     func onActivate() {
         forEach(events()) {

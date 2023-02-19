@@ -98,7 +98,7 @@ private struct ChildModel: Model, Identifiable {
         case count(Int)
     }
 
-    @ModelState var state: State
+    @ModelState private var state: State
 }
 
 private struct ParentModel: Model {
@@ -112,7 +112,7 @@ private struct ParentModel: Model {
         var receivedIds: [Int] = []
     }
 
-    @ModelState var state: State
+    @ModelState private var state: State
 
     func onActivate() {
         forEach(events(from: \.$child)) { event in

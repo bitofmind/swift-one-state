@@ -14,7 +14,9 @@ class CounterFactTests: XCTestCase {
         @TestModel var appModel = store.model
 
         appModel.addButtonTapped()
-        await $appModel.counters.assert([.init(counter: .init(), id: id)])
+        await $appModel.assert {
+            $0.counters = [.init(counter: .init(), id: id)]
+        }
 
         @TestModel var counterRowModel = try XCTUnwrap(appModel.$counters.first)
         @TestModel var counterModel: CounterModel = counterRowModel.$counter
@@ -28,12 +30,12 @@ class CounterFactTests: XCTestCase {
 
         @TestModel var factPromptModel = try XCTUnwrap(appModel.$factPrompt)
 
-        factPromptModel.send(.dismissButtonTapped)
-        await $factPromptModel.receive(.dismissButtonTapped)
+        factPromptModel.send(.onDismiss)
+        await $factPromptModel.receive(.onDismiss)
         await $appModel.factPrompt.assert(nil)
 
-        counterRowModel.send(.removeButtonTapped)
-        await $counterRowModel.receive(.removeButtonTapped)
+        counterRowModel.send(.onRemove)
+        await $counterRowModel.receive(.onRemove)
         await $appModel.counters.assert([])
     }
 }

@@ -3,7 +3,7 @@ import XCTest
 
 private struct TestModel: Model {
     struct State {}
-    @ModelState var state: State
+    @ModelState private var state: State
 }
 
 class StoreTests: XCTestCase {
