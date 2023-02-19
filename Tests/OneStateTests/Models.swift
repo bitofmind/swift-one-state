@@ -24,7 +24,7 @@ struct TwoCountersModel: Model {
 struct EventModel: Model, Identifiable {
     struct State: Equatable, Identifiable {
         var id = 0
-        var count = 0
+        @Writable var count = 0
         var receivedEvents: [EventModel.Event] = []
     }
 

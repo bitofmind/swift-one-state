@@ -41,9 +41,9 @@ final class CallContextTests: XCTestCase {
         model.forEach(model.events()) { event in
             switch event {
             case .empty:
-                model.state.count += 1
+                model.$count.wrappedValue += 1
             case let .count(val):
-                model.state.count = val
+                model.$count.wrappedValue = val
             }
         }
 
