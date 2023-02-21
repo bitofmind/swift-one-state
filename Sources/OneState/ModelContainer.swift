@@ -62,20 +62,27 @@ extension Optional: ModelContainer where Wrapped: Model {
     }
 }
 
-extension Array: ModelContainer where Element: Model, Element.State: Identifiable, Element: Identifiable {
+extension Collection where Element: Model, Element.State: Identifiable, Element: Identifiable {
     public typealias StateContainer = [Element.State]
-
-    public static func modelContainer(from elements: [Element]) -> Self {
-        elements
-    }
 
     public var stateContainer: StateContainer {
         map { $0.nonObservableState }
     }
 
-    public var models: [ModelElement] {
-        self
+    public var models: [Element] {
+        map { $0 }
     }
+}
+
+extension RangeReplaceableCollection where Element: Model, Element.State: Identifiable, Element: Identifiable {
+    public static func modelContainer(from elements: [Element]) -> Self {
+        Self(elements)
+    }
+}
+
+extension Array: ModelContainer where Element: Model, Element.State: Identifiable, Element: Identifiable {
+    public static func modelContainer(from elements: [Element]) -> Self { elements }
+    public var models: [ModelElement] { self }
 }
 
 extension Optional {

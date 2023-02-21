@@ -45,6 +45,8 @@ Models are central building blocks in One State. A model declare a state togethe
 You conform your models to the `Model` protocol that, at a minimum, requires your type to declare its type of `State` as well as to add a single `@ModelState` property for accessing that state. This state should have value semantics and conform to `Equatable` to ensure state changes can be detected, and for views to be updated properly.
 
 ```swift
+import OneState
+
 struct CountModel: Model {
   struct State: Equatable {
     var count = 0
@@ -116,7 +118,7 @@ And given that a model (such as `CounterRowModel` above) is identifiable, you ca
 ```swift
 struct AppModel: Model {
   struct State: Equatable {
-    @StateModel<[CounterRowModel]> var rows = []
+    @StateModel<[CounterRowModel]> var counters = []
     @StateModel<FactPromptModel?> var factPrompt = nil
 
     var sum: Int {
@@ -127,7 +129,7 @@ struct AppModel: Model {
   @ModelState private var state: State
 }
 
-for row in appModel.$rows {
+for row in appModel.$counters {
   row.$counter.incrementTapped()
 }
 ```
@@ -214,7 +216,17 @@ struct CounterView_Previews: PreviewProvider {
 
 #### Bindings
 
-As model property access is read-only by design, but many SwiftUI controls expect a `Binding`, you have a choice to either construct your binding manually and updating the state via setter methods, or explicitly allow write access by annotating your property with `@Writable`.
+As model property access is read-only by design, but many SwiftUI controls expect a `Binding`, you have a choice to either construct your binding manually and updating the state via setter methods:
+
+```swift
+Binding {
+  model.count
+} set: {
+  model.countDidUpdate(to: $0)
+}
+```
+ 
+Or explicitly allow write access by annotating your property with `@Writable`.
 
 ```swift
 struct State: Equatable {
@@ -491,7 +503,7 @@ let store = Store<AppModel>(initialState: .init()) {
 }
 ```
 
-A model can also override (or reset) a dependency. This will affect the model itself and its descendants:
+A model can override a dependency with a local value, which will affect the model itself and its descendants. An overridden value can be restored to the original value by calling `reset()`.
 
 ```swift
 @ModelDependency(\.sound) var sound
