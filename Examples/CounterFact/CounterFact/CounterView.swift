@@ -151,11 +151,13 @@ struct AppView: View {
                 }
             }
             .navigationTitle("Counters")
-            .navigationBarItems(trailing: Button("Add") {
-                OneState.withAnimation {
-                    model.addButtonTapped()
+            .toolbar {
+                Button("Add") {
+                    OneState.withAnimation {
+                        model.addButtonTapped()
+                    }
                 }
-            })
+            }
 
             if let factPrompt = model.$factPrompt {
                 FactPromptView(model: factPrompt)

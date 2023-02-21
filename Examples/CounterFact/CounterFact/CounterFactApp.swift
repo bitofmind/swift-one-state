@@ -8,6 +8,9 @@ struct CounterFactApp: App {
     var body: some Scene {
         WindowGroup {
             NavigationView {
+                #if os(macOS)
+                EmptyView()
+                #endif
                 AppView(model: store.model)
             }
         }
