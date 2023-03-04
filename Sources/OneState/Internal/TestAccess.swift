@@ -47,9 +47,10 @@ final class TestAccess<State: Equatable>: TestAccessBase {
             if isExhaustive {
                 return value == expected
             } else {
-                var copy = value
-                modify(&copy[keyPath: storePath])
-                return copy == value
+                let original = value[keyPath: storePath]
+                var modified = original
+                modify(&modified)
+                return original == modified
             }
         }
 

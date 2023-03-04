@@ -21,10 +21,12 @@ public protocol StoreViewProvider {
 
 public extension StoreViewProvider {
     var stateDidUpdate: AnyAsyncSequence<()> {
-        let view = self.storeView
-        return .init(view.context.stateUpdates.filter { update in
+        let context = self.storeView.context
+        return .init(context.stateUpdates.filter { update in
             !update.isOverrideUpdate
-        }.map { _ in () })
+        }.map { _ in
+            _ = context // Capture context
+        })
     }
 }
 
