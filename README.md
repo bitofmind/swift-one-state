@@ -3,7 +3,6 @@
 One State is a library for composing models for driving SwiftUI views that comes with advanced tooling using a lightweight modern Swift style.
 
 - [What is One State](#what-is-one-state)
-  * [Related Libraries](#related-libraries)
 - [Documentation](#documentation)
   * [Models, Stores and Composition](#models--stores-and-composition)
   * [SwiftUI Integration](#swiftui-integration)
@@ -12,6 +11,7 @@ One State is a library for composing models for driving SwiftUI views that comes
   * [Dependencies](#dependencies)
   * [Testing](#testing)
 - [Cheat Sheet](#cheat-sheet)
+- [One State Extensions](#one-state-extensions)
 - [Troubleshooting](#troubleshooting)
   * [Observing of State Changes](#observing-of-state-changes)
 
@@ -25,12 +25,6 @@ Much like SwiftUI's composition of views, One State uses well-integrated modern 
 - Exhaustive testing of state changes, events and concurrent operations.
 
 > One State takes inspiration from similar architectures such as [The Composable Architecture](https://github.com/pointfreeco/swift-composable-architecture), but aims to be less strict and esoteric by using a more familiar style.
-
-### Related Libraries
-
-**[OneStateExtensions](https://github.com/bitofmind/swift-one-state-extensions)**: Extensions for [CasePaths](https://github.com/pointfreeco/swift-case-paths) and [IdentifiedCollections](https://github.com/pointfreeco/swift-identified-collections).\
-**[OneStateRecorder](https://github.com/bitofmind/swift-one-state-recorder)**: Utility for recording and replaying of model state changes.
-
 
 ## Documentation
 
@@ -609,6 +603,50 @@ One State comes with several core types and property wrappers.
 **TestStore**: A store used for testing.\
 **@TestModel**: Declares a model used for testing.
 
+
+## One State Extensions
+
+The `OneStateExtensions` library, part of the `OneState` package, provides some useful extensions to One State:
+
+#### Identified Arrays
+
+Point-Free's [Identified Arrays](https://github.com/pointfreeco/swift-identified-collections) makes it more convenient to work with arrays of identifiable items. This extension adds support for using `IdentifiedArray` in your `@StateModel`s.
+
+```swift
+@StateModel<IdentifiedArrayOf<CounterRowModel>> var counters = []
+
+forEach(events(of: .onRemove, from: \.$counters)) { counter in
+  state.counters.remove(id: counter.id)
+}
+```
+
+#### Case Paths
+
+Point-Free's [Case Paths](https://github.com/pointfreeco/swift-case-paths) bring the power and ergonomics of key paths to enums. This extension adds support for using case paths with `StoreView`s.
+
+```swift
+struct AppModel: Model {
+  struct State: Equatable {
+    var destination: Destination? = nil
+  }
+
+  enum Destination: Equatable {
+    case edit(EditModel.State)
+    case record(RecordModel.State)
+  }
+  
+  @ModelState private var state: State
+
+  var editModel: EditModel? {
+    .init($state.destination.case(/Destination.edit))
+  }
+
+  var recordModel: RecordModel? {
+    .init($state.destination.case(/Destination.record))
+  }
+}
+```
+
 ## Troubleshooting
 
 ### Observing of State Changes
@@ -647,7 +685,7 @@ var countSquared: Int {
 }
 ```
 
-Of course it is often prefereable to add computed properties directly to your `State` when that is possible.
+Of course it is often preferable to add computed properties directly to your `State` when that is possible.
 
 ```swift
 struct State: Equatable {
