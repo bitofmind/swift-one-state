@@ -12,6 +12,7 @@ One State is a library for composing models for driving SwiftUI views that comes
   * [Testing](#testing)
 - [Cheat Sheet](#cheat-sheet)
 - [One State Extensions](#one-state-extensions)
+- [One State Time Traveler](#one-state-time-traveler)
 - [Troubleshooting](#troubleshooting)
   * [Observing of State Changes](#observing-of-state-changes)
 
@@ -646,6 +647,44 @@ struct AppModel: Model {
   }
 }
 ```
+
+## One State Time Traveler
+
+The `OneStateTimeTraveler` library, part of the `OneState` package, provide some helpers to manage time traveling.
+
+The example project `TimeTravelerRemote` contains a mac system menu app displaying locally (via Bonjour) running one state applications that has been set up to advertise their stores. The app allows to pause and navigate through stored history of states.
+
+Your app need to advertise its store over the local network for the remote to find it:
+
+```swift
+import OneStateTimeTraveler
+
+@main
+struct MyApp: App {
+  let store = Store<AppModel>(initialState: .init())
+    
+  var body: some Scene {
+    WindowGroup {
+      AppView(model: store.model)
+        .advertise(store)
+    }
+  }
+}
+```
+
+And your app's `info.plist` also needs to be updated to allow Bonjour networking: 
+
+```plist
+<key>NSLocalNetworkUsageDescription</key>
+<string>One State Time Traveler</string>
+<key>NSBonjourServices</key>
+<array>
+    <string>_onestatetimetraveler._udp</string>
+</array>
+```
+
+The simplest way to start advertising is to use the `advertise()` view modifier:
+
 
 ## Troubleshooting
 

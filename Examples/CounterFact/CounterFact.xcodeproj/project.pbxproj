@@ -7,8 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CE79368D29A7D293009E60CF /* OneState in Frameworks */ = {isa = PBXBuildFile; productRef = CE79368C29A7D293009E60CF /* OneState */; };
+		CE79368F29A7D293009E60CF /* OneStateExtensions in Frameworks */ = {isa = PBXBuildFile; productRef = CE79368E29A7D293009E60CF /* OneStateExtensions */; };
+		CECCDE3729B4F189006DD723 /* OneStateTimeTraveler in Frameworks */ = {isa = PBXBuildFile; productRef = CECCDE3629B4F189006DD723 /* OneStateTimeTraveler */; };
 		F60DAA1E299FC9DC00589B17 /* Dependencies in Frameworks */ = {isa = PBXBuildFile; productRef = F60DAA1D299FC9DC00589B17 /* Dependencies */; };
-		F60DAA22299FD42E00589B17 /* OneState in Frameworks */ = {isa = PBXBuildFile; productRef = F60DAA21299FD42E00589B17 /* OneState */; };
 		F61EBCD42786139400F098A8 /* CounterFactTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F61EBCD32786139400F098A8 /* CounterFactTests.swift */; };
 		F6CB02FE2782300300C71DFF /* FactClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6CB02FD2782300300C71DFF /* FactClient.swift */; };
 		F6E72B632781F53E00A8FC45 /* CounterFactApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E72B622781F53E00A8FC45 /* CounterFactApp.swift */; };
@@ -49,8 +51,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CECCDE3729B4F189006DD723 /* OneStateTimeTraveler in Frameworks */,
 				F60DAA1E299FC9DC00589B17 /* Dependencies in Frameworks */,
-				F60DAA22299FD42E00589B17 /* OneState in Frameworks */,
+				CE79368D29A7D293009E60CF /* OneState in Frameworks */,
+				CE79368F29A7D293009E60CF /* OneStateExtensions in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -142,7 +146,9 @@
 			name = CounterFact;
 			packageProductDependencies = (
 				F60DAA1D299FC9DC00589B17 /* Dependencies */,
-				F60DAA21299FD42E00589B17 /* OneState */,
+				CE79368C29A7D293009E60CF /* OneState */,
+				CE79368E29A7D293009E60CF /* OneStateExtensions */,
+				CECCDE3629B4F189006DD723 /* OneStateTimeTraveler */,
 			);
 			productName = CounterFact;
 			productReference = F6E72B602781F53E00A8FC45 /* CounterFact.app */;
@@ -178,7 +184,7 @@
 			mainGroup = F6FB1FD12778D5D9005BB6B6;
 			packageReferences = (
 				F60DAA1C299FC9DC00589B17 /* XCRemoteSwiftPackageReference "swift-dependencies" */,
-				F60DAA20299FD42E00589B17 /* XCRemoteSwiftPackageReference "swift-one-state" */,
+				CE79368B29A7D293009E60CF /* XCRemoteSwiftPackageReference "swift-one-state" */,
 			);
 			productRefGroup = F6FB1FDF2778D5DD005BB6B6 /* Products */;
 			projectDirPath = "";
@@ -241,14 +247,16 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = LQ4R33WJ9R;
+				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.apple.control.CounterFactTests;
+				PRODUCT_BUNDLE_IDENTIFIER = swift.onestate.CounterFactTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -261,14 +269,16 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = LQ4R33WJ9R;
+				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.2;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.apple.control.CounterFactTests;
+				PRODUCT_BUNDLE_IDENTIFIER = swift.onestate.CounterFactTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
@@ -284,12 +294,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = LQ4R33WJ9R;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CounterFact/Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "One State Time Traveller";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -301,7 +313,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.onestate.CounterFact;
+				PRODUCT_BUNDLE_IDENTIFIER = swift.onestate.CounterFact;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
@@ -320,12 +332,14 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_IDENTITY = "Apple Development";
-				CODE_SIGN_STYLE = Automatic;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = LQ4R33WJ9R;
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CounterFact/Info.plist;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "One State Time Traveller";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -337,7 +351,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.onestate.CounterFact;
+				PRODUCT_BUNDLE_IDENTIFIER = swift.onestate.CounterFact;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SDKROOT = iphoneos;
@@ -499,6 +513,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		CE79368B29A7D293009E60CF /* XCRemoteSwiftPackageReference "swift-one-state" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/bitofmind/swift-one-state";
+			requirement = {
+				branch = main;
+				kind = branch;
+			};
+		};
 		F60DAA1C299FC9DC00589B17 /* XCRemoteSwiftPackageReference "swift-dependencies" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pointfreeco/swift-dependencies";
@@ -507,26 +529,27 @@
 				minimumVersion = 0.1.4;
 			};
 		};
-		F60DAA20299FD42E00589B17 /* XCRemoteSwiftPackageReference "swift-one-state" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/bitofmind/swift-one-state.git";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		CE79368C29A7D293009E60CF /* OneState */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CE79368B29A7D293009E60CF /* XCRemoteSwiftPackageReference "swift-one-state" */;
+			productName = OneState;
+		};
+		CE79368E29A7D293009E60CF /* OneStateExtensions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CE79368B29A7D293009E60CF /* XCRemoteSwiftPackageReference "swift-one-state" */;
+			productName = OneStateExtensions;
+		};
+		CECCDE3629B4F189006DD723 /* OneStateTimeTraveler */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = OneStateTimeTraveler;
+		};
 		F60DAA1D299FC9DC00589B17 /* Dependencies */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = F60DAA1C299FC9DC00589B17 /* XCRemoteSwiftPackageReference "swift-dependencies" */;
 			productName = Dependencies;
-		};
-		F60DAA21299FD42E00589B17 /* OneState */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = F60DAA20299FD42E00589B17 /* XCRemoteSwiftPackageReference "swift-one-state" */;
-			productName = OneState;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

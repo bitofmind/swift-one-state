@@ -15,7 +15,7 @@ let package = Package(
     products: [
         .library(name: "OneState", targets: ["OneState"]),
         .library(name: "OneStateExtensions", targets: ["OneStateExtensions"]),
-
+        .library(name: "OneStateTimeTraveler", targets: ["OneStateTimeTraveler"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "0.1.0"),
@@ -43,6 +43,15 @@ let package = Package(
                 "OneState",
                 .product(name: "CasePaths", package: "swift-case-paths"),
                 .product(name: "IdentifiedCollections", package: "swift-identified-collections"),
+            ],
+            swiftSettings: swiftSettings
+        ),
+        .target(
+            name: "OneStateTimeTraveler",
+            dependencies: [
+                "OneState",
+                .product(name: "OrderedCollections", package: "swift-collections"),
+                .product(name: "Dependencies", package: "swift-dependencies"),
             ],
             swiftSettings: swiftSettings
         ),

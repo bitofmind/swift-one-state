@@ -1,5 +1,6 @@
 import SwiftUI
 import OneState
+import OneStateTimeTraveler
 
 @main
 struct CounterFactApp: App {
@@ -8,11 +9,15 @@ struct CounterFactApp: App {
     var body: some Scene {
         WindowGroup {
             NavigationView {
-                #if os(macOS)
+#if os(macOS)
                 EmptyView()
-                #endif
+#endif
                 AppView(model: store.model)
             }
+#if !os(macOS)
+            .navigationViewStyle(.stack)
+#endif
+            .advertise(store)
         }
     }
 }
