@@ -41,13 +41,15 @@ final class CallContextTests: XCTestCase {
         model.forEach(model.events()) { event in
             switch event {
             case .empty:
-                model.$count.wrappedValue += 1
+                model.$count.wrappedValue += 10
             case let .count(val):
                 model.$count.wrappedValue = val
             }
         }
 
-        await $model.count.assert(1)
+        await $model.count.assert(3)
+
+        try await Task.sleep(nanoseconds: NSEC_PER_MSEC*1)
 
         withA(count: 5) {
             withB(count: 2) {
@@ -57,7 +59,7 @@ final class CallContextTests: XCTestCase {
 
         await $model.receive(.empty)
         await $model.assert {
-            $0.count = 2
+            $0.count += 10
             $0.receivedEvents += [.empty]
         }
 
@@ -81,7 +83,7 @@ final class CallContextTests: XCTestCase {
         await $model.receive(.empty)
 
         await $model.assert {
-            $0.count += 1
+            $0.count += 10
             $0.receivedEvents += [.empty]
         }
 

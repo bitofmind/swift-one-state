@@ -7,7 +7,9 @@ final class EventTests: XCTestCase {
         let store = TestStore<EventModel>(initialState: .init())
         @TestModel var model = store.model
 
-        await $model.count.assert(1)
+        await $model.count.assert(3)
+
+        try await Task.sleep(nanoseconds: NSEC_PER_MSEC*1)
 
         model.send(.empty)
         model.increment()
@@ -15,13 +17,13 @@ final class EventTests: XCTestCase {
         model.send(.empty)
 
         await $model.assert() {
-            $0.count = 3
-            $0.receivedEvents = [.empty, .count(2) , .count(3), .empty]
+            $0.count = 3 + 1 + 1
+            $0.receivedEvents = [.empty, .count(4) , .count(5), .empty]
         }
 
         await $model.receive(.empty)
-        await $model.receive(.count(2))
-        await $model.receive(.count(3))
+        await $model.receive(.count(4))
+        await $model.receive(.count(5))
         await $model.receive(.empty)
     }
 

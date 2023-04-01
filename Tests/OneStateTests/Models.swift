@@ -40,7 +40,7 @@ struct EventModel: Model, Identifiable {
             state.receivedEvents.append($0)
         }
 
-        state.count += 1
+        state.count += 3
     }
 
     func increment() {
