@@ -176,6 +176,12 @@ extension TaskCancellable {
     }
 }
 
+struct EmptyCancellable: Cancellable {
+    func cancel() {}
+    
+    func cancel(for key: some Hashable & Sendable, cancelInFlight: Bool) -> EmptyCancellable { self }
+}
+
 protocol InternalCancellable {
     var cancellations: Cancellations { get }
     var id: Int { get }

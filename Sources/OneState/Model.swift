@@ -136,7 +136,11 @@ public extension Model {
     /// - Returns: A cancellable to optionally allow cancelling before deactivation.
     @discardableResult
     func task(priority: TaskPriority? = nil, _ operation: @escaping @Sendable () async throws -> Void, `catch`: @escaping @Sendable (Error) -> Void) -> Cancellable {
-        TaskCancellable(
+        if !context.assertActive(refreshContainers: true) {
+            return EmptyCancellable()
+        }
+
+        return TaskCancellable(
             name: typeDescription,
             cancellations: context.cancellations,
             priority: priority,

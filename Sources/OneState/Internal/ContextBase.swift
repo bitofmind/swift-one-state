@@ -28,7 +28,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     let contextCancellationKey = UUID()
     let activateContextKey = UUID()
 
-    @Locked var containers: [AnyKeyPath: (StateUpdate) -> ()] = [:]
+    @Locked var containers: [AnyKeyPath: () -> ()] = [:]
 
     init(parent: ContextBase?) {
         self.parent = parent
@@ -49,6 +49,21 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         }
 
         parent?.removeContext(self)
+    }
+    
+    @discardableResult
+    func assertActive(refreshContainers: Bool = false) -> Bool {
+        if refreshContainers {
+            parent?.updateContainers()
+        }
+        
+        guard hasBeenRemoved else { return true }
+
+        if !Task.isCancelled {
+            XCTFail("Trying to access a model '\(typeDescription)' that is no longer active")
+        }
+        
+        return false
     }
 
     var regularChildren: [AnyKeyPath: ContextBase] {
@@ -95,6 +110,8 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     }
 
     func removeRecursively() {
+        guard !hasBeenRemoved else { return }
+        
         onRemoval()
 
         for child in allChildren.values {
@@ -150,9 +167,13 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         notifyAncestors(update)
         notifyUpdate(update)
         notifyDescendants(update)
+        
+        updateContainers()
+    }
 
+    func updateContainers() {
         for container in containers.values {
-            container(update)
+            container()
         }
     }
 

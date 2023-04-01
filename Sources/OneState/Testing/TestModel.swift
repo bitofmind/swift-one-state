@@ -1,13 +1,19 @@
 import Foundation
+import XCTestDynamicOverlay
 
 @propertyWrapper @dynamicMemberLookup
 public final class TestModel<M: Model> where M.State: Equatable {
-    public let wrappedValue: M
+    private let _wrappedValue: M
 
     public init(wrappedValue model: M) {
-        wrappedValue = model
+        _wrappedValue = model
     }
-
+    
+    public var wrappedValue: M {
+        _wrappedValue.context.assertActive(refreshContainers: true)
+        return _wrappedValue
+    }
+    
     public var projectedValue: TestModel<M> {
         self
     }
@@ -27,11 +33,11 @@ extension TestModel: TestViewProvider {
 
 public extension TestModel {
     func receive(_ event: M.Event, timeoutNanoseconds timeout: UInt64 = NSEC_PER_SEC, file: StaticString = #file, line: UInt = #line) async where M.Event: Equatable {
-        await access.receive(event, context: wrappedValue.context, timeout: timeout, file: file, line: line)
+        await access.receive(event, context: _wrappedValue.context, timeout: timeout, file: file, line: line)
     }
 
     func receive(_ event: some Equatable, timeoutNanoseconds timeout: UInt64 = NSEC_PER_SEC, file: StaticString = #file, line: UInt = #line) async where M.Event: Equatable {
-        await access.receive(event, context: wrappedValue.context, timeout: timeout, file: file, line: line)
+        await access.receive(event, context: _wrappedValue.context, timeout: timeout, file: file, line: line)
     }
 }
 

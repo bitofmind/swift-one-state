@@ -108,6 +108,9 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
     private func context<M: Model>(at path: WritableKeyPath<State, M.State>) -> ChildContext<StoreModel, M> {
         let isInViewModelContext = StoreAccess.isInViewModelContext
 
+        lock.lock()
+        defer { lock.unlock() }
+        
         if isInViewModelContext, let context = _children[path] {
             return (context as! ChildContext<StoreModel, M>)
         } else if !isInViewModelContext, let context = _allChildren[path] {
@@ -128,14 +131,17 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
                 context.isOverrideContext = true
                 _overrideChildren[path] = context
             }
+            
+            lock.unlock()
+            updateContainers()
+            lock.lock()
 
             return context
         }
     }
 
     override func model<M: Model>(at path: WritableKeyPath<State, M.State>) -> M {
-        let context: ChildContext<StoreModel, M> = lock { self.context(at: path) }
-        return context.model
+        context(at: path).model
     }
 
     override func didModify(for access: StoreAccess) {

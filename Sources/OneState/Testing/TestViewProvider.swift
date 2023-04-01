@@ -9,10 +9,15 @@ public protocol TestViewProvider {
 
 extension TestViewProvider {
     var access: TestAccessBase {
-        guard let access = testView.storeView.access as? TestAccessBase else {
+        guard let access = testView.storeView.access else {
+            fatalError("Missing store")
+        }
+
+        guard let testAccess = access as? TestAccessBase else {
             fatalError("Tests need to use a TestStore instead of a regular Store")
         }
-        return access
+
+        return testAccess
     }
 }
 

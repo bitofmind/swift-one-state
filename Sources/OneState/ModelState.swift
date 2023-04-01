@@ -34,10 +34,12 @@ public struct ModelState<State> {
 
     public var wrappedValue: State {
         _read {
+            context.assertActive()
             yield context[path: \.self, access: storeAccess]
         }
 
         nonmutating _modify {
+            context.assertActive()
             yield &context[path: \.self, access: storeAccess]
         }
     }

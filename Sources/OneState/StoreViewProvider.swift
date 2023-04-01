@@ -141,7 +141,7 @@ extension StoreViewProvider where Access == Write {
             let prevContainer = view.context[path: containerPath]
             var prevStructure = StructureComparableValue(value: prevContainer)
             var prevElementPaths = Set(prevContainer.elementKeyPaths)
-            context.containers[containerPath] = { [weak context, weak containerContext = view.context] update in
+            context.containers[containerPath] = { [weak context, weak containerContext = view.context] in
                 guard let context, let containerContext else { return }
 
                 let currentContainer = containerContext[path: containerPath]
