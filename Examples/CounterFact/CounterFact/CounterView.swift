@@ -232,11 +232,9 @@ struct FactPromptView: View {
 }
 
 struct CounterView_Previews: PreviewProvider {
-    static let store = Store<AppModel>(initialState: .init())
-
     static var previews: some View {
         NavigationView {
-            AppView(model: store.model)
+            AppView(model: AppModel(initialState: .init()))
         }
     }
 }

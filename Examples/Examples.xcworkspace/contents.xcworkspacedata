@@ -5,6 +5,6 @@
       location = "group:CounterFact/CounterFact.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:/Users/user/dev/swift-one-state/Examples/TimeTravellerRemote/TimeTravelerRemote.xcodeproj">
+      location = "group:TimeTravellerRemote/TimeTravelerRemote.xcodeproj">
    </FileRef>
 </Workspace>

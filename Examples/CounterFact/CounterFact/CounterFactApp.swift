@@ -1,6 +1,7 @@
 import SwiftUI
 import OneState
 import OneStateTimeTraveler
+import XCTestDynamicOverlay
 
 @main
 struct CounterFactApp: App {
@@ -12,7 +13,9 @@ struct CounterFactApp: App {
 #if os(macOS)
                 EmptyView()
 #endif
-                AppView(model: store.model)
+                if !_XCTIsTesting {
+                    AppView(model: store.model)
+                }
             }
 #if !os(macOS)
             .navigationViewStyle(.stack)
