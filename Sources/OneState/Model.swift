@@ -1,6 +1,7 @@
 import Foundation
 import AsyncAlgorithms
 import CustomDump
+import Dependencies
 
 /// A type that models the state and logic that drives SwiftUI views
 ///
@@ -72,6 +73,21 @@ public extension Model {
     init<Provider: StoreViewProvider>(_ provider: Provider) where Provider.State == State, Provider.Access == Write {
         let view = provider.storeView
         self = view.context.model(at: view.path)
+    }
+
+    /// Constructs a model together with a store.
+    ///
+    /// Convenience initializer when working with e.g. SwiftUI previews:
+    ///
+    ///     struct AppView_Previews: PreviewProvider {
+    ///       static var previews: some View {
+    ///         AppView(model: AppModel(initialState: .init(count: 4711)) {
+    ///           $0.uuid == .incrementing
+    ///         }
+    ///       }
+    ///     }
+    init(initialState: State, dependencies: @escaping (inout DependencyValues) -> Void = { _ in }) {
+        self = Store<Self>(initialState: initialState, dependencies: dependencies).model
     }
 }
 
