@@ -96,10 +96,7 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
     }
 
     override func sendEvent(_ eventInfo: EventInfo) {
-        Task {
-            events.yield(eventInfo)
-        }
-
+        events.yield(eventInfo)
         parent?.sendEvent(eventInfo)
     }
 
