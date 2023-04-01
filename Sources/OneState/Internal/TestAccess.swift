@@ -84,10 +84,10 @@ final class TestAccess<State: Equatable>: TestAccessBase {
             return await Task.yield()
         }
 
-        if isExhaustive {
-            let localDiff = diffMessage(expected: expected[keyPath: storePath], actual: lastReceivedState[keyPath: storePath])
-            let totalDiff = diffMessage(expected: expected, actual: lastReceivedState)
+        let localDiff = diffMessage(expected: expected[keyPath: storePath], actual: lastReceivedState[keyPath: storePath])
+        let totalDiff = diffMessage(expected: expected, actual: lastReceivedState)
 
+        if isExhaustive  {
             if let localDiff {
                 XCTFail(localDiff, file: file, line: line)
             } else if let totalDiff {
@@ -96,10 +96,21 @@ final class TestAccess<State: Equatable>: TestAccessBase {
         } else {
             var expected = lastReceivedState
             modify(&expected[keyPath: storePath])
-            let localDiff = diffMessage(expected: expected[keyPath: storePath], actual: lastReceivedState[keyPath: storePath])
+            let noexhaustiveLocalDiff = diffMessage(expected: expected[keyPath: storePath], actual: lastReceivedState[keyPath: storePath])
+            let noexhaustiveTotalDiff = diffMessage(expected: expected, actual: lastReceivedState)
 
-            if let localDiff {
-                XCTFail(localDiff, file: file, line: line)
+            if let noexhaustiveLocalDiff {
+                XCTFail(noexhaustiveLocalDiff, file: file, line: line)
+            }
+
+            if showSkippedAssertions {
+                _XCTExpectFailure {
+                    if let localDiff, localDiff != noexhaustiveLocalDiff {
+                        XCTFail(localDiff, file: file, line: line)
+                    } else if let totalDiff, totalDiff != noexhaustiveTotalDiff {
+                        XCTFail(totalDiff, file: file, line: line)
+                    }
+                }
             }
         }
     }
@@ -132,7 +143,9 @@ final class TestAccess<State: Equatable>: TestAccessBase {
         if lock({ exhaustivity.contains(area) }) {
             XCTFail(message, file: file, line: line)
         } else if lock({ showSkippedAssertions }) {
-            print(message)
+            _XCTExpectFailure {
+                XCTFail(message, file: file, line: line)
+            }
         }
     }
 }
@@ -210,4 +223,21 @@ extension String {
         let indentation = String(repeating: " ", count: indent)
         return indentation + replacingOccurrences(of: "\n", with: "\n\(indentation)")
     }
+}
+
+private func _XCTExpectFailure(failingBlock: () -> Void) {
+  #if DEBUG
+    guard
+      let XCTExpectedFailureOptions = NSClassFromString("XCTExpectedFailureOptions")
+        as Any as? NSObjectProtocol,
+      let options = XCTExpectedFailureOptions.perform(NSSelectorFromString("nonStrictOptions"))?.takeUnretainedValue()
+    else { return }
+
+    let XCTExpectFailureWithOptionsInBlock = unsafeBitCast(
+      dlsym(dlopen(nil, RTLD_LAZY), "XCTExpectFailureWithOptionsInBlock"),
+      to: (@convention(c) (String?, AnyObject, () -> Void) -> Void).self
+    )
+
+    XCTExpectFailureWithOptionsInBlock(nil, options, failingBlock)
+  #endif
 }
