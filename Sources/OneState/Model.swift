@@ -72,7 +72,9 @@ public extension Model {
     ///     MyModel($store.myModalState)
     init<Provider: StoreViewProvider>(_ provider: Provider) where Provider.State == State, Provider.Access == Write {
         let view = provider.storeView
-        self = view.context.model(at: view.path)
+        self = StoreAccess.with(view.access) {
+            view.context.model(at: view.path)
+        }
     }
 
     /// Constructs a model together with a store.

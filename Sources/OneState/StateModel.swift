@@ -66,9 +66,7 @@ extension StateModel: CustomDumpRepresentable {
 
 public extension Model {
     subscript<M: Model>(dynamicMember path: WritableKeyPath<State, StateModel<M>>) -> M where M.StateContainer == M.State {
-        StoreAccess.with(modelState?.storeAccess) {
-            M(storeView(for: path.appending(path: \.wrappedValue)))
-        }
+        M(storeView(for: path.appending(path: \.wrappedValue)))
     }
 
     subscript<Models>(dynamicMember path: WritableKeyPath<State, StateModel<Models>>) -> Models where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {

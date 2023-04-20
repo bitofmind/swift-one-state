@@ -68,15 +68,15 @@ extension TestStore: Sendable where State: Sendable {}
 
 extension TestStore: StoreViewProvider {
     public var storeView: StoreView<State, State, Write> {
-        store.storeView
+        var view = store.storeView
+        view.access = access
+        return view
     }
 }
 
 public extension TestStore {
     var model: M {
-        StoreAccess.with(access) {
-            M(self)
-        }
+        M(self)
     }
 
     var state: State { store.state }
