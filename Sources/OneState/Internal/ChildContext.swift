@@ -104,6 +104,7 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
 
     private func context<M: Model>(at path: WritableKeyPath<State, M.State>) -> ChildContext<StoreModel, M> {
         let isInViewModelContext = StoreAccess.isInViewModelContext
+        let hasBeenRemoved = self.hasBeenRemoved
 
         lock.lock()
         defer { lock.unlock() }
@@ -112,7 +113,7 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
             return (context as! ChildContext<StoreModel, M>)
         } else if !isInViewModelContext, let context = _allChildren[path] {
             return (context as! ChildContext<StoreModel, M>)
-        } else if parent == nil && path == (\State.self as AnyKeyPath) {
+        } else if parent == nil && !hasBeenRemoved && path == (\State.self as AnyKeyPath) {
             return (self as! ChildContext<StoreModel, M>)
         } else {
             let contextValue = self[path: \.self, access: nil]
@@ -121,6 +122,11 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
             assert(ThreadState.current.stateModelCount <= 1, "Don't skip middle models when accessing sub model")
 
             let context = ChildContext<StoreModel, M>(store: store, path: self.path.appending(path: path), parent: self)
+
+            if hasBeenRemoved {
+                context.removeRecursively()
+                return context
+            }
 
             if isInViewModelContext || !isStateOverridden {
                 _children[path] = context
