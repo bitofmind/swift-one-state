@@ -105,10 +105,18 @@ enum AdvertiserMessage: Equatable, Sendable, Codable {
 public extension [String: String] {
     static let discoveryInfo: Self = [
         "globallyUniqueString": ProcessInfo.processInfo.globallyUniqueString,
-        "hostName": ProcessInfo.processInfo.hostName,
+        "hostName": deviceName,
         "processName": ProcessInfo.processInfo.processName,
         "platform": platform + (isSimulator ? " Simulator" : ""),
     ]
+}
+
+var deviceName: String {
+#if os(iOS)
+    UIDevice.current.name
+#else
+    ProcessInfo.processInfo.hostName
+#endif
 }
 
 var isSimulator: Bool {
