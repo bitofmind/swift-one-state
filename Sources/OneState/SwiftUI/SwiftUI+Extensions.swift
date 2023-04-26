@@ -41,20 +41,24 @@ public extension Model {
 
 @discardableResult
 public func withAnimation<Result>(_ animation: Animation? = .default, _ body: () throws -> Result) rethrows -> Result {
-    try withCallContext(body: body) { action in
-        SwiftUI.withAnimation(animation) {
-            action()
+    try SwiftUI.withAnimation(animation) {
+        try withCallContext(body: body) { action in
+            SwiftUI.withAnimation(animation) {
+                action()
+            }
         }
     }
 }
 
 @discardableResult
 public func withTransaction<Result>(_ transaction: Transaction, _ body: () throws -> Result) rethrows -> Result {
-    try withCallContext(body: body) { action in
-         SwiftUI.withTransaction(transaction) {
-             action()
-         }
-     }
+    try SwiftUI.withTransaction(transaction) {
+        try withCallContext(body: body) { action in
+            SwiftUI.withTransaction(transaction) {
+                action()
+            }
+        }
+    }
 }
 
 public extension StoreViewProvider where Access == Write {
