@@ -22,9 +22,9 @@ class Context<State>: ContextBase {
 
     func model<M: Model>(at path: WritableKeyPath<State, M.State>) -> M { fatalError() }
 
-    func sendEvent(_ event: Any, context: ContextBase, callContexts: [CallContext], storeAccess: StoreAccess?) {
+    func sendEvent(_ event: Any, to receivers: EventReceivers, context: ContextBase, callContexts: [CallContext], storeAccess: StoreAccess?) {
         let eventInfo = EventInfo(event: event, path: storePath, context: context, callContexts: callContexts)
-        sendEvent(eventInfo)
+        sendEvent(eventInfo, to: receivers)
         storeAccess?.didSend(event: eventInfo)
     }
 

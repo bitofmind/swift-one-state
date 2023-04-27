@@ -95,9 +95,26 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
         store.stateOverride != nil
     }
 
-    override func sendEvent(_ eventInfo: EventInfo) {
-        events.yield(eventInfo)
-        parent?.sendEvent(eventInfo)
+    override func sendEvent(_ eventInfo: EventInfo, to receivers: EventReceivers) {
+        if receivers.contains(.self) {
+            events.yield(eventInfo)
+        }
+
+        if receivers.contains(.ancestors) {
+            parent?.sendEvent(eventInfo, to: [.self, .ancestors])
+        } else if receivers.contains(.parent) {
+            parent?.sendEvent(eventInfo, to: .self)
+        }
+
+        if receivers.contains(.descendants) {
+            for child in regularChildren.values {
+                child.sendEvent(eventInfo, to: [.self, .descendants])
+            }
+        } else if receivers.contains(.children) {
+            for child in regularChildren.values {
+                child.sendEvent(eventInfo, to: .self)
+            }
+        }
     }
 
     override var storePath: AnyKeyPath { path }

@@ -181,7 +181,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         fatalError()
     }
 
-    func sendEvent(_ eventInfo: EventInfo) {
+    func sendEvent(_ eventInfo: EventInfo, to receivers: EventReceivers) {
         fatalError()
     }
 

@@ -249,17 +249,35 @@ public extension Model {
     }
 }
 
-public extension Model {
-    /// Sends an event to self and ancestors
-    func send(_ event: Event) {
-        let view = storeView
-        context.sendEvent(event, context: view.context, callContexts: CallContext.currentContexts, storeAccess: view.access)
+public struct EventReceivers: OptionSet {
+    public let rawValue: Int
+
+    public init(rawValue: Int) {
+        self.rawValue = rawValue
     }
 
-    /// Sends an event to self and ancestors
-    func send<E>(_ event: E) {
+    public static let `self` = EventReceivers(rawValue: 1 << 0)
+    public static let ancestors = EventReceivers(rawValue: 1 << 1)
+    public static let descendants = EventReceivers(rawValue: 1 << 2)
+    public static let parent = EventReceivers(rawValue: 1 << 3)
+    public static let children = EventReceivers(rawValue: 1 << 4)
+}
+
+public extension Model {
+    /// Sends an event.
+    /// - Parameter event: even to send.
+    /// - Parameter receivers: Receivers of the event, default to self and ancestors.
+    func send(_ event: Event, to receivers: EventReceivers = [.self, .ancestors]) {
         let view = storeView
-        context.sendEvent(event, context: view.context, callContexts: CallContext.currentContexts, storeAccess: view.access)
+        context.sendEvent(event, to: receivers, context: view.context, callContexts: CallContext.currentContexts, storeAccess: view.access)
+    }
+
+    /// Sends an event.
+    /// - Parameter event: even to send.
+    /// - Parameter receivers: Receivers of the event, default to self and ancestors.
+    func send<E>(_ event: E, to receivers: EventReceivers = [.self, .ancestors]) {
+        let view = storeView
+        context.sendEvent(event, to: receivers, context: view.context, callContexts: CallContext.currentContexts, storeAccess: view.access)
     }
 }
 
