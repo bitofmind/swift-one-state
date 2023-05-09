@@ -68,7 +68,7 @@ private final class Observation {
     var lock = Lock()
     var cancel: () -> Void = {}
     var observedStates: [AnyKeyPath: ObservedState] = [:]
-    var wasStateOverriden = false
+    var wasStateOverridden = false
 
     init(context: ContextBase, onChange: @escaping (StateUpdate) -> Void) {
         let stateUpdates = context.stateUpdates
@@ -90,8 +90,8 @@ private final class Observation {
 
     func didUpdate(for update: StateUpdate, from context: ContextBase) -> Bool {
         lock {
-            if wasStateOverriden != update.isStateOverridden {
-                wasStateOverriden = update.isStateOverridden
+            if wasStateOverridden != update.isStateOverridden {
+                wasStateOverridden = update.isStateOverridden
                 return true
             }
 

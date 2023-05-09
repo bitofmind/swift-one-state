@@ -57,13 +57,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
             parent?.updateContainers()
         }
         
-        guard hasBeenRemoved else { return true }
-
-        if !Task.isCancelled {
-            XCTFail("Trying to access a model '\(typeDescription)' that is no longer active")
-        }
-        
-        return false
+        return !hasBeenRemoved
     }
 
     var regularChildren: [AnyKeyPath: ContextBase] {
