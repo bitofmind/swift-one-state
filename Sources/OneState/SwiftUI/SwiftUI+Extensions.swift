@@ -21,7 +21,7 @@ public extension Model {
         }
     }
 
-    subscript<M: Model>(dynamicMember path: WritableKeyPath<State, Writable<StateModel<M>>>) -> Binding<M> where M.StateContainer == M.State {
+    subscript<M: Model>(dynamicMember path: WritableKeyPath<State, Writable<StateModel<M>>>) -> Binding<M> {
         .init {
             self[dynamicMember: path.appending(path: \.wrappedValue)]
         } set: { models in
@@ -29,7 +29,7 @@ public extension Model {
         }
     }
 
-    subscript<Models>(dynamicMember path: WritableKeyPath<State, Writable<StateModel<Models>>>) -> Binding<Models> where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
+    subscript<Models>(dynamicMember path: WritableKeyPath<State, Writable<StateModel<Models>>>) -> Binding<Models> {
         .init {
             self[dynamicMember: path.appending(path: \.wrappedValue)]
         } set: { models in

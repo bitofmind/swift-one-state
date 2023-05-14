@@ -2,20 +2,23 @@ import Foundation
 
 public protocol ModelContainer {
     associatedtype ModelElement: Model = Self
-    associatedtype StateContainer = ModelElement.State
+    associatedtype StateContainer: OneState.StateContainer = IdentityStateContainer<ModelElement.State> where ModelElement.State == StateContainer.Element
+    typealias Container = StateContainer.Container
     
     static func modelContainer(from elements: [ModelElement]) -> Self
-    var stateContainer: StateContainer { get }
+    var stateContainer: Container { get }
     var models: [ModelElement] { get }
 }
 
+public typealias ContainerStoreViewProvider<State: StateContainer, Access> = StoreViewProvider<State, Access> where State.Container == State
+
 public extension ModelContainer {
-    init<Provider: StoreViewProvider>(_ provider: Provider) where Provider.State == StateContainer, Provider.Access == Write, StateContainer: OneState.StateContainer, StateContainer.Element == ModelElement.State {
+    init(_ provider: some StoreViewProvider<Container, Write>) {
         let view = provider.storeView
         let containerPath = view.path
         let containerView = StoreView(context: view.context, path: containerPath, access: view.access)
-        let container = view.context.value(for: containerView.path, access: containerView.access, comparable: StructureComparableValue.self)
-        let elementPaths = container.elementKeyPaths
+        let container = view.context.value(for: containerView.path, access: containerView.access, comparable: StructureComparableValue<StateContainer>.self)
+        let elementPaths = StateContainer.elementKeyPaths(for: container)
         let models = StoreAccess.with(view.access) {
             elementPaths.map { path in
                 ModelElement(containerView.storeView(for: path))
@@ -27,17 +30,17 @@ public extension ModelContainer {
         view.observeContainer(ofType: type(of: self), atPath: \.self)
     }
 
-    init<Provider: StoreViewProvider>(_ storeView: Provider) where Provider.State == StateModel<Self>, Provider.Access == Write, StateContainer: OneState.StateContainer, StateContainer.Element == ModelElement.State {
-        self.init(storeView.storeView(for: \.wrappedValue))
+    init<Provider: StoreViewProvider>(_ provider: Provider) where Provider.State == StateModel<Self>, Provider.Access == Write {
+        self.init(provider.storeView(for: \.wrappedValue))
     }
 }
 
-extension Model where StateContainer == State, ModelElement == Self {
+extension Model where StateContainer == IdentityStateContainer<State>, ModelElement == Self {
     public static func modelContainer(from elements: [Self]) -> Self {
         elements[0]
     }
 
-    public var stateContainer: StateContainer {
+    public var stateContainer: Container {
         nonObservableState
     }
 

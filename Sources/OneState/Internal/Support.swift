@@ -78,8 +78,8 @@ struct EquatableComparableValue<Value: Equatable>: ComparableValue {
 struct StructureComparableValue<Value: StateContainer>: ComparableValue {
     let structureValue: Value.StructureValue
 
-    init(value: Value) {
-        structureValue = value.structureValue
+    init(value: Value.Container) {
+        structureValue = Value.structureValue(for: value)
     }
 
     static func == (lhs: Self, rhs: Self) -> Bool {

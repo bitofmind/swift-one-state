@@ -2,29 +2,36 @@ import Foundation
 import CoreMedia
 
 public protocol StateContainer {
+    associatedtype Container = Self
     associatedtype Element
     associatedtype StructureValue: Equatable
 
-    var elementKeyPaths: [WritableKeyPath<Self, Element>] { get }
-    var structureValue: StructureValue { get }
+    static func elementKeyPaths(for container: Container) -> [WritableKeyPath<Container, Element>]
+    static func structureValue(for container: Container) -> StructureValue
 }
 
 extension StateContainer where Element == Self {
-    public var elementKeyPaths: [WritableKeyPath<Self, Self>] { [\.self] }
+    public static func elementKeyPaths(for container: Self) -> [WritableKeyPath<Self, Self>] { [\.self] }
+}
+
+public enum IdentityStateContainer<State>: StateContainer {
+    public struct AlwaysEqual: Equatable {}
+    public static func elementKeyPaths(for container: State) -> [WritableKeyPath<State, State>] { [\.self] }
+    public static func structureValue(for container: State) -> AlwaysEqual { .init() }
 }
 
 extension Optional: StateContainer {
-    public var elementKeyPaths: [WritableKeyPath<Self, Wrapped>] {
-        map { [\.[unwrapFallback: UnwrapFallback(value: $0)]] } ?? []
+    public static func elementKeyPaths(for container: Self) -> [WritableKeyPath<Self, Wrapped>] {
+        container.map { [\.[unwrapFallback: UnwrapFallback(value: $0)]] } ?? []
     }
 
-    public var structureValue: Bool { self != nil }
+    public static func structureValue(for container: Self) -> Bool { container != nil }
 }
 
 public extension MutableCollection {
-    func elementKeyPaths<ID: Hashable>(idPath: KeyPath<Element, ID>) -> [WritableKeyPath<Self, Element>] {
-        indices.map { index in
-            let state = self[index]
+    static func elementKeyPaths<ID: Hashable>(for container: Self, idPath: KeyPath<Element, ID>) -> [WritableKeyPath<Self, Element>] {
+        container.indices.map { index in
+            let state = container[index]
             let cursor = Cursor(idPath: idPath, id: state[keyPath: idPath], index: index, fallback: state)
             return \.[cursor: cursor]
         }
@@ -32,11 +39,11 @@ public extension MutableCollection {
 }
 
 public extension MutableCollection where Element: Identifiable {
-    var elementKeyPaths: [WritableKeyPath<Self, Element>] {
-        elementKeyPaths(idPath: \.id)
+    static func elementKeyPaths(for container: Self) -> [WritableKeyPath<Self, Element>] {
+        elementKeyPaths(for: container, idPath: \.id)
     }
 
-    var structureValue: [Element.ID] { map(\.id) }
+    static func structureValue(for container: Self) -> [Element.ID] { container.map(\.id) }
 }
 
 extension Array: StateContainer where Element: Identifiable {}

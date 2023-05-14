@@ -392,14 +392,14 @@ public extension Model {
     }
 
     subscript<S, T: Equatable>(dynamicMember path: WritableKeyPath<S, T>) -> T? where State == S? {
-        _ = containerValue(for: \.self) // To trigger update once optional toggles
-        guard let path = nonObservableState.elementKeyPaths.first?.appending(path: path) else { return nil }
+        _ = containerValue(for: \.self, forStateContainerType: Optional.self) // To trigger update once optional toggles
+        guard let path = Optional.elementKeyPaths(for: nonObservableState).first?.appending(path: path) else { return nil }
         return value(for: path)
     }
 
     subscript<S, T: Equatable>(dynamicMember path: WritableKeyPath<S, T?>) -> T? where State == S? {
-        _ = containerValue(for: \.self) // To trigger update once optional toggles
-        guard let path = nonObservableState.elementKeyPaths.first?.appending(path: path) else { return nil }
+        _ = containerValue(for: \.self, forStateContainerType: Optional.self) // To trigger update once optional toggles
+        guard let path = Optional.elementKeyPaths(for: nonObservableState).first?.appending(path: path) else { return nil }
         return value(for: path)
     }
 
@@ -421,9 +421,9 @@ public extension Model {
         return view.context.value(for: view.path.appending(path: path), access: view.access, comparable: EquatableComparableValue.self)
     }
 
-    func containerValue<T: OneState.StateContainer>(for path: KeyPath<State, T>) -> T {
+    func containerValue<T: OneState.StateContainer>(for path: KeyPath<State, T.Container>, forStateContainerType: T.Type = T.self) -> T.Container {
         let view = self.storeView
-        return view.context.value(for: view.path.appending(path: path), access: view.access, comparable: StructureComparableValue.self)
+        return view.context.value(for: view.path.appending(path: path), access: view.access, comparable: StructureComparableValue<T>.self)
     }
 }
 

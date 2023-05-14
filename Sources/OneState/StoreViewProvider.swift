@@ -11,7 +11,7 @@ import CustomDump
 /// view into a store:
 ///
 ///     MyModel(provider.myState)
-public protocol StoreViewProvider {
+public protocol StoreViewProvider<State, Access> {
     associatedtype Root
     associatedtype State
     associatedtype Access
@@ -61,9 +61,9 @@ public extension StoreViewProvider {
         return view.context.value(for: view.path.appending(path: keyPath), access: view.access, comparable: IDCollectionComparableValue.self)
     }
 
-    func containerValue<T: StateContainer>(for keyPath: KeyPath<State, T>) -> T {
+    func containerValue<T: StateContainer>(for keyPath: KeyPath<State, T.Container>, forStateContainerType: T.Type = T.self) -> T.Container {
         let view = self.storeView
-        return view.context.value(for: view.path.appending(path: keyPath), access: view.access, comparable: StructureComparableValue.self)
+        return view.context.value(for: view.path.appending(path: keyPath), access: view.access, comparable: StructureComparableValue<T>.self)
     }
 
     func value<T: Equatable>(for keyPath: KeyPath<State, T>) -> T {
@@ -133,25 +133,25 @@ extension StoreViewProvider {
 }
 
 extension StoreViewProvider where Access == Write {
-    func observeContainer<Models: ModelContainer>(ofType: Models.Type, atPath path: WritableKeyPath<State, Models.StateContainer>) where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
+    func observeContainer<Models: ModelContainer>(ofType: Models.Type, atPath path: WritableKeyPath<State, Models.Container>) {
         let view = storeView
         let containerPath = view.path.appending(path: path)
         let context = view.context
         if context.containers[containerPath] == nil {
             let prevContainer = view.context[path: containerPath]
-            var prevStructure = StructureComparableValue(value: prevContainer)
-            var prevElementPaths = Set(prevContainer.elementKeyPaths)
+            var prevStructure = StructureComparableValue<Models.StateContainer>(value: prevContainer)
+            var prevElementPaths = Set(Models.StateContainer.elementKeyPaths(for: prevContainer))
             context.containers[containerPath] = { [weak context, weak containerContext = view.context] in
                 guard let context, let containerContext else { return }
 
                 let currentContainer = containerContext[path: containerPath]
-                let currentStructure = StructureComparableValue(value: currentContainer)
+                let currentStructure = StructureComparableValue<Models.StateContainer>(value: currentContainer)
 
                 guard prevStructure != currentStructure else {
                     return
                 }
 
-                let currentElementPaths = Set(currentContainer.elementKeyPaths)
+                let currentElementPaths = Set(Models.StateContainer.elementKeyPaths(for: currentContainer))
 
                 defer {
                     prevStructure = currentStructure
@@ -178,7 +178,7 @@ extension StoreViewProvider where Access == Write {
         }
     }
 
-    func observeContainer<Models>(atPath path: WritableKeyPath<State, StateModel<Models>>) where Models.StateContainer: OneState.StateContainer, Models.StateContainer.Element == Models.ModelElement.State {
+    func observeContainer<Models>(atPath path: WritableKeyPath<State, StateModel<Models>>) {
         observeContainer(ofType: Models.self, atPath: path.appending(path: \.wrappedValue))
     }
 }
