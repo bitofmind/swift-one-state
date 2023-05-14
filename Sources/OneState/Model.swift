@@ -36,7 +36,7 @@ import Dependencies
 ///         }
 ///     }
 @dynamicMemberLookup
-public protocol Model: ModelContainer {
+public protocol Model: ModelContainer where State == Container, ModelElement.Container == ModelElement.State {
     /// The type of the this view model's state.
     associatedtype State
 
@@ -70,7 +70,7 @@ public extension Model {
     /// sometimes you might  have to manually create the model
     ///
     ///     MyModel($store.myModalState)
-    init<Provider: StoreViewProvider>(_ provider: Provider) where Provider.State == State, Provider.Access == Write {
+    init(_ provider: some StoreViewProvider<State, Write>) {
         let view = provider.storeView
         self = StoreAccess.with(view.access) {
             view.context.model(at: view.path)
@@ -88,7 +88,7 @@ public extension Model {
     ///         }
     ///       }
     ///     }
-    init(initialState: State, dependencies: @escaping (inout DependencyValues) -> Void = { _ in }) {
+    init(initialState: Container, dependencies: @escaping (inout DependencyValues) -> Void = { _ in }) {
         self = Store<Self>(initialState: initialState, dependencies: dependencies).model
     }
 }

@@ -2,7 +2,7 @@ import OneState
 import IdentifiedCollections
 import OrderedCollections
 
-extension IdentifiedArray: StateContainer where Element: Identifiable, Element.ID == ID  {
+extension IdentifiedArray: StateContainer&DefaultedStateContainer where Element: Identifiable, Element.ID == ID  {
     public var structureValue: OrderedSet<Element.ID> { ids }
 }
 

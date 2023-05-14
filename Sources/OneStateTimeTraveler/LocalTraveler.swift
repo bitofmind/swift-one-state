@@ -4,7 +4,7 @@ import AsyncAlgorithms
 import CustomDump
 
 public extension TimeTraveler {
-    static func local<M: Model>(for store: Store<M>, reducer: StateHistoryReducer<M.State> = .timeDelta()) -> Self {
+    static func local<Models: ModelContainer>(for store: Store<Models>, reducer: StateHistoryReducer<Models.Container> = .timeDelta()) -> Self {
         let localOverride = LocalOverride(for: store, reducer: reducer)
         Task {
             await localOverride.startListening()
@@ -26,11 +26,11 @@ public extension TimeTraveler {
     }
 }
 
-actor LocalOverride<M: Model> {
-    typealias State = M.State
+actor LocalOverride<Models: ModelContainer> {
+    typealias State = Models.Container
     typealias Record = StateRecord<State>
     
-    let store: Store<M>
+    let store: Store<Models>
     let stateChannel = AsyncChannel<OverrideState?>()
     let reducer: StateHistoryReducer<State>
     var states: [Record] = []
@@ -38,7 +38,7 @@ actor LocalOverride<M: Model> {
     var overrideIndex: Int? = nil
     var task: Task<(), Never>? = nil
     
-    init(for store: Store<M>, reducer: StateHistoryReducer<State>) {
+    init(for store: Store<Models>, reducer: StateHistoryReducer<State>) {
         self.store = store
         self.reducer = reducer
     }
@@ -56,7 +56,7 @@ actor LocalOverride<M: Model> {
         }
     }
     
-    func add(_ state: M.State) {
+    func add(_ state: State) {
         let record = StateRecord(state: state)
         states.append(record)
         reducer(&states)

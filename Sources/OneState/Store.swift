@@ -1,5 +1,6 @@
 import Foundation
 import Dependencies
+import SwiftUI
 
 /// A store holds the state of an application or part of a application
 ///
@@ -25,8 +26,8 @@ import Dependencies
 ///     }
 ///
 @dynamicMemberLookup
-public final class Store<M: Model>: @unchecked Sendable {
-    public typealias State = M.State
+public final class Store<Models: ModelContainer>: ObservableObject, @unchecked Sendable {
+    public typealias State = Models.Container
 
     @Dependency(\.uuid) private var dependencies
     private let lock = NSRecursiveLock()
@@ -40,10 +41,11 @@ public final class Store<M: Model>: @unchecked Sendable {
     private var lastFromContext: ContextBase?
     private var lastCallContexts: [CallContext] = []
 
-    private(set) weak var weakContext: ChildContext<M, M>?
+    private(set) weak var weakContext: ChildContext<Models, Models>?
     private var hasBeenActivated = false
 
     let cancellations = Cancellations()
+    private var didStructureUpdate: (Models.StateContainer.StructureValue) -> Bool = { _ in false }
 
     /// Creates a store.
     ///
@@ -67,8 +69,8 @@ public final class Store<M: Model>: @unchecked Sendable {
 }
 
 public extension Store {
-    var model: M {
-        M(self)
+    var model: Models {
+        Models(self)
     }
 
     var state: State {
@@ -85,6 +87,39 @@ public extension Store {
         set {
             lock { overrideState = newValue }
             weakContext?.notify(StateUpdate(isStateOverridden: true, isOverrideUpdate: true, fromContext: context))
+        }
+    }
+}
+
+public extension Store where Models.StateContainer: DefaultedStateContainer {
+    /// Creates a store.
+    ///
+    ///     Store<AppView?> {
+    ///       $0.uuid = .incrementing
+    ///
+    ///       return await loadInitialState()
+    ///     }
+    ///
+    /// - Parameter delayedInitialState:A async closure passing overridden dependencies of the store and returning the initial state.
+    ///
+    convenience init(delayedInitialState: @escaping (inout DependencyValues) async -> State) {
+        let initialState = Models.StateContainer.defaultContainer()
+        self.init(initialState: initialState) { _ in }
+        var lastStructure = Models.StateContainer.structureValue(for: initialState)
+        self.didStructureUpdate = { newStructure in
+            if newStructure != lastStructure {
+                lastStructure = newStructure
+                return true
+            }
+            return false
+
+        }
+        Task {
+            await withDependencies(from: self) {
+                self[path: \.self, fromContext: context] = await delayedInitialState(&$0)
+            } operation: {
+                _dependencies = Dependency(\.uuid)
+            }
         }
     }
 }
@@ -185,21 +220,28 @@ extension Store {
             fromContext: context
         )
 
-        return {
+        let structureDidChange = didStructureUpdate(Models.StateContainer.structureValue(for: state))
+
+        return { [objectWillChange] in
             if !Task.isCancelled {
                 context.notify(update)
+                if structureDidChange {
+                    Task { @MainActor in
+                        objectWillChange.send()
+                    }
+                }
             }
         }
     }
 
-    var context: ChildContext<M, M> {
+    var context: ChildContext<Models, Models> {
         lock.lock()
         if let context = weakContext {
             lock.unlock()
             return context
         }
 
-        let context = ChildContext<M, M>(store: self, path: \.self, parent: nil)
+        let context = ChildContext<Models, Models>(store: self, path: \.self, parent: nil)
         weakContext = context
 
         guard !hasBeenActivated else {

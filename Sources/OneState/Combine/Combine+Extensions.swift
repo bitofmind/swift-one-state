@@ -73,8 +73,6 @@ extension PassthroughSubject where Failure == Never, Output: Sendable {
     }
 }
 
-extension Store: ObservableObject {}
-
 extension PassthroughSubject: @unchecked Sendable where Output: Sendable {}
 
 #endif

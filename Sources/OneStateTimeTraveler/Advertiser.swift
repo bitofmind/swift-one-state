@@ -11,7 +11,7 @@ public extension View {
         }
     }
     
-    func advertise<M: Model>(_ store: Store<M>, reducer: StateHistoryReducer<M.State> = .default, discoveryInfo: [String: String] = .discoveryInfo, onConnect: @escaping (Data?) -> Bool = { _ in true }) -> some View {
+    func advertise<Models: ModelContainer>(_ store: Store<Models>, reducer: StateHistoryReducer<Models.StateContainer> = .default, discoveryInfo: [String: String] = .discoveryInfo, onConnect: @escaping (Data?) -> Bool = { _ in true }) -> some View {
         advertise(.store(store, reducer: reducer, discoveryInfo: discoveryInfo, onConnect: onConnect))
     }
 }
@@ -29,7 +29,7 @@ public struct Advertiser {
 }
 
 public extension Advertiser {
-    static func store<M: Model>(_ store: Store<M>, reducer: StateHistoryReducer<M.State> = .default, discoveryInfo: [String: String] = .discoveryInfo, onConnect: @escaping (Data?) -> Bool = { _ in true }) -> Self {
+    static func store<Models: ModelContainer>(_ store: Store<Models>, reducer: StateHistoryReducer<Models.StateContainer> = .default, discoveryInfo: [String: String] = .discoveryInfo, onConnect: @escaping (Data?) -> Bool = { _ in true }) -> Self {
         Self(traveler: .local(for: store), discoveryInfo: discoveryInfo, onConnect: onConnect)
     }
 }

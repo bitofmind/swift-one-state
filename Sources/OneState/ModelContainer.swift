@@ -4,13 +4,14 @@ public protocol ModelContainer {
     associatedtype ModelElement: Model = Self
     associatedtype StateContainer: OneState.StateContainer = IdentityStateContainer<ModelElement.State> where ModelElement.State == StateContainer.Element
     typealias Container = StateContainer.Container
-    
+
+    init()
+
     static func modelContainer(from elements: [ModelElement]) -> Self
+
     var stateContainer: Container { get }
     var models: [ModelElement] { get }
 }
-
-public typealias ContainerStoreViewProvider<State: StateContainer, Access> = StoreViewProvider<State, Access> where State.Container == State
 
 public extension ModelContainer {
     init(_ provider: some StoreViewProvider<Container, Write>) {
@@ -30,7 +31,7 @@ public extension ModelContainer {
         view.observeContainer(ofType: type(of: self), atPath: \.self)
     }
 
-    init<Provider: StoreViewProvider>(_ provider: Provider) where Provider.State == StateModel<Self>, Provider.Access == Write {
+    init(_ provider: some StoreViewProvider<StateModel<Self>, Write>) where ModelElement.Container == ModelElement.State {
         self.init(provider.storeView(for: \.wrappedValue))
     }
 }
@@ -50,6 +51,8 @@ extension Model where StateContainer == IdentityStateContainer<State>, ModelElem
 }
 
 extension Optional: ModelContainer where Wrapped: Model {
+    public init() { self = nil }
+
     public typealias StateContainer = Wrapped.State?
 
     public static func modelContainer(from elements: [Wrapped]) -> Self {

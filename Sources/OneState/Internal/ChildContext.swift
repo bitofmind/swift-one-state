@@ -1,9 +1,9 @@
 import CustomDump
 import Dependencies
 
-final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<ContextModel.State> {
-    typealias StoreState = StoreModel.State
-    typealias State = ContextModel.State
+final class ChildContext<StoreModel: ModelContainer, ContextModel: ModelContainer>: Context<ContextModel.Container> {
+    typealias StoreState = StoreModel.Container
+    typealias State = ContextModel.Container
 
     @Dependency(\.uuid) private var _marker
 
@@ -39,8 +39,10 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
                 _models[key] = model
 
                 for (key, value) in _models {
-                    if value.modelState?.storeAccess == nil && key != ObjectIdentifier(self) {
-                        _models[key] = nil
+                    for model in value.models {
+                        if model.modelState?.storeAccess == nil && key != ObjectIdentifier(self) {
+                            _models[key] = nil
+                        }
                     }
                 }
             }
@@ -48,7 +50,9 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
             if firstAccess && !self.isOverrideContext {
                 ContextBase.$current.withValue(nil) {
                     withCancellationContext(activateContextKey) {
-                        model.onActivate()
+                        for model in model.models {
+                            model.onActivate()
+                        }
                     }
                 }
             }
@@ -119,7 +123,7 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
 
     override var storePath: AnyKeyPath { path }
 
-    private func context<M: Model>(at path: WritableKeyPath<State, M.State>) -> ChildContext<StoreModel, M> {
+    private func context<M: ModelContainer>(at path: WritableKeyPath<State, M.Container>) -> ChildContext<StoreModel, M> {
         let isInViewModelContext = StoreAccess.isInViewModelContext
         let hasBeenRemoved = self.hasBeenRemoved
 
@@ -160,7 +164,7 @@ final class ChildContext<StoreModel: Model, ContextModel: Model>: Context<Contex
         }
     }
 
-    override func model<M: Model>(at path: WritableKeyPath<State, M.State>) -> M {
+    override func model<M: ModelContainer>(at path: WritableKeyPath<State, M.Container>) -> M {
         context(at: path).model
     }
 

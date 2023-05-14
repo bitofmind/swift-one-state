@@ -4,13 +4,13 @@ import Dependencies
 import XCTestDynamicOverlay
 import CustomDump
 
-public final class TestStore<M: Model> where M.State: Equatable&Sendable {
-    let store: Store<M>
-    let access: TestAccess<M.State>
+public final class TestStore<Models: ModelContainer> where Models.Container: Equatable&Sendable {
+    let store: Store<Models>
+    let access: TestAccess<State>
     let file: StaticString
     let line: UInt
 
-    public typealias State = M.State
+    public typealias State = Models.Container
 
     /// Creates a store for testing.
     ///
@@ -75,10 +75,12 @@ extension TestStore: StoreViewProvider {
 }
 
 public extension TestStore {
-    var model: M {
-        M(self)
+    var model: Models {
+        Models(self)
     }
+}
 
+public extension TestStore {
     var state: State { store.state }
 
     var exhaustivity: Exhaustivity {

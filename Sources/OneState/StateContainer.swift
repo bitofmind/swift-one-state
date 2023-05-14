@@ -10,6 +10,10 @@ public protocol StateContainer {
     static func structureValue(for container: Container) -> StructureValue
 }
 
+public protocol DefaultedStateContainer: StateContainer {
+    static func defaultContainer() -> Container
+}
+
 extension StateContainer where Element == Self {
     public static func elementKeyPaths(for container: Self) -> [WritableKeyPath<Self, Self>] { [\.self] }
 }
@@ -20,7 +24,8 @@ public enum IdentityStateContainer<State>: StateContainer {
     public static func structureValue(for container: State) -> AlwaysEqual { .init() }
 }
 
-extension Optional: StateContainer {
+extension Optional: DefaultedStateContainer {
+    public static func defaultContainer() -> Self { .none }
     public static func elementKeyPaths(for container: Self) -> [WritableKeyPath<Self, Wrapped>] {
         container.map { [\.[unwrapFallback: UnwrapFallback(value: $0)]] } ?? []
     }
@@ -38,6 +43,10 @@ public extension MutableCollection {
     }
 }
 
+public extension RangeReplaceableCollection {
+    static func defaultContainer() -> Self { Self() }
+}
+
 public extension MutableCollection where Element: Identifiable {
     static func elementKeyPaths(for container: Self) -> [WritableKeyPath<Self, Element>] {
         elementKeyPaths(for: container, idPath: \.id)
@@ -46,7 +55,7 @@ public extension MutableCollection where Element: Identifiable {
     static func structureValue(for container: Self) -> [Element.ID] { container.map(\.id) }
 }
 
-extension Array: StateContainer where Element: Identifiable {}
+extension Array: StateContainer&DefaultedStateContainer where Element: Identifiable {}
     
 private extension Optional {
     subscript (unwrapFallback fallback: UnwrapFallback<Wrapped>) -> Wrapped {
