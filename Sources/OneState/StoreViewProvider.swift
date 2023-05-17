@@ -32,7 +32,7 @@ public extension StoreViewProvider {
 
 public extension StoreViewProvider where State: Sendable {
     func changes(isSame: @escaping @Sendable (State, State) -> Bool) -> AnyAsyncSequence<State> {
-        AnyAsyncSequence(allChanges().removeDuplicates(by: isSame))
+        AnyAsyncSequence(values(isSame: isSame).dropFirst())
     }
 
     func values(isSame: @escaping @Sendable (State, State) -> Bool) -> AnyAsyncSequence<State> {
@@ -40,7 +40,7 @@ public extension StoreViewProvider where State: Sendable {
             c.yield(nonObservableState)
             c.finish()
         }
-        let changes = changes(isSame: isSame)
+        let changes = allChanges()
         return AnyAsyncSequence(chain(state, changes).removeDuplicates(by: isSame))
     }
 }
