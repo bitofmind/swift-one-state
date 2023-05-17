@@ -36,7 +36,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     }
 
     deinit {
-        onRemoval()
+        removeRecursively()
     }
 
     func onRemoval() {
