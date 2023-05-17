@@ -104,7 +104,7 @@ struct IDCollectionComparableValue<Value: MutableCollection>: ComparableValue wh
 }
 
 class StoreAccess: @unchecked Sendable {
-    func willAccess<StoreModel: ModelContainer, Comparable: ComparableValue>(store: Store<StoreModel>, from context: ContextBase, path: KeyPath<StoreModel.Container, Comparable.Value>, comparable: Comparable.Type) { }
+    func willAccess<StoreModel: ModelContainer, Comparable: ComparableValue>(store: InternalStore<StoreModel>, from context: ContextBase, path: KeyPath<StoreModel.Container, Comparable.Value>, comparable: Comparable.Type) { }
     func didModify<State>(state: State) { }
     func didSend(event: ContextBase.EventInfo) {}
 

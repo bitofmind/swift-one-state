@@ -31,10 +31,10 @@ public final class TestStore<Models: ModelContainer> where Models.Container: Equ
     }
 
     deinit {
-        store.cancellations.cancelAll(for: TestStoreScope.self)
+        store.internalStore.cancellations.cancelAll(for: TestStoreScope.self)
         store.context.cancelActiveContextRecursively()
 
-        for info in store.cancellations.activeTasks {
+        for info in store.internalStore.cancellations.activeTasks {
             access.fail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", for: .tasks, file: file, line: line)
         }
 

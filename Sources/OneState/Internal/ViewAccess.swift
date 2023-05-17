@@ -5,7 +5,7 @@ class ViewAccess: StoreAccess, ObservableObject {
     private var observations: [ObjectIdentifier: Observation] = [:]
     private(set) var updateCount = 0
 
-    override func willAccess<StoreModel: ModelContainer, Comparable: ComparableValue>(store: Store<StoreModel>, from context: ContextBase, path: KeyPath<StoreModel.Container, Comparable.Value>, comparable: Comparable.Type) {
+    override func willAccess<StoreModel: ModelContainer, Comparable: ComparableValue>(store: InternalStore<StoreModel>, from context: ContextBase, path: KeyPath<StoreModel.Container, Comparable.Value>, comparable: Comparable.Type) {
         lock {
             let id = ObjectIdentifier(context)
 
@@ -38,11 +38,11 @@ private class ObservedState {
 }
 
 private final class _ObservedState<StoreModel: ModelContainer, Comparable: ComparableValue>: ObservedState {
-    weak var store: Store<StoreModel>?
+    weak var store: InternalStore<StoreModel>?
     let path: KeyPath<StoreModel.Container, Comparable.Value>
     var value: Comparable
 
-    init(store: Store<StoreModel>, path: KeyPath<StoreModel.Container, Comparable.Value>, comparable: Comparable.Type) {
+    init(store: InternalStore<StoreModel>, path: KeyPath<StoreModel.Container, Comparable.Value>, comparable: Comparable.Type) {
         self.store = store
         self.path = path
         self.value = Comparable(value: store[overridePath: path] ?? store[path: path])

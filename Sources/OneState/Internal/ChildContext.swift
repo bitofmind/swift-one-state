@@ -7,12 +7,12 @@ final class ChildContext<StoreModel: ModelContainer, ContextModel: ModelContaine
 
     @Dependency(\.uuid) private var _marker
 
-    let store: Store<StoreModel>
+    let store: InternalStore<StoreModel>
     let path: WritableKeyPath<StoreState, State>
     private var _models: [ObjectIdentifier: ContextModel] = [:]
     private var modelLock = Lock()
 
-    init(store: Store<StoreModel>, path: WritableKeyPath<StoreState, State>, parent: ContextBase?) {
+    init(store: InternalStore<StoreModel>, path: WritableKeyPath<StoreState, State>, parent: ContextBase?) {
         self.store = store
         self.path = path
         super.init(parent: parent)
