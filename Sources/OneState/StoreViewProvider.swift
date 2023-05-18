@@ -1,3 +1,4 @@
+import Foundation
 import AsyncAlgorithms
 import CustomDump
 
@@ -139,27 +140,33 @@ extension StoreViewProvider where Access == Write {
         let context = view.context
         if context.containers[containerPath] == nil {
             let prevContainer = view.context[path: containerPath]
-            let prevStructure = Protected(StructureComparableValue<Models.StateContainer>(value: prevContainer))
-            let prevElementPaths = Protected(Set(Models.StateContainer.elementKeyPaths(for: prevContainer)))
+            let lock = NSLock()
+            var prevStructure = StructureComparableValue<Models.StateContainer>(value: prevContainer)
+            var prevElementPaths = Set(Models.StateContainer.elementKeyPaths(for: prevContainer))
             context.containers[containerPath] = { [weak context, weak containerContext = view.context] in
+                typealias Path = WritableKeyPath<Models.StateContainer.Container, Models.ModelElement.State>
+
                 guard let context, let containerContext else { return }
 
-                let currentContainer = containerContext[path: containerPath]
-                let currentStructure = StructureComparableValue<Models.StateContainer>(value: currentContainer)
+                let (addedPaths, removedPaths): (Set<Path>, Set<Path>) = lock {
+                    let currentContainer = containerContext[path: containerPath]
+                    let currentStructure = StructureComparableValue<Models.StateContainer>(value: currentContainer)
 
-                guard prevStructure.value != currentStructure else {
-                    return
+                    guard prevStructure != currentStructure else {
+                        return (([], []))
+                    }
+
+                    let currentElementPaths = Set(Models.StateContainer.elementKeyPaths(for: currentContainer))
+
+                    defer {
+                        prevStructure = currentStructure
+                        prevElementPaths = currentElementPaths
+                    }
+
+                    let addedPaths = currentElementPaths.subtracting(prevElementPaths)
+                    let removedPaths = prevElementPaths.subtracting(currentElementPaths)
+                    return (addedPaths, removedPaths)
                 }
-
-                let currentElementPaths = Set(Models.StateContainer.elementKeyPaths(for: currentContainer))
-
-                defer {
-                    prevStructure.value = currentStructure
-                    prevElementPaths.value = currentElementPaths
-                }
-
-                let addedPaths = currentElementPaths.subtracting(prevElementPaths.value)
-                let removedPaths = prevElementPaths.value.subtracting(currentElementPaths)
 
                 for addedPath in addedPaths {
                     let childPath = containerPath.appending(path: addedPath)
