@@ -31,8 +31,8 @@ public final class TestStore<Models: ModelContainer> where Models.Container: Equ
     }
 
     deinit {
-        store.internalStore.cancellations.cancelAll(for: TestStoreScope.self)
-        store.context.cancelActiveContextRecursively()
+        store.context.cancelAllRecursively(for: TestStoreScope.self)
+        store.context.cancelAllRecursively(for: ActivateContextKey.self)
 
         for info in store.internalStore.cancellations.activeTasks {
             access.fail("Models of type `\(info.modelName)` have \(info.count) active tasks still running", for: .tasks, file: file, line: line)

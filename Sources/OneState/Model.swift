@@ -107,9 +107,9 @@ public extension Model {
     ///  The returned `Cancellable` will be set up to cancel once the self is destructed.
     @discardableResult
     func onCancel(_ perform: @Sendable @escaping () -> Void) -> Cancellable {
-        AnyCancellable(cancellations: context.cancellations) {
+        AnyCancellable(context: context) {
             perform()
-        }.cancel(for: context.contextCancellationKey)
+        }.cancel(for: ContextCancellationKey.self)
     }
 
     /// Cancel all cancellables that have been registered for the provided `key`
@@ -122,7 +122,7 @@ public extension Model {
     ///
     ///     model.cancelAll(for: key)
     func cancelAll(for key: some Hashable&Sendable) {
-        context.cancellations.cancelAll(for: key)
+        context.cancellations.cancelAll(for: key, context: cancellationContext)
     }
 
     /// Cancel all cancellables that have been registered for the provided `type`
@@ -135,7 +135,7 @@ public extension Model {
     ///
     ///     model.cancelAll(for: ID.self)
     func cancelAll(for id: Any.Type) {
-        context.cancellations.cancelAll(for: id)
+        context.cancellations.cancelAll(for: id, context: cancellationContext)
     }
 }
 
@@ -160,12 +160,12 @@ public extension Model {
 
         return TaskCancellable(
             name: typeDescription,
-            cancellations: context.cancellations,
+            context: context,
             priority: priority,
             operation: operation,
             catch: `catch`
         )
-        .cancel(for: context.contextCancellationKey)
+        .cancel(for: ContextCancellationKey.self)
     }
 
     /// Perform a task for the life time of the model
@@ -187,7 +187,6 @@ public extension Model {
     /// - Returns: A cancellable to optionally allow cancelling before deactivation.
     @discardableResult
     func forEach<S: AsyncSequence&Sendable>(_ sequence: S, cancelPrevious: Bool = false, priority: TaskPriority? = nil, perform operation: @escaping @Sendable (S.Element) async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) -> Cancellable where S.Element: Sendable {
-        let cancellations = context.cancellations
         let typeDescription = typeDescription
         return task(priority: priority, {
             guard cancelPrevious else {
@@ -208,10 +207,10 @@ public extension Model {
                     let streamContexts = CallContext.streamContexts.value
                     CallContext.streamContexts.value.removeAll()
 
-                    cancellations.cancelAll(for: cancelID)
+                    cancelAll(for: cancelID)
                     TaskCancellable(
                         name: typeDescription,
-                        cancellations: cancellations,
+                        context: context,
                         priority: priority,
                         operation: {
                             guard !Task.isCancelled else { return }
@@ -231,7 +230,7 @@ public extension Model {
                     ).cancel(for: cancelID)
                 }
             } onCancel: {
-                cancellations.cancelAll(for: cancelID)
+                cancelAll(for: cancelID)
             }
         }, catch: { `catch`?($0) })
     }
@@ -479,6 +478,8 @@ extension Model {
     var typeDescription: String {
         String(describing: type(of: self))
     }
+
+    var cancellationContext: ObjectIdentifier { .init(context) }
 }
 
 @discardableResult nonisolated

@@ -49,7 +49,7 @@ final class ChildContext<StoreModel: ModelContainer, ContextModel: ModelContaine
 
             if firstAccess && !self.isOverrideContext {
                 ContextBase.$current.withValue(nil) {
-                    withCancellationContext(activateContextKey) {
+                    withCancellationContext(ActivateContextKey.self) {
                         for model in model.models {
                             model.onActivate()
                         }

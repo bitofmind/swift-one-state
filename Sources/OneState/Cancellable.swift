@@ -84,12 +84,14 @@ struct FileAndLine: Hashable, Sendable {
 }
 
 struct AnyCancellable: Cancellable, InternalCancellable {
-    let cancellations: Cancellations
+    var context: ObjectIdentifier
+    var cancellations: Cancellations
     var id: Int
     private var _onCancel: @Sendable () -> Void
 
-    init(cancellations: Cancellations, onCancel: @escaping @Sendable () -> Void) {
-        self.cancellations = cancellations
+    init(context: ContextBase, onCancel: @escaping @Sendable () -> Void) {
+        self.context = ObjectIdentifier(context)
+        self.cancellations = context.cancellations
         id = cancellations.nextId
         _onCancel = onCancel
         cancellations.register(self)
@@ -114,14 +116,16 @@ struct AnyCancellable: Cancellable, InternalCancellable {
 
 final class TaskCancellable: Cancellable, InternalCancellable {
     var id: Int
+    var context: ObjectIdentifier
     var cancellations: Cancellations
     var task: Task<Void, Error>!
     var name: String
     var lock = Lock()
     var hasBeenCancelled = false
 
-    init(name: String, cancellations: Cancellations, task: @escaping @Sendable (@escaping @Sendable () -> Void) -> Task<Void, Error>) {
-        self.cancellations = cancellations
+    init(name: String, context: ContextBase, task: @escaping @Sendable (@escaping @Sendable () -> Void) -> Task<Void, Error>) {
+        self.context = ObjectIdentifier(context)
+        self.cancellations = context.cancellations
         let id = cancellations.nextId
         self.id = id
         self.name = name
@@ -131,7 +135,7 @@ final class TaskCancellable: Cancellable, InternalCancellable {
 
         lock {
             guard !self.hasBeenCancelled else { return }
-            self.task = task {
+            self.task = task { [cancellations = context.cancellations] in
                 _ = cancellations.unregister(id)
             }
         }
@@ -156,8 +160,8 @@ final class TaskCancellable: Cancellable, InternalCancellable {
 }
 
 extension TaskCancellable {
-    convenience init(name: String, cancellations: Cancellations, priority: TaskPriority? = nil, operation: @escaping @Sendable () async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) {
-        self.init(name: name, cancellations: cancellations) { onDone in
+    convenience init(name: String, context: ContextBase, priority: TaskPriority? = nil, operation: @escaping @Sendable () async throws -> Void, `catch`: (@Sendable (Error) -> Void)? = nil) {
+        self.init(name: name, context: context) { onDone in
             Task(priority: priority) {
                 do {
                     try await CallContext.$streamContexts.withValue(.init([])) {
@@ -182,16 +186,25 @@ struct EmptyCancellable: Cancellable {
     func cancel(for key: some Hashable & Sendable, cancelInFlight: Bool) -> EmptyCancellable { self }
 }
 
+enum ContextCancellationKey {}
+enum ActivateContextKey {}
+
 protocol InternalCancellable {
     var cancellations: Cancellations { get }
+    var context: ObjectIdentifier { get }
     var id: Int { get }
     func onCancel()
+}
+
+struct ContextAndKey: Hashable, @unchecked Sendable  {
+    var context: ObjectIdentifier
+    var key: CancellableKey
 }
 
 final class Cancellations: @unchecked Sendable {
     fileprivate var lock = Lock()
     fileprivate var registered: [Int: InternalCancellable] = [:]
-    fileprivate var keyed: [CancellableKey: [Int]] = [:]
+    fileprivate var keyed: [ContextAndKey: [Int]] = [:]
 
     func cancel(_ c: InternalCancellable) {
         unregister(c.id)?.onCancel()
@@ -199,12 +212,12 @@ final class Cancellations: @unchecked Sendable {
 
     func cancel<Key: Hashable&Sendable>(_ c: InternalCancellable, for key: Key, cancelInFlight: Bool) {
         if cancelInFlight {
-            cancelAll(for: key)
+            cancelAll(for: key, context: c.context)
         }
 
         lock {
             guard registered[c.id] != nil else { return }
-            keyed[.init(key: key), default: []].append(c.id)
+            keyed[.init(context: c.context, key: .init(key: key)), default: []].append(c.id)
         }
     }
 
@@ -213,7 +226,7 @@ final class Cancellations: @unchecked Sendable {
             registered[c.id] = c
 
             for key in AnyCancellable.contexts {
-                keyed[key, default: []].append(c.id)
+                keyed[.init(context: c.context, key: key), default: []].append(c.id)
             }
         }
     }
@@ -224,9 +237,9 @@ final class Cancellations: @unchecked Sendable {
         }
     }
 
-    func cancelAll(for key: some Hashable&Sendable) {
+    func cancelAll(for key: some Hashable&Sendable, context: ObjectIdentifier) {
         lock {
-            (keyed.removeValue(forKey: .init(key: key)) ?? []).compactMap { id in
+            (keyed.removeValue(forKey: .init(context: context, key: .init(key: key))) ?? []).compactMap { id in
                 registered.removeValue(forKey: id)
             }
         }.forEach {
@@ -234,10 +247,9 @@ final class Cancellations: @unchecked Sendable {
         }
     }
 
-    func cancelAll(for id: Any.Type) {
-        cancelAll(for: ObjectIdentifier(id))
+    func cancelAll(for id: Any.Type, context: ObjectIdentifier) {
+        cancelAll(for: ObjectIdentifier(id), context: context)
     }
-
 
     var activeTasks: [(modelName: String, count: Int)] {
         lock {

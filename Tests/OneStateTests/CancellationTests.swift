@@ -58,6 +58,10 @@ class CancelletionTests: XCTestCase {
 
             XCTAssertEqual(count, 0)
             model.cancelAll(for: CancelKey.self)
+            XCTAssertEqual(count, 0)
+            counter1.cancelAll(for: CancelKey.self)
+            XCTAssertEqual(count, 5)
+            counter2.cancelAll(for: CancelKey.self)
             XCTAssertEqual(count, 8)
         }
 

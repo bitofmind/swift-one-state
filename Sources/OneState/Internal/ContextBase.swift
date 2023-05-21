@@ -25,9 +25,6 @@ class ContextBase: HoldsLock, @unchecked Sendable {
 
     @TaskLocal static var current: ContextBase?
 
-    let contextCancellationKey = UUID()
-    let activateContextKey = UUID()
-
     @Locked var containers: [AnyKeyPath: () -> ()] = [:]
 
     init(parent: ContextBase?) {
@@ -40,7 +37,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     }
 
     func onRemoval() {
-        cancellations.cancelAll(for: contextCancellationKey)
+        cancellations.cancelAll(for: ContextCancellationKey.self, context: cancellationContext)
 
         self.hasBeenRemoved = true
         let parent = lock {
@@ -113,13 +110,15 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         }
     }
 
-    func cancelActiveContextRecursively() {
-        cancellations.cancelAll(for: activateContextKey)
+    func cancelAllRecursively(for id: Any.Type) {
+        cancellations.cancelAll(for: id, context: cancellationContext)
 
         for child in allChildren.values {
-            child.cancelActiveContextRecursively()
+            child.cancelAllRecursively(for: id)
         }
     }
+
+    var cancellationContext: ObjectIdentifier { .init(self) }
 
     private func notifyUpdate(_ update: StateUpdate) {
         guard !hasBeenRemoved else { return }
