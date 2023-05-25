@@ -187,12 +187,10 @@ extension InternalStore {
         let structureDidChange = didStructureUpdate(Models.StateContainer.structureValue(for: state))
 
         return { [objectWillChange] in
-            if !Task.isCancelled {
-                context.notify(update)
-                if structureDidChange {
-                    Task { @MainActor in
-                        objectWillChange.send()
-                    }
+            context.notify(update)
+            if structureDidChange {
+                Task { @MainActor in
+                    objectWillChange.send()
                 }
             }
         }
