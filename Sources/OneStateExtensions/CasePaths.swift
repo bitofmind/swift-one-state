@@ -11,6 +11,22 @@ public extension StoreViewProvider where State: Equatable, Access == Write {
     }
 }
 
+public extension Model {
+    func events<Case>(ofCase casePath: CasePath<Event, Case>) -> AnyAsyncSequence<Case> where Event: Sendable {
+        AnyAsyncSequence(events().compactMap { event in
+            casePath.extract(from: event)
+        })
+    }
+
+    func events<M: Model, Case>(ofCase casePath: CasePath<M.Event, Case>, fromType modelType: M.Type = M.self) -> AnyAsyncSequence<(case: Case, model: M)> where M.Event: Sendable {
+        AnyAsyncSequence(events(fromType: modelType).compactMap { event, model in
+            casePath.extract(from:event).map {
+                (case: $0, model: model)
+            }
+        })
+    }
+}
+
 #if canImport(SwiftUI)
 import SwiftUI
 
