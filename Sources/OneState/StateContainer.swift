@@ -30,7 +30,9 @@ extension Optional: DefaultedStateContainer {
         container.map { [\.[unwrapFallback: UnwrapFallback(value: $0)]] } ?? []
     }
 
-    public static func structureValue(for container: Self) -> Bool { container != nil }
+    public static func structureValue(for container: Self) -> AnyHashable? {
+        container.map(anyHashable)
+    }
 }
 
 public extension MutableCollection {
@@ -56,7 +58,7 @@ public extension MutableCollection where Element: Identifiable {
 }
 
 extension Array: StateContainer&DefaultedStateContainer where Element: Identifiable {}
-    
+
 private extension Optional {
     subscript (unwrapFallback fallback: UnwrapFallback<Wrapped>) -> Wrapped {
         get {
@@ -106,12 +108,26 @@ private class UnwrapFallback<Value>: Hashable, @unchecked Sendable {
     init(value: Value) {
         self.value = value
     }
-    
-    static func == (lhs: UnwrapFallback, rhs: UnwrapFallback) -> Bool {
-        return true
+
+    var id: AnyHashable {
+        anyHashable(from: value)
     }
     
-    func hash(into hasher: inout Hasher) { }
+    static func == (lhs: UnwrapFallback, rhs: UnwrapFallback) -> Bool {
+        lhs.id == rhs.id
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+}
+
+private func anyHashable(from value: Any) -> AnyHashable {
+    (value as? any Identifiable)?.anyHashable ?? AnyHashable(ObjectIdentifier(Any.self))
+}
+
+private extension Identifiable {
+    var anyHashable: AnyHashable { AnyHashable(id) }
 }
 
 // Crash in key path append if using struct instead of class

@@ -77,6 +77,31 @@ public extension Model {
         }
     }
 
+    /// Constructs a model with a view into a store's state
+    ///
+    /// A model is required to be constructed from a view into a store's state for
+    /// its `@ModelState` and other dependencies such as `@ModelEnvironment` to be
+    /// set up correctly. This  will automatically be handled when using `@StateModel`, but
+    /// sometimes you might  have to manually create the model
+    ///
+    /// If the model state identity is changed, the previous model with de-activate and the new model will activate
+    ///
+    ///     MyModel($store.myModalState)
+    init(_ provider: some StoreViewProvider<State, Write>) where State: Identifiable {
+        let view = provider.storeView
+
+        let id = AnyHashable(view.value(for: \.id)) // To trigger update once identity toggles
+        if let prevId = view.context.identities[view.path], prevId != id {
+            let oldModel: Self = view.context.model(at: view.path.appending(path: \.[id: prevId]))
+            oldModel.context.removeRecursively()
+        }
+
+        view.context.identities[view.path] = id
+        self = StoreAccess.with(view.access) {
+            view.context.model(at: view.path.appending(path: \.[id: id]))
+        }
+    }
+
     /// Constructs a model together with a store.
     ///
     /// Convenience initializer when working with e.g. SwiftUI previews:
@@ -221,7 +246,6 @@ public extension Model {
                                     }
                                 }
                             } catch is CancellationError {
-                                print()
                             } catch {
                                 `catch`?(error)
                                 throw error
@@ -493,5 +517,12 @@ func inViewModelContext<T: Sendable>(@_inheritActorContext _ operation: @escapin
 func inViewModelContext<T: Sendable>(@_inheritActorContext _ operation: @escaping () throws -> T) rethrows -> T {
     try StoreAccess.$isInViewModelContext.withValue(true) {
         try operation()
+    }
+}
+
+private extension Identifiable {
+    subscript (id id: AnyHashable) -> Self {
+        get { self }
+        set { self = newValue }
     }
 }

@@ -89,7 +89,7 @@ struct StructureComparableValue<Value: StateContainer>: ComparableValue {
     static var ignoreChildUpdates: Bool { true }
 }
 
-struct IDCollectionComparableValue<Value: MutableCollection>: ComparableValue where Value.Element: Identifiable  {
+struct IDCollectionComparableValue<Value: MutableCollection>: ComparableValue where Value.Element: Identifiable {
     let structureValue: [Value.Element.ID]
 
     init(value: Value) {

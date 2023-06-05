@@ -50,7 +50,7 @@ extension AnyAsyncIterator: @unchecked Sendable where Element: Sendable {}
 public struct AnyAsyncSequence<Element>: AsyncSequence {
     let makeAsyncIteratorClosure: () -> AsyncIterator
 
-    init<T: AsyncSequence>(_ sequence: T) where T.Element == Element {
+    public init<T: AsyncSequence>(_ sequence: T) where T.Element == Element {
         makeAsyncIteratorClosure = { AnyAsyncIterator(sequence.makeAsyncIterator()) }
     }
 

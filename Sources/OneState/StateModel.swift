@@ -69,6 +69,10 @@ public extension Model {
         M(storeView(for: path.appending(path: \.wrappedValue)))
     }
 
+    subscript<M: Model>(dynamicMember path: WritableKeyPath<State, StateModel<M>>) -> M where M.State: Identifiable {
+        M(storeView(for: path.appending(path: \.wrappedValue)))
+    }
+
     subscript<Models>(dynamicMember path: WritableKeyPath<State, StateModel<Models>>) -> Models {
         Models(storeView.storeView(for: path))
     }
@@ -130,7 +134,23 @@ public extension Model {
         })
     }
 
+    func events<M: Model>(from path: WritableKeyPath<State, StateModel<M>>) -> AnyAsyncSequence<M.Event> where M.State: Identifiable {
+        let events = M(storeView(for: path).wrappedValue).context.events
+        return AnyAsyncSequence(events.compactMap {
+            guard let e = $0.event as? M.Event else { return nil }
+            return e
+        })
+    }
+
     func events<M: Model>(of event: M.Event, from path: WritableKeyPath<State, StateModel<M>>) -> AnyAsyncSequence<()> where M.Event: Equatable&Sendable {
+        let events = M(storeView(for: path).wrappedValue).context.events
+        return AnyAsyncSequence(events.compactMap {
+            guard let e = $0.event as? M.Event, e == event else { return nil }
+            return ()
+        })
+    }
+
+    func events<M: Model>(of event: M.Event, from path: WritableKeyPath<State, StateModel<M>>) -> AnyAsyncSequence<()> where M.Event: Equatable&Sendable&Identifiable {
         let events = M(storeView(for: path).wrappedValue).context.events
         return AnyAsyncSequence(events.compactMap {
             guard let e = $0.event as? M.Event, e == event else { return nil }

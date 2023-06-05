@@ -26,6 +26,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     @TaskLocal static var current: ContextBase?
 
     @Locked var containers: [AnyKeyPath: () -> ()] = [:]
+    @Locked var identities: [AnyKeyPath: AnyHashable] = [:]
 
     init(parent: ContextBase?) {
         self.parent = parent
