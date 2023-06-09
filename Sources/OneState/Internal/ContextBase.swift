@@ -132,6 +132,8 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     }
 
     func notifyDescendants(_ update: StateUpdate) {
+        updateContainers()
+
         let (children, overrideChildren) = lock {
             (_children.values, _overrideChildren.values)
         }
