@@ -24,9 +24,11 @@ class ViewAccess: StoreAccess, ObservableObject {
                 return observation
             }()
 
-            guard observation.observedStates.index(forKey: path) == nil else { return }
-
-            observation.observedStates[path] = _ObservedState(store: store, path: path, comparable: comparable)
+            observation.lock {
+                guard observation.observedStates.index(forKey: path) == nil else { return }
+                
+                observation.observedStates[path] = _ObservedState(store: store, path: path, comparable: comparable)
+            }
         }
     }
 
