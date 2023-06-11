@@ -43,18 +43,18 @@ public extension Advertiser {
         let listener = try NWListener(using: params)
         listener.service = NWListener.Service(name: "OneStateTimeTraveler", type: "_onestatetimetraveler._udp", txtRecord: .init(.discoveryInfo))
         
-        var tasks: [Task<(), Error>] = []
+        let tasks = Protected<[Task<(), Error>]>([])
         listener.newConnectionHandler = { newConnection in
-            tasks.forEach { $0.cancel() }
-            tasks.removeAll()
-            
-            tasks.append(Task {
+            tasks.value.forEach { $0.cancel() }
+            tasks.value.removeAll()
+
+            tasks.value.append(Task {
                 for await state in traveler.stateStream() {
                     try await newConnection.send(AdvertiserMessage.overrideState(state))
                 }
             })
             
-            tasks.append(Task {
+            tasks.value.append(Task {
                 while !Task.isCancelled {
                     let command = try await newConnection.receiveMessage(ofType: BrowserMessage.self)
                     
@@ -74,12 +74,12 @@ public extension Advertiser {
             newConnection.start(queue: .main)
         }
         
-        var task: Task<Void, Error>?
+        let task = Protected<Task<Void, Error>?>(nil)
         listener.stateUpdateHandler = { [weak listener] state in
             switch state {
             case .failed:
                 listener?.cancel()
-                task = Task {
+                task.value = Task {
                     try await advertise()
                 }
             default:
@@ -93,7 +93,7 @@ public extension Advertiser {
             try? await Task.sleep(nanoseconds: NSEC_PER_SEC * 1_0000_0000)
         }
           
-        task?.cancel()
+        task.value?.cancel()
         _ = listener
     }
 }
