@@ -220,6 +220,7 @@ public extension Model {
                     CallContext.streamContexts.value.removeAll()
 
                     try await CallContext.$currentContexts.withValue(streamContexts) {
+                        guard !Task.isCancelled else { return }
                         try await operation(value)
                     }
                 }
@@ -238,10 +239,10 @@ public extension Model {
                         context: context,
                         priority: priority,
                         operation: {
-                            guard !Task.isCancelled else { return }
                             do {
                                 try await inViewModelContext {
                                     try await CallContext.$currentContexts.withValue(streamContexts) {
+                                        guard !Task.isCancelled else { return }
                                         try await operation(value)
                                     }
                                 }
