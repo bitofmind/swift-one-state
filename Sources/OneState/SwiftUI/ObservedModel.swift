@@ -32,6 +32,7 @@ public struct ObservedModel<M: ModelContainer>: DynamicProperty {
     }
 
     public mutating func update() {
+        access.reset()
         let hasBeenRemoved = wrappedValue.models.reduce(false) { $0 || $1.context.hasBeenRemoved }
         guard !hasBeenRemoved else { return }
 

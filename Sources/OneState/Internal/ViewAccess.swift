@@ -33,6 +33,12 @@ class ViewAccess: StoreAccess, ObservableObject {
     }
 
     override var allowAccessToBeOverridden: Bool { true }
+
+    func reset() {
+        lock {
+            observations.removeAll(keepingCapacity: true)
+        }
+    }
 }
 
 private class ObservedState {
