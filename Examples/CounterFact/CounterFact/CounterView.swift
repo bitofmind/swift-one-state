@@ -144,7 +144,7 @@ struct AppView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             List {
-                Text("Sum: \(model.sum)")
+                //Text("Sum: \(model.sum)")
 
                 ForEach(model.$counters) { row in
                     CounterRowView(model: row)

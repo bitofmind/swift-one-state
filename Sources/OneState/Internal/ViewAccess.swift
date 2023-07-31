@@ -4,9 +4,14 @@ class ViewAccess: StoreAccess, ObservableObject {
     private var lock = Lock()
     private var observations: [ObjectIdentifier: Observation] = [:]
     private(set) var updateCount = 0
+    private var shouldReset = false
 
     override func willAccess<StoreModel: ModelContainer, Comparable: ComparableValue>(store: InternalStore<StoreModel>, from context: ContextBase, path: KeyPath<StoreModel.Container, Comparable.Value>, comparable: Comparable.Type) {
         lock {
+            if shouldReset {
+                shouldReset = false 
+                observations.removeAll(keepingCapacity: true)
+            }
             let id = ObjectIdentifier(context)
 
             let observation = observations[id] ?? {
@@ -36,7 +41,7 @@ class ViewAccess: StoreAccess, ObservableObject {
 
     func reset() {
         lock {
-            observations.removeAll(keepingCapacity: true)
+            shouldReset = true
         }
     }
 }
