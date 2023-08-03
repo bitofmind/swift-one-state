@@ -103,18 +103,20 @@ private extension MutableCollection {
 
 // Crash in key path append if using struct instead of class
 private class UnwrapFallback<Value>: Hashable, @unchecked Sendable {
-    var value: Value
+    var value: Value {
+        didSet {
+            id = anyHashable(from: value)
+        }
+    }
+    private var id: AnyHashable
     
     init(value: Value) {
         self.value = value
+        self.id = anyHashable(from: value)
     }
 
-    var id: AnyHashable {
-        anyHashable(from: value)
-    }
-    
     static func == (lhs: UnwrapFallback, rhs: UnwrapFallback) -> Bool {
-        lhs.id == rhs.id
+        lhs === rhs || lhs.id == rhs.id
     }
     
     func hash(into hasher: inout Hasher) {
