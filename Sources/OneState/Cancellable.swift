@@ -233,7 +233,19 @@ final class Cancellations: @unchecked Sendable {
 
     func unregister(_ id: Int) -> InternalCancellable? {
         lock {
-            registered.removeValue(forKey: id)
+            let cancellable = registered.removeValue(forKey: id)
+
+            for contextAndKey in keyed.keys {
+                while let index = keyed[contextAndKey]?.firstIndex(of: id) {
+                    keyed[contextAndKey]?.remove(at: index)
+                }
+                
+                if keyed[contextAndKey]?.isEmpty == true {
+                    keyed[contextAndKey] = nil
+                }
+            }
+
+            return cancellable
         }
     }
 
