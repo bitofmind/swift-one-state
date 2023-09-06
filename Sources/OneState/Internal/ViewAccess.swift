@@ -4,15 +4,16 @@ class ViewAccess: StoreAccess, ObservableObject {
     private var lock = Lock()
     private var observations: [ObjectIdentifier: Observation] = [:]
     private(set) var updateCount = 0
-    private var shouldReset = false
+    private var shouldResets: Set<ObjectIdentifier> = []
 
     override func willAccess<StoreModel: ModelContainer, Comparable: ComparableValue>(store: InternalStore<StoreModel>, from context: ContextBase, path: KeyPath<StoreModel.Container, Comparable.Value>, comparable: Comparable.Type) {
         lock {
-            if shouldReset {
-                shouldReset = false 
-                observations.removeAll(keepingCapacity: true)
-            }
             let id = ObjectIdentifier(context)
+
+            if shouldResets.contains(id) {
+                shouldResets.remove(id)
+                observations[id]?.reset()
+            }
 
             let observation = observations[id] ?? {
                 let observation = Observation(context: context) { [weak self] update in
@@ -39,9 +40,16 @@ class ViewAccess: StoreAccess, ObservableObject {
 
     override var allowAccessToBeOverridden: Bool { true }
 
-    func reset() {
+    func didUpdate(contexts: [ContextBase]) {
+        let ids = contexts.map { ObjectIdentifier($0) }
         lock {
-            shouldReset = true
+            shouldResets.formUnion(ids)
+
+            Task { @MainActor in
+                lock {
+                    shouldResets.subtract(ids)
+                }
+            }
         }
     }
 }
@@ -111,6 +119,12 @@ private final class Observation {
             return observedStates.values.reduce(false) {
                 $1.onUpdate(update, in: context) || $0
             }
+        }
+    }
+
+    func reset() {
+        lock {
+            observedStates.removeAll(keepingCapacity: true)
         }
     }
 }
