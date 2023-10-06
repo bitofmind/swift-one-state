@@ -173,6 +173,9 @@ extension TaskCancellable {
                         }
                     }
                 } catch {
+                    guard !Task.isCancelled else {
+                        return
+                    }
                     `catch`?(error)
                 }
             }
