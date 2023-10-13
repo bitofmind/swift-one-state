@@ -120,7 +120,7 @@ final class TaskCancellable: Cancellable, InternalCancellable {
     var cancellations: Cancellations
     var task: Task<Void, Error>!
     var name: String
-    var lock = Lock()
+    let lock = NSLock()
     var hasBeenCancelled = false
 
     init(name: String, context: ContextBase, task: @escaping @Sendable (@escaping @Sendable () -> Void) -> Task<Void, Error>) {
@@ -205,7 +205,7 @@ struct ContextAndKey: Hashable, @unchecked Sendable  {
 }
 
 final class Cancellations: @unchecked Sendable {
-    fileprivate var lock = Lock()
+    fileprivate var lock = NSLock()
     fileprivate var registered: [Int: InternalCancellable] = [:]
     fileprivate var keyed: [ContextAndKey: [Int]] = [:]
 

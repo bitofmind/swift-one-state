@@ -1,7 +1,7 @@
 import Foundation
 
 final class Protected<Value: Sendable>: @unchecked Sendable {
-    private var lock = NSLock()
+    private let lock = NSLock()
     private var _value: Value
 
     init(_ value: Value) {

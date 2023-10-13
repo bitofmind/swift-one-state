@@ -2,7 +2,7 @@ import Foundation
 import Dependencies
 
 class ContextBase: HoldsLock, @unchecked Sendable {
-    var lock = Lock()
+    let lock = NSLock()
     private(set) weak var parent: ContextBase?
 
     var _children: [AnyKeyPath: ContextBase] = [:]

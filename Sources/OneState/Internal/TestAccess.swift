@@ -13,14 +13,14 @@ class TestAccessBase: StoreAccess {
 }
 
 final class TestAccess<State: Equatable>: TestAccessBase {
-    var lock = Lock()
+    let lock = NSLock()
     private var _expectedState: State
     var expectedState: State { lock { _expectedState } }
     var exhaustivity: Exhaustivity = .full
     var showSkippedAssertions = false
 
     final class Update<T> {
-        private var lock = Lock()
+        private let lock = NSLock()
         private var _values: [T] = []
         var values: [T] { lock { _values } }
     }

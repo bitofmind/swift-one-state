@@ -1,7 +1,7 @@
 import Foundation
 
 final class AsyncPassthroughSubject<Element>: AsyncSequence, @unchecked Sendable {
-    private var lock = Lock()
+    private let lock = NSLock()
     private var continuations: [Int: AsyncStream<Element>.Continuation] = [:]
     private var nextKey = 0
 

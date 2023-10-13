@@ -1,7 +1,7 @@
 import Foundation
 
 class ViewAccess: StoreAccess, ObservableObject {
-    private var lock = Lock()
+    private let lock = NSLock()
     private var observations: [ObjectIdentifier: Observation] = [:]
     private(set) var updateCount = 0
     private var shouldResets: Set<ObjectIdentifier> = []
@@ -86,7 +86,7 @@ private final class _ObservedState<StoreModel: ModelContainer, Comparable: Compa
 }
 
 private final class Observation {
-    var lock = Lock()
+    let lock = NSLock()
     var cancel: () -> Void = {}
     var observedStates: [AnyKeyPath: ObservedState] = [:]
     var wasStateOverridden = false

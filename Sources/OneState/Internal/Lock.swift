@@ -6,26 +6,9 @@ extension NSLocking {
     }
 }
 
-struct Lock {
-    private var _lock = os_unfair_lock_s()
-    
-    mutating func lock() {
-        os_unfair_lock_lock(&_lock)
-    }
-
-    mutating func unlock() {
-        os_unfair_lock_unlock(&_lock)
-    }
-    
-    mutating func callAsFunction<T>(_ operation: () throws -> T) rethrows -> T {
-        lock()
-        defer { unlock() }
-        return try operation()
-    }
-}
-
 protocol HoldsLock: AnyObject {
-    var lock: Lock { get set }
+    associatedtype Lock: NSLocking
+    var lock: Lock { get }
 }
 
 @propertyWrapper
@@ -66,7 +49,7 @@ struct Locked<Value> {
 }
 
 final class Protected<Value: Sendable>: @unchecked Sendable {
-    private var lock = Lock()
+    private let lock = NSLock()
     private var _value: Value
 
     init(_ value: Value) {
