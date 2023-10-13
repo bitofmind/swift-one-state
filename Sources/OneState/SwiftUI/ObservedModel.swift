@@ -1,6 +1,7 @@
 #if canImport(SwiftUI)
 import SwiftUI
 import CustomDump
+import XCTestDynamicOverlay
 
 @propertyWrapper
 @dynamicMemberLookup
@@ -75,9 +76,10 @@ public struct UsingModel<M: ModelContainer, Content: View>: View {
 private extension ModelContainer {
     @discardableResult
     func checkedContexts() -> [Context<ModelElement.State>] {
-        models.map { model in
+        models.compactMap { model in
             guard let context = model.modelState?.context as? Context<ModelElement.State> else {
-                fatalError("Model \(type(of: self)) must be created via a @StateModel or the provide initializer taking a ViewStore. This is required for the view models state to be hooked up to view into a store.")
+                XCTFail("Model \(type(of: self)) must be created via a @StateModel or the provide initializer taking a ViewStore. This is required for the view models state to be hooked up to view into a store.")
+                return nil
             }
             return context
         }
