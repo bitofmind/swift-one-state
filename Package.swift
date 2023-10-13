@@ -19,11 +19,11 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-async-algorithms.git", from: "0.1.0"),
-        .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "0.6.0"),
-        .package(url: "https://github.com/pointfreeco/xctest-dynamic-overlay", from: "0.8.0"),
-        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "0.1.0"),
-        .package(url: "https://github.com/pointfreeco/swift-case-paths", from: "0.11.0"),
-        .package(url: "https://github.com/pointfreeco/swift-identified-collections", from: "0.6.0"),
+        .package(url: "https://github.com/pointfreeco/swift-custom-dump", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/xctest-dynamic-overlay", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-dependencies", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-case-paths", from: "1.0.0"),
+        .package(url: "https://github.com/pointfreeco/swift-identified-collections", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-collections", from: "1.0.0"),
     ],
     targets: [
