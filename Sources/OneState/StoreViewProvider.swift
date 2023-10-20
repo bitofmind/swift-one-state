@@ -125,10 +125,10 @@ extension StoreViewProvider {
         return view.context[path: view.path, access: view.access]
     }
 
-    func allChanges() -> CallContextsStream<State> {
+    func allChanges() -> AsyncStream<State> {
         let view = self.storeView
-        return CallContextsStream(view.context.stateUpdates.map { stateChange -> WithCallContexts<State> in
-            WithCallContexts(value: view.nonObservableState, callContexts: stateChange.callContexts)
+        return AsyncStream(view.context.stateUpdates.map { _ in
+            view.nonObservableState
         })
     }
 }

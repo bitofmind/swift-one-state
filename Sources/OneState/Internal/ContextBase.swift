@@ -196,12 +196,6 @@ class ContextBase: HoldsLock, @unchecked Sendable {
 
     func withDependencies<Value>(_ operation: () -> Value) -> Value { fatalError() }
 
-    var callContextEvents: CallContextsStream<ContextBase.EventInfo> {
-        CallContextsStream(events.map {
-            .init(value: $0, callContexts: $0.callContexts)
-        })
-    }
-
     var typeDescription: String { fatalError() }
 }
 

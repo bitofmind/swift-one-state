@@ -102,7 +102,7 @@ public extension Model {
         let containerView = storeView(for: path).wrappedValue
         containerView.observeContainer(ofType: Models.self, atPath: \.self)
 
-        return AsyncStream(storeView.context.callContextEvents.compactMap { e -> (event: Models.ModelElement.Event, model: Models.ModelElement)? in
+        return AsyncStream(storeView.context.events.compactMap { e -> (event: Models.ModelElement.Event, model: Models.ModelElement)? in
             guard let event = e.event as? Models.ModelElement.Event,
                   let containerPath = containerView.context.storePath.appending(path: containerView.path)
             else { return nil }
