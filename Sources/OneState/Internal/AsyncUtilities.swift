@@ -8,10 +8,9 @@ final class AsyncPassthroughSubject<Element>: AsyncSequence, @unchecked Sendable
     init() {}
 
     func yield(_ element: Element) {
-        lock {
-            for cont in continuations.values {
-                cont.yield(element)
-            }
+        let conts = lock { continuations.values }
+        for cont in conts {
+            cont.yield(element)
         }
     }
 
