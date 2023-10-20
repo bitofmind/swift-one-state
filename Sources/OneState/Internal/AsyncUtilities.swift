@@ -31,34 +31,8 @@ final class AsyncPassthroughSubject<Element>: AsyncSequence, @unchecked Sendable
     }
 }
 
-public struct AnyAsyncIterator<Element>: AsyncIteratorProtocol {
-    let nextClosure: () async -> Element?
-
-    init<T: AsyncIteratorProtocol>(_ iterator: T) where T.Element == Element {
-        var iterator = iterator
-        nextClosure = { try? await iterator.next() }
-    }
-
-    public func next() async -> Element? {
-        await nextClosure()
-    }
-}
-
-extension AnyAsyncIterator: @unchecked Sendable where Element: Sendable {}
-
-public struct AnyAsyncSequence<Element>: AsyncSequence {
-    let makeAsyncIteratorClosure: () -> AsyncIterator
-
-    public init<T: AsyncSequence>(_ sequence: T) where T.Element == Element {
-        makeAsyncIteratorClosure = { AnyAsyncIterator(sequence.makeAsyncIterator()) }
-    }
-
-    public func makeAsyncIterator() -> AnyAsyncIterator<Element> {
-        AnyAsyncIterator(makeAsyncIteratorClosure())
-    }
-}
-
-extension AnyAsyncSequence: @unchecked Sendable where Element: Sendable {}
+public typealias AnyAsyncSequence = AsyncStream
+public typealias AnyAsyncIterator<T> = AnyAsyncSequence<T>.AsyncIterator
 
 struct CallContextsIterator<Element>: AsyncIteratorProtocol {
     let nextClosure: () async -> WithCallContexts<Element>?
