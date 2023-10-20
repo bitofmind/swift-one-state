@@ -31,9 +31,6 @@ final class AsyncPassthroughSubject<Element>: AsyncSequence, @unchecked Sendable
     }
 }
 
-public typealias AnyAsyncSequence = AsyncStream
-public typealias AnyAsyncIterator<T> = AnyAsyncSequence<T>.AsyncIterator
-
 struct CallContextsIterator<Element>: AsyncIteratorProtocol {
     let nextClosure: () async -> WithCallContexts<Element>?
 

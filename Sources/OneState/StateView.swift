@@ -1,5 +1,5 @@
 public struct StateView<Value> {
-    let didUpdate: AnyAsyncSequence<Value>
+    let didUpdate: AsyncStream<Value>
     let get: @Sendable () -> Value
     let set: @Sendable (Value) ->()
 
@@ -21,7 +21,7 @@ public extension StateView {
 extension StateView: AsyncSequence {
     public typealias Element = Value
 
-    public func makeAsyncIterator() -> AnyAsyncIterator<Value> {
+    public func makeAsyncIterator() -> AsyncStream<Value>.AsyncIterator {
         didUpdate.makeAsyncIterator()
     }
 }

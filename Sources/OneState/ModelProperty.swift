@@ -46,8 +46,8 @@ extension ModelProperty: Sendable where Value: Sendable {}
 extension ModelProperty: AsyncSequence {
     public typealias Element = Value
 
-    public func makeAsyncIterator() -> AnyAsyncIterator<Value> where Value: Sendable {
-        AnyAsyncSequence(chain([wrappedValue].async, box.subject)).makeAsyncIterator()
+    public func makeAsyncIterator() -> AsyncStream<Value>.AsyncIterator where Value: Sendable {
+        AsyncStream(chain([wrappedValue].async, box.subject)).makeAsyncIterator()
     }
 }
 

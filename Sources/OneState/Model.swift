@@ -307,16 +307,16 @@ public extension Model {
 
 public extension Model {
     /// Returns a sequence of events sent from this model.
-    func events() -> AnyAsyncSequence<Event> {
-        AnyAsyncSequence(context.callContextEvents.compactMap { [context] in
+    func events() -> AsyncStream<Event> {
+        AsyncStream(context.callContextEvents.compactMap { [context] in
             guard let e = $0.event as? Event, $0.context === context else { return nil }
             return e
         })
     }
 
     /// Returns a sequence that emits when events of type `eventType` is sent from this model or any of its descendants.
-    func events<E: Sendable>(ofType eventType: E.Type = E.self) -> AnyAsyncSequence<E> {
-        AnyAsyncSequence(context.callContextEvents.compactMap {
+    func events<E: Sendable>(ofType eventType: E.Type = E.self) -> AsyncStream<E> {
+        AsyncStream(context.callContextEvents.compactMap {
             guard let e = $0.event as? E else { return nil }
             return e
         })
@@ -327,16 +327,16 @@ public extension Model {
     ///     forEach(events(fromType: ChildModel.self)) { event, model in ... }
     ///
     ///     forEach(events()) { (event, _: ChildModel) in ... }
-    func events<M: Model>(fromType modelType: M.Type = M.self) -> AnyAsyncSequence<(event: M.Event, model: M)> {
-        AnyAsyncSequence(context.callContextEvents.compactMap {
+    func events<M: Model>(fromType modelType: M.Type = M.self) -> AsyncStream<(event: M.Event, model: M)> {
+        AsyncStream(context.callContextEvents.compactMap {
             guard let event = $0.event as? M.Event, let context = $0.context as? Context<M.State> else { return nil }
             return (event, M(context: context))
         })
     }
 
     /// Returns a sequence that emits when events of type `eventType` is sent from model or any of its descendants of the type `fromType`.
-    func events<E: Sendable, M: Model>(ofType eventType: E.Type = E.self, fromType modelType: M.Type = M.self) -> AnyAsyncSequence<(event: E, model: M)> {
-        AnyAsyncSequence(context.callContextEvents.compactMap {
+    func events<E: Sendable, M: Model>(ofType eventType: E.Type = E.self, fromType modelType: M.Type = M.self) -> AsyncStream<(event: E, model: M)> {
+        AsyncStream(context.callContextEvents.compactMap {
             guard let event = $0.event as? E, let context = $0.context as? Context<M.State> else { return nil }
             return (event, M(context: context))
         })
@@ -345,16 +345,16 @@ public extension Model {
 
 public extension Model {
     /// Returns a sequence that emits when events equal to the provided `event` is sent from this model.
-    func events(of event: Event) -> AnyAsyncSequence<()> where Event: Equatable&Sendable {
-        AnyAsyncSequence(context.callContextEvents.compactMap { [context] in
+    func events(of event: Event) -> AsyncStream<()> where Event: Equatable&Sendable {
+        AsyncStream(context.callContextEvents.compactMap { [context] in
             guard let e = $0.event as? Event, e == event, $0.context === context else { return nil }
             return ()
         })
     }
 
     /// Returns a sequence that emits when events equal to the provided `event` is sent from this model or any of its descendants.
-    func events<E: Equatable&Sendable>(of event: E) -> AnyAsyncSequence<()> {
-        AnyAsyncSequence(context.callContextEvents.compactMap {
+    func events<E: Equatable&Sendable>(of event: E) -> AsyncStream<()> {
+        AsyncStream(context.callContextEvents.compactMap {
             guard let e = $0.event as? E, e == event else { return nil }
             return ()
         })
@@ -365,16 +365,16 @@ public extension Model {
     ///     forEach(events(of: .someEvent, fromType: ChildModel.self)) { model in ... }
     ///
     ///     forEach(events(of: .someEvent)) { (_: ChildModel) in ... }
-    func events<M: Model>(of event: M.Event, fromType modelType: M.Type = M.self) -> AnyAsyncSequence<M> where M.Event: Equatable&Sendable {
-        AnyAsyncSequence(context.callContextEvents.compactMap {
+    func events<M: Model>(of event: M.Event, fromType modelType: M.Type = M.self) -> AsyncStream<M> where M.Event: Equatable&Sendable {
+        AsyncStream(context.callContextEvents.compactMap {
             guard let e = $0.event as? M.Event, e == event, let context = $0.context as? Context<M.State> else { return nil }
             return M(context: context)
         })
     }
 
     /// Returns a sequence that emits when events equal to the provided `event` is sent from this model or any of its descendants of type `fromType`.
-    func events<E: Equatable&Sendable, M: Model>(of event: E, fromType modelType: M.Type = M.self) -> AnyAsyncSequence<M> {
-        AnyAsyncSequence(context.callContextEvents.compactMap {
+    func events<E: Equatable&Sendable, M: Model>(of event: E, fromType modelType: M.Type = M.self) -> AsyncStream<M> {
+        AsyncStream(context.callContextEvents.compactMap {
             guard let e = $0.event as? E, e == event, let context = $0.context as? Context<M.State> else { return nil }
             return M(context: context)
         })
@@ -382,11 +382,11 @@ public extension Model {
 }
 
 public extension Model {
-    func changes<T: Equatable&Sendable>(of path: KeyPath<State, T>) -> AnyAsyncSequence<T> {
+    func changes<T: Equatable&Sendable>(of path: KeyPath<State, T>) -> AsyncStream<T> {
         storeView(for: path).changes
     }
 
-    func values<T: Equatable&Sendable>(of path: KeyPath<State, T>) -> AnyAsyncSequence<T> {
+    func values<T: Equatable&Sendable>(of path: KeyPath<State, T>) -> AsyncStream<T> {
         storeView(for: path).values
     }
 

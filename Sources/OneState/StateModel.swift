@@ -98,11 +98,11 @@ public extension StoreViewProvider where Access == Write {
 }
 
 public extension Model {
-    func events<Models: ModelContainer>(from path: WritableKeyPath<State, StateModel<Models>>) -> AnyAsyncSequence<(event: Models.ModelElement.Event, model: Models.ModelElement)> where Models.ModelElement.Event: Sendable {
+    func events<Models: ModelContainer>(from path: WritableKeyPath<State, StateModel<Models>>) -> AsyncStream<(event: Models.ModelElement.Event, model: Models.ModelElement)> where Models.ModelElement.Event: Sendable {
         let containerView = storeView(for: path).wrappedValue
         containerView.observeContainer(ofType: Models.self, atPath: \.self)
 
-        return AnyAsyncSequence(storeView.context.callContextEvents.compactMap { e -> (event: Models.ModelElement.Event, model: Models.ModelElement)? in
+        return AsyncStream(storeView.context.callContextEvents.compactMap { e -> (event: Models.ModelElement.Event, model: Models.ModelElement)? in
             guard let event = e.event as? Models.ModelElement.Event,
                   let containerPath = containerView.context.storePath.appending(path: containerView.path)
             else { return nil }
@@ -120,39 +120,39 @@ public extension Model {
         })
     }
 
-    func events<Models: ModelContainer>(of event: Models.ModelElement.Event, from path: WritableKeyPath<State, StateModel<Models>>) -> AnyAsyncSequence<Models.ModelElement> where Models.ModelElement.Event: Sendable&Equatable {
-        AnyAsyncSequence(events(from: path).compactMap {
+    func events<Models: ModelContainer>(of event: Models.ModelElement.Event, from path: WritableKeyPath<State, StateModel<Models>>) -> AsyncStream<Models.ModelElement> where Models.ModelElement.Event: Sendable&Equatable {
+        AsyncStream(events(from: path).compactMap {
             $0.event == event ? $0.model : nil
         })
     }
 
-    func events<M: Model>(from path: WritableKeyPath<State, StateModel<M>>) -> AnyAsyncSequence<M.Event> {
+    func events<M: Model>(from path: WritableKeyPath<State, StateModel<M>>) -> AsyncStream<M.Event> {
         let events = M(storeView(for: path).wrappedValue).context.events
-        return AnyAsyncSequence(events.compactMap {
+        return AsyncStream(events.compactMap {
             guard let e = $0.event as? M.Event else { return nil }
             return e
         })
     }
 
-    func events<M: Model>(from path: WritableKeyPath<State, StateModel<M>>) -> AnyAsyncSequence<M.Event> where M.State: Identifiable {
+    func events<M: Model>(from path: WritableKeyPath<State, StateModel<M>>) -> AsyncStream<M.Event> where M.State: Identifiable {
         let events = M(storeView(for: path).wrappedValue).context.events
-        return AnyAsyncSequence(events.compactMap {
+        return AsyncStream(events.compactMap {
             guard let e = $0.event as? M.Event else { return nil }
             return e
         })
     }
 
-    func events<M: Model>(of event: M.Event, from path: WritableKeyPath<State, StateModel<M>>) -> AnyAsyncSequence<()> where M.Event: Equatable&Sendable {
+    func events<M: Model>(of event: M.Event, from path: WritableKeyPath<State, StateModel<M>>) -> AsyncStream<()> where M.Event: Equatable&Sendable {
         let events = M(storeView(for: path).wrappedValue).context.events
-        return AnyAsyncSequence(events.compactMap {
+        return AsyncStream(events.compactMap {
             guard let e = $0.event as? M.Event, e == event else { return nil }
             return ()
         })
     }
 
-    func events<M: Model>(of event: M.Event, from path: WritableKeyPath<State, StateModel<M>>) -> AnyAsyncSequence<()> where M.Event: Equatable&Sendable&Identifiable {
+    func events<M: Model>(of event: M.Event, from path: WritableKeyPath<State, StateModel<M>>) -> AsyncStream<()> where M.Event: Equatable&Sendable&Identifiable {
         let events = M(storeView(for: path).wrappedValue).context.events
-        return AnyAsyncSequence(events.compactMap {
+        return AsyncStream(events.compactMap {
             guard let e = $0.event as? M.Event, e == event else { return nil }
             return ()
         })

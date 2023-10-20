@@ -21,7 +21,7 @@ public protocol StoreViewProvider<State, Access> {
 }
 
 public extension StoreViewProvider {
-    var stateDidUpdate: AnyAsyncSequence<()> {
+    var stateDidUpdate: AsyncStream<()> {
         let context = self.storeView.context
         return .init(context.stateUpdates.filter { update in
             !update.isOverrideUpdate
@@ -32,26 +32,26 @@ public extension StoreViewProvider {
 }
 
 public extension StoreViewProvider where State: Sendable {
-    func changes(isSame: @escaping @Sendable (State, State) -> Bool) -> AnyAsyncSequence<State> {
-        AnyAsyncSequence(values(isSame: isSame).dropFirst())
+    func changes(isSame: @escaping @Sendable (State, State) -> Bool) -> AsyncStream<State> {
+        AsyncStream(values(isSame: isSame).dropFirst())
     }
 
-    func values(isSame: @escaping @Sendable (State, State) -> Bool) -> AnyAsyncSequence<State> {
+    func values(isSame: @escaping @Sendable (State, State) -> Bool) -> AsyncStream<State> {
         let state = AsyncStream<State> { c in
             c.yield(nonObservableState)
             c.finish()
         }
         let changes = allChanges()
-        return AnyAsyncSequence(chain(state, changes).removeDuplicates(by: isSame))
+        return AsyncStream(chain(state, changes).removeDuplicates(by: isSame))
     }
 }
 
 public extension StoreViewProvider where State: Equatable&Sendable {
-    var changes: AnyAsyncSequence<State> {
+    var changes: AsyncStream<State> {
         changes(isSame: { $0 == $1 })
     }
 
-    var values: AnyAsyncSequence<State> {
+    var values: AsyncStream<State> {
         values(isSame: { $0 == $1 })
     }
 }
