@@ -37,12 +37,26 @@ public extension StoreViewProvider where State: Sendable {
     }
 
     func values(isSame: @escaping @Sendable (State, State) -> Bool) -> AsyncStream<State> {
-        let state = AsyncStream<State> { c in
-            c.yield(nonObservableState)
-            c.finish()
+        let view = self.storeView
+        return AsyncStream<State> { c in
+            let value = nonObservableState
+            c.yield(value)
+
+            let task = Task {
+                var prevValue = value
+                for await _ in view.context.stateUpdates {
+                    let value = nonObservableState
+                    if !isSame(prevValue, value) {
+                        c.yield(value)
+                        prevValue = value
+                    }
+                }
+            }
+
+            c.onTermination = { _ in
+                task.cancel()
+            }
         }
-        let changes = allChanges()
-        return AsyncStream(chain(state, changes).removeDuplicates(by: isSame))
     }
 }
 
