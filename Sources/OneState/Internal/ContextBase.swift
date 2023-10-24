@@ -2,7 +2,7 @@ import Foundation
 import Dependencies
 
 class ContextBase: HoldsLock, @unchecked Sendable {
-    let lock = NSLock()
+    let lock = NSRecursiveLock()
     private(set) weak var parent: ContextBase?
 
     var _children: [AnyKeyPath: ContextBase] = [:]
@@ -10,7 +10,8 @@ class ContextBase: HoldsLock, @unchecked Sendable {
     @Locked var isOverrideContext = false
     @Locked var hasBeenRemoved = false
 
-    let stateUpdates = AsyncPassthroughSubject<StateUpdate>()
+    private let _stateUpdates = AsyncPassthroughSubject<StateUpdate>()
+    var stateUpdates: AsyncStream<StateUpdate> { _stateUpdates.stream() }
 
     struct EventInfo: @unchecked Sendable {
         var event: Any
@@ -18,7 +19,8 @@ class ContextBase: HoldsLock, @unchecked Sendable {
         var context: ContextBase
         var callContexts: [CallContext]
     }
-    let events = AsyncPassthroughSubject<EventInfo>()
+    let _events = AsyncPassthroughSubject<EventInfo>()
+    var events: AsyncStream<EventInfo> { _events.stream() }
 
     var dependencies: [(index: Int, apply: (inout DependencyValues) -> Void)] = []
     @Locked var properties: [Any] = []
@@ -123,7 +125,7 @@ class ContextBase: HoldsLock, @unchecked Sendable {
 
     private func notifyUpdate(_ update: StateUpdate) {
         guard !hasBeenRemoved else { return }
-        stateUpdates.yield(update)
+        _stateUpdates.yield(update)
     }
 
     func notifyAncestors(_ update: StateUpdate) {

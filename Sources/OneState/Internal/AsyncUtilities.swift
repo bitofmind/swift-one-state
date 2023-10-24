@@ -1,7 +1,7 @@
 import Foundation
 
-final class AsyncPassthroughSubject<Element>: AsyncSequence, @unchecked Sendable {
-    private let lock = NSLock()
+final class AsyncPassthroughSubject<Element>: @unchecked Sendable {
+    private let lock = NSRecursiveLock()
     private var continuations: [Int: AsyncStream<Element>.Continuation] = [:]
     private var nextKey = 0
 
@@ -14,20 +14,21 @@ final class AsyncPassthroughSubject<Element>: AsyncSequence, @unchecked Sendable
         }
     }
 
-    func makeAsyncIterator() -> AsyncStream<Element>.Iterator {
-        AsyncStream(Element.self) { continuation in
-            let key: Int = lock {
-                nextKey += 1;
-                continuations[nextKey] = continuation
-                return nextKey
-            }
+    func stream() -> AsyncStream<Element> {
+        lock {
+            let (stream, cont) = AsyncStream<Element>.makeStream()
+            nextKey += 1;
+            let key = nextKey
 
-            continuation.onTermination = { @Sendable _ in
+            continuations[key] = cont
+            cont.onTermination = { @Sendable _ in
                 self.lock {
                     self.continuations[key] = nil
                 }
             }
-        }.makeAsyncIterator()
+
+            return stream
+        }
     }
 }
 

@@ -101,7 +101,7 @@ final class ChildContext<StoreModel: ModelContainer, ContextModel: ModelContaine
 
     override func sendEvent(_ eventInfo: EventInfo, to receivers: EventReceivers) {
         if receivers.contains(.self) {
-            events.yield(eventInfo)
+            _events.yield(eventInfo)
         }
 
         if receivers.contains(.ancestors) {
